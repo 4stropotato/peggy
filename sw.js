@@ -1,9 +1,10 @@
-const CACHE_NAME = 'baby-prep-v1';
+const CACHE_NAME = 'baby-prep-v2';
+const BASE = '/baby-prep-tracker/';
 const PRECACHE = [
-  '/',
-  '/index.html',
-  '/manifest.json',
-  '/icon-192.png'
+  BASE,
+  BASE + 'index.html',
+  BASE + 'manifest.json',
+  BASE + 'icon-192.png'
 ];
 
 self.addEventListener('install', (e) => {
