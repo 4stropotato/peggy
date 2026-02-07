@@ -1,0 +1,22 @@
+{
+  "name": "Baby #2 Prep Tracker",
+  "short_name": "Baby Prep",
+  "description": "Pregnancy tracker for Baby #2 - Ryzen's future sibling",
+  "start_url": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "theme_color": "#0f0f13",
+  "background_color": "#0f0f13",
+  "icons": [
+    {
+      "src": "/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "/icon-192.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}
