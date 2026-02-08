@@ -86,24 +86,24 @@ export default function CloudSyncAgent() {
           try { await clearLocalAppData() } catch {}
         }
 
-        // First-time account linking on this device: keep meaningful local data for this user.
-        if (!activeUser) {
-          const localBackup = await buildBackupObject()
-          if (hasMeaningfulBackupData(localBackup)) {
-            await cloudUploadBackup(localBackup, validated)
-            localStorage.setItem(ACTIVE_USER_KEY, validated.user.id)
-            return
-          }
-        }
-
         try {
           const { backup } = await cloudDownloadBackup(validated)
           if (cancelled) return
           await restoreBackupObject(backup)
         } catch (err) {
           if (!hasCloudBackupError(err)) throw err
-          const localBackup = await buildBackupObject()
-          await cloudUploadBackup(localBackup, validated)
+          if (switchedUser) {
+            // New account on this device with no backup: stay blank.
+            try { await clearLocalAppData() } catch {}
+          } else {
+            // First account link (or same account missing backup): seed cloud from meaningful local data.
+            const localBackup = await buildBackupObject()
+            if (hasMeaningfulBackupData(localBackup)) {
+              await cloudUploadBackup(localBackup, validated)
+            } else {
+              try { await clearLocalAppData() } catch {}
+            }
+          }
         }
 
         if (cancelled) return
