@@ -69,7 +69,8 @@ export function AppProvider({ children }) {
   const [dailySupp, setDailySupp] = useLS('baby-prep-daily', {})
   const [moneyClaimed, setMoneyClaimed] = useLS('baby-prep-money', {})
   const [dueDate, setDueDate] = useLS('baby-prep-due', '2026-10-04')
-  const [theme, setTheme] = useLS('baby-prep-theme', 'dark')
+  const [theme, setTheme] = useLS('baby-prep-theme', 'light')
+  const [iconStyle, setIconStyle] = useLS('baby-prep-icon-style', 'minimal-clean')
   const [salary, setSalary] = useLS('baby-prep-salary', [])
   const [checkups, setCheckups] = useLS('baby-prep-checkups', {})
   const [moods, setMoods] = useLS('baby-prep-moods', [])
@@ -209,7 +210,8 @@ export function AppProvider({ children }) {
     attendance, markAttendance, getAttendance,
     suppSchedule,
     suppLastTaken, suppBottles, resetBottle,
-    theme, toggleTheme
+    theme, toggleTheme,
+    iconStyle, setIconStyle
   }
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>

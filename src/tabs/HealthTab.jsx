@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo } from 'react'
 import { useApp } from '../AppContext'
 import { supplements, checkupSchedule, optimalSchedule } from '../data'
 import Calendar, { isoToDateString } from '../components/Calendar'
+import { APP_ICONS, TokenIcon, UiIcon } from '../uiIcons'
 
 const MOOD_EMOJIS = ['😊', '😐', '😢', '🤢', '😴', '😤', '🥰', '😰']
 
@@ -75,7 +76,7 @@ function SuppCountdownCard({ supp, schedule, isTaken, toggleSupp, undoSupp, rese
   return (
     <li className={`glass-card supp-card ${allDone ? 'supp-done' : ''}`}>
       <div className="supp-card-header">
-        <span className="supp-icon-lg">{supp.icon}</span>
+        <span className="supp-icon-lg"><TokenIcon token={supp.icon} /></span>
         <div className="supp-card-info">
           <div className="supp-card-name">{supp.name}</div>
           <div className="supp-card-why">{supp.why}</div>
@@ -310,7 +311,10 @@ export default function HealthTab() {
       <div className="sub-tabs glass-tabs">
         {['supps', 'work', 'checkups', 'mood'].map(t => (
           <button key={t} className={`glass-tab ${subTab === t ? 'active' : ''}`} onClick={() => setSubTab(t)}>
-            {t === 'supps' ? '💊 Supps' : t === 'work' ? '💼 Work' : t === 'checkups' ? '🏥 Checkups' : '😊 Mood'}
+            <span className="tab-icon-label">
+              <UiIcon icon={t === 'supps' ? APP_ICONS.supplements : t === 'work' ? APP_ICONS.work : t === 'checkups' ? APP_ICONS.checkup : APP_ICONS.tip} />
+              <span>{t === 'supps' ? 'Supps' : t === 'work' ? 'Work' : t === 'checkups' ? 'Checkups' : 'Mood'}</span>
+            </span>
           </button>
         ))}
       </div>
@@ -320,7 +324,7 @@ export default function HealthTab() {
         <>
           <section className="glass-section">
             <div className="section-header">
-              <span className="section-icon">💊</span>
+              <span className="section-icon"><UiIcon icon={APP_ICONS.supplements} /></span>
               <div>
                 <h2>Daily Supplement Tracker</h2>
                 <span className="section-count">{suppTaken}/{suppTotal} complete today</span>
@@ -378,7 +382,7 @@ export default function HealthTab() {
 
           <section className="glass-section">
             <div className="section-header">
-              <span className="section-icon">📋</span>
+              <span className="section-icon"><UiIcon icon={APP_ICONS.tasks} /></span>
               <div><h2>Optimal Schedule (Locked)</h2></div>
             </div>
             <p className="section-note">This is the optimal schedule — follow it para ma-maximize ang absorption!</p>
@@ -386,7 +390,7 @@ export default function HealthTab() {
               {optimalSchedule.map((slot, i) => (
                 <div key={i} className="optimal-slot glass-card">
                   <div className="optimal-slot-header">
-                    <span className="optimal-icon">{slot.icon}</span>
+                    <span className="optimal-icon"><TokenIcon token={slot.icon} /></span>
                     <span className="optimal-time">{slot.time}</span>
                   </div>
                   <div className="optimal-supps">
@@ -402,7 +406,7 @@ export default function HealthTab() {
 
           <section className="glass-section">
             <div className="section-header">
-              <span className="section-icon">⚠️</span>
+              <span className="section-icon"><UiIcon icon={APP_ICONS.warning} /></span>
               <div><h2>Important Rule</h2></div>
             </div>
             <div className="glass-card warn-card">
@@ -421,7 +425,7 @@ export default function HealthTab() {
         <>
           <section className="glass-section">
             <div className="section-header">
-              <span className="section-icon">💼</span>
+              <span className="section-icon"><UiIcon icon={APP_ICONS.work} /></span>
               <div><h2>Naomi's Work Attendance</h2></div>
               <button
                 type="button"
@@ -491,7 +495,7 @@ export default function HealthTab() {
 
           <section className="glass-section">
             <div className="section-header">
-              <span className="section-icon">📊</span>
+              <span className="section-icon"><UiIcon icon={APP_ICONS.overview} /></span>
               <div><h2>Monthly Summary — {viewMonth}</h2></div>
             </div>
             <div className="attendance-stats">
@@ -534,7 +538,7 @@ export default function HealthTab() {
       {subTab === 'checkups' && (
         <section className="glass-section">
           <div className="section-header">
-            <span className="section-icon">🏥</span>
+            <span className="section-icon"><UiIcon icon={APP_ICONS.checkup} /></span>
             <div>
               <h2>Checkup Visits</h2>
               <span className="section-count">
@@ -556,7 +560,7 @@ export default function HealthTab() {
               year={checkCal.y} month={checkCal.m}
               onMonthChange={(y, m) => setCheckCal({ y, m })}
               renderDay={(dateISO) => {
-                if (checkupDates[dateISO]) return <span className="cal-icon">🏥</span>
+                if (checkupDates[dateISO]) return <span className="cal-icon"><UiIcon icon={APP_ICONS.checkup} /></span>
                 return null
               }}
             />
@@ -625,7 +629,7 @@ export default function HealthTab() {
         <>
           <section className="glass-section">
             <div className="section-header">
-              <span className="section-icon">😊</span>
+              <span className="section-icon"><UiIcon icon={APP_ICONS.tip} /></span>
               <div><h2>Mood & Cravings</h2></div>
               <button
                 type="button"
@@ -644,7 +648,11 @@ export default function HealthTab() {
                 renderDay={(dateISO) => {
                   const m = moodByDate[dateISO]
                   if (!m) return null
-                  return <span className="cal-icon cal-mood-icon">{m.mood}</span>
+                  return (
+                    <span className="cal-icon cal-mood-icon">
+                      <TokenIcon token={m.mood} />
+                    </span>
+                  )
                 }}
               />
             )}
@@ -659,7 +667,9 @@ export default function HealthTab() {
                     type="button"
                     className={`mood-emoji glass-inner ${moodForm.mood === e ? 'selected' : ''}`}
                     onClick={() => setMoodForm(p => ({ ...p, mood: e }))}
-                  >{e}</button>
+                  >
+                    <TokenIcon token={e} className="ui-icon mood-option-icon" />
+                  </button>
                 ))}
               </div>
 
@@ -699,7 +709,7 @@ export default function HealthTab() {
           {moods.length > 0 && (
             <section className="glass-section">
               <div className="section-header">
-                <span className="section-icon">📝</span>
+                <span className="section-icon"><UiIcon icon={APP_ICONS.info} /></span>
                 <div>
                   <h2>Mood History</h2>
                   <span className="section-count">{moods.length} entries</span>
@@ -709,7 +719,7 @@ export default function HealthTab() {
                 {moods.slice(0, 20).map(m => (
                   <li key={m.id} className="glass-card mood-entry">
                     <div className="mood-entry-top">
-                      <span className="mood-entry-emoji">{m.mood}</span>
+                      <span className="mood-entry-emoji"><TokenIcon token={m.mood} /></span>
                       <span className="mood-entry-energy">Energy: {m.energy}/5</span>
                       <span className="mood-entry-date">{new Date(m.date).toLocaleDateString()}</span>
                     </div>

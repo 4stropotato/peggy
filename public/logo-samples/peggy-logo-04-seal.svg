@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-labelledby="t d">
+  <title id="t">Peggy Logo 04 Seal</title>
+  <desc id="d">Classic circular seal with Peggy wordmark.</desc>
+  <defs>
+    <radialGradient id="g4" cx="50%" cy="38%" r="65%">
+      <stop offset="0%" stop-color="#ffd3e6"/>
+      <stop offset="100%" stop-color="#f39ac4"/>
+    </radialGradient>
+  </defs>
+  <rect width="512" height="512" rx="120" fill="#fff1f7"/>
+  <circle cx="256" cy="256" r="186" fill="url(#g4)" stroke="#b73f86" stroke-width="10"/>
+  <circle cx="256" cy="256" r="146" fill="none" stroke="#b73f86" stroke-width="4" stroke-dasharray="4 12"/>
+  <text x="256" y="285" text-anchor="middle" font-family="Segoe UI, Arial, sans-serif" font-size="96" font-weight="800" fill="#6b2355">Peggy</text>
+  <path d="M145 330h222" stroke="#6b2355" stroke-width="8" stroke-linecap="round"/>
+</svg>

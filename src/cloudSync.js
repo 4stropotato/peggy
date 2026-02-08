@@ -1,5 +1,6 @@
 const CLOUD_SESSION_KEY = 'baby-prep-cloud-session';
 const CLOUD_SESSION_EVENT = 'peggy-cloud-session-changed';
+const REFRESH_SKEW_SECONDS = 45;
 
 function notifySessionChanged(session) {
   if (typeof window !== 'undefined') {
@@ -72,21 +73,79 @@ async function cloudFetch(path, { method = 'GET', body, headers } = {}, accessTo
   return resp.json();
 }
 
-function normalizeSession(data) {
-  if (!data?.access_token || !data?.user?.id) {
+function nowSeconds() {
+  return Math.floor(Date.now() / 1000);
+}
+
+function normalizeSession(data, fallbackSession = null) {
+  const resolvedUser = data?.user || fallbackSession?.user || null;
+  if (!data?.access_token || !resolvedUser?.id) {
     throw new Error('Missing auth session from Supabase.');
   }
 
-  const nowSec = Math.floor(Date.now() / 1000);
+  const nowSec = nowSeconds();
   return {
     accessToken: data.access_token,
-    refreshToken: data.refresh_token || '',
+    refreshToken: data.refresh_token || fallbackSession?.refreshToken || '',
     expiresAt: nowSec + (Number(data.expires_in) || 3600),
     user: {
-      id: data.user.id,
-      email: data.user.email || ''
+      id: resolvedUser.id,
+      email: resolvedUser.email || ''
     }
   };
+}
+
+function isSessionNearExpiry(session, skewSeconds = REFRESH_SKEW_SECONDS) {
+  if (!session?.expiresAt) return false;
+  return nowSeconds() >= (Number(session.expiresAt) - skewSeconds);
+}
+
+function isAuthError(err) {
+  const msg = String(err?.message || '').toLowerCase();
+  return (
+    msg.includes('jwt') ||
+    msg.includes('token') ||
+    msg.includes('expired') ||
+    msg.includes('unauthorized') ||
+    msg.includes('invalid claim') ||
+    msg.includes('http 401')
+  );
+}
+
+function requireSession(session) {
+  if (!session?.accessToken || !session?.user?.id) {
+    throw new Error('Not signed in.');
+  }
+  return session;
+}
+
+async function cloudRefreshSessionInternal(session) {
+  const current = requireSession(session);
+  if (!current.refreshToken) {
+    throw new Error('Session expired. Please sign in again.');
+  }
+
+  const data = await cloudFetch('/auth/v1/token?grant_type=refresh_token', {
+    method: 'POST',
+    body: { refresh_token: current.refreshToken }
+  });
+
+  return writeSession(normalizeSession(data, current));
+}
+
+async function withSessionRetry(session, action) {
+  let active = requireSession(session);
+  if (isSessionNearExpiry(active) && active.refreshToken) {
+    active = await cloudRefreshSessionInternal(active);
+  }
+
+  try {
+    return { result: await action(active), session: active };
+  } catch (err) {
+    if (!active.refreshToken || !isAuthError(err)) throw err;
+    const refreshed = await cloudRefreshSessionInternal(active);
+    return { result: await action(refreshed), session: refreshed };
+  }
 }
 
 function encodeEqValue(value) {
@@ -154,49 +213,58 @@ export async function cloudSignOut() {
   }
 }
 
+export async function cloudRefreshSession(session = null) {
+  const source = session || readSession();
+  if (!source) throw new Error('Not signed in.');
+  return cloudRefreshSessionInternal(source);
+}
+
 export async function cloudValidateSession(session) {
-  const data = await cloudFetch('/auth/v1/user', { method: 'GET' }, session?.accessToken || '');
+  const { result: data, session: active } = await withSessionRetry(session, async (workingSession) => {
+    return cloudFetch('/auth/v1/user', { method: 'GET' }, workingSession.accessToken);
+  });
+
   return writeSession({
-    ...session,
+    ...active,
     user: {
       id: data.id,
-      email: data.email || ''
+      email: data.email || active.user?.email || ''
     }
   });
 }
 
 export async function cloudUploadBackup(backup, session) {
-  const userId = session?.user?.id;
-  if (!userId) throw new Error('Not signed in.');
+  const { result } = await withSessionRetry(session, async (workingSession) => {
+    const row = [{
+      user_id: workingSession.user.id,
+      payload: backup,
+      updated_at: new Date().toISOString()
+    }];
 
-  const row = [{
-    user_id: userId,
-    payload: backup,
-    updated_at: new Date().toISOString()
-  }];
+    const data = await cloudFetch(
+      '/rest/v1/cloud_backups?on_conflict=user_id',
+      {
+        method: 'POST',
+        headers: { Prefer: 'resolution=merge-duplicates,return=representation' },
+        body: row
+      },
+      workingSession.accessToken
+    );
 
-  const data = await cloudFetch(
-    '/rest/v1/cloud_backups?on_conflict=user_id',
-    {
-      method: 'POST',
-      headers: { Prefer: 'resolution=merge-duplicates,return=representation' },
-      body: row
-    },
-    session.accessToken
-  );
+    return data?.[0] || null;
+  });
 
-  return data?.[0] || null;
+  return result;
 }
 
 export async function cloudDownloadBackup(session) {
-  const userId = session?.user?.id;
-  if (!userId) throw new Error('Not signed in.');
-
-  const data = await cloudFetch(
-    `/rest/v1/cloud_backups?select=payload,updated_at&user_id=eq.${encodeEqValue(userId)}&limit=1`,
-    { method: 'GET' },
-    session.accessToken
-  );
+  const { result: data } = await withSessionRetry(session, async (workingSession) => {
+    return cloudFetch(
+      `/rest/v1/cloud_backups?select=payload,updated_at&user_id=eq.${encodeEqValue(workingSession.user.id)}&limit=1`,
+      { method: 'GET' },
+      workingSession.accessToken
+    );
+  });
 
   if (!Array.isArray(data) || !data.length || !data[0]?.payload) {
     throw new Error('No cloud backup found yet.');

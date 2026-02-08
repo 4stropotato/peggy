@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useApp } from '../AppContext'
 import { moneyTracker } from '../data'
 import { calculateTax } from '../taxCalc'
+import { APP_ICONS, UiIcon } from '../uiIcons'
 
 export default function MoneyTab() {
   const { moneyClaimed, toggleMoney, salary, addSalary, removeSalary, taxInputs, setTaxInputs } = useApp()
@@ -43,7 +44,10 @@ export default function MoneyTab() {
       <div className="sub-tabs glass-tabs">
         {['benefits', 'salary', 'tax'].map(t => (
           <button key={t} className={`glass-tab ${subTab === t ? 'active' : ''}`} onClick={() => setSubTab(t)}>
-            {t === 'benefits' ? '💰 Benefits' : t === 'salary' ? '💵 Salary' : '📊 Tax Calc'}
+            <span className="tab-icon-label">
+              <UiIcon icon={t === 'benefits' ? APP_ICONS.benefits : t === 'salary' ? APP_ICONS.salary : APP_ICONS.tax} />
+              <span>{t === 'benefits' ? 'Benefits' : t === 'salary' ? 'Salary' : 'Tax Calc'}</span>
+            </span>
           </button>
         ))}
       </div>
@@ -52,7 +56,7 @@ export default function MoneyTab() {
         <>
           <section className="glass-section">
             <div className="section-header">
-              <span className="section-icon">💰</span>
+              <span className="section-icon"><UiIcon icon={APP_ICONS.benefits} /></span>
               <div>
                 <h2>Money Tracker</h2>
                 <span className="section-count">
@@ -108,7 +112,7 @@ export default function MoneyTab() {
                           <div className="task-phones">
                             {m.phones.map((p, i) => (
                               <a key={i} href={`tel:${p.number.replace(/-/g, '')}`} className="task-phone-link">
-                                <span className="phone-icon">📞</span>
+                                <span className="phone-icon"><UiIcon icon={APP_ICONS.phone} /></span>
                                 <span className="phone-info">
                                   <span className="phone-label">{p.label}</span>
                                   <span className="phone-number">{p.number}</span>
@@ -134,7 +138,7 @@ export default function MoneyTab() {
 
           <section className="glass-section">
             <div className="section-header">
-              <span className="section-icon">📊</span>
+              <span className="section-icon"><UiIcon icon={APP_ICONS.tax} /></span>
               <div><h2>18-Year Support Ceiling</h2></div>
             </div>
             <div className="ceiling-table">
@@ -151,7 +155,7 @@ export default function MoneyTab() {
       {subTab === 'salary' && (
         <section className="glass-section">
           <div className="section-header">
-            <span className="section-icon">💵</span>
+            <span className="section-icon"><UiIcon icon={APP_ICONS.salary} /></span>
             <div>
               <h2>Naomi's Salary Tracker</h2>
               <span className="section-count">Total: ¥{salaryTotal.toLocaleString()}</span>
@@ -188,7 +192,7 @@ export default function MoneyTab() {
       {subTab === 'tax' && (
         <section className="glass-section">
           <div className="section-header">
-            <span className="section-icon">📊</span>
+            <span className="section-icon"><UiIcon icon={APP_ICONS.tax} /></span>
             <div>
               <h2>Japan Tax Calculator</h2>
               <span className="section-count">Estimate your tax & refund</span>

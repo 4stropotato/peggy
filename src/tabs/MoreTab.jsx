@@ -12,6 +12,7 @@ import {
   isCloudConfigured, getCloudSession, cloudSignUp, cloudSignIn, cloudSignOut,
   cloudValidateSession, cloudUploadBackup, cloudDownloadBackup
 } from '../cloudSync'
+import { APP_ICONS, ExpandIcon, ICON_STYLE_PRESETS, TokenIcon, UiIcon, resolveIconStyle } from '../uiIcons'
 
 const PHOTO_CATEGORIES = ['Ultrasound', 'Documents', 'Receipts', 'Boshi Techo', 'Other']
 
@@ -38,8 +39,14 @@ function InfoPanel({ section }) {
         {governmentSupportInfo.map((phase, pi) => (
           <div key={pi} className="glass-card info-phase">
             <div className="info-phase-header" onClick={() => setExpandedPhase(expandedPhase === pi ? null : pi)}>
-              <span>{phase.icon} {phase.phase}</span>
-              <span className="info-count">{phase.items.length} items {expandedPhase === pi ? '▲' : '▼'}</span>
+              <span className="info-phase-head-main">
+                <TokenIcon token={phase.icon} />
+                <span>{phase.phase}</span>
+              </span>
+              <span className="info-count info-phase-toggle">
+                <span>{phase.items.length} items</span>
+                <ExpandIcon expanded={expandedPhase === pi} />
+              </span>
             </div>
             {expandedPhase === pi && (
               <div className="info-phase-body">
@@ -73,8 +80,11 @@ function InfoPanel({ section }) {
         {budgetTipsInfo.sections.map((sec, si) => (
           <div key={si} className="glass-card info-phase">
             <div className="info-phase-header" onClick={() => setExpandedPhase(expandedPhase === si ? null : si)}>
-              <span>{sec.icon} {sec.title}</span>
-              <span>{expandedPhase === si ? '▲' : '▼'}</span>
+              <span className="info-phase-head-main">
+                <TokenIcon token={sec.icon} />
+                <span>{sec.title}</span>
+              </span>
+              <span className="info-phase-toggle"><ExpandIcon expanded={expandedPhase === si} /></span>
             </div>
             {expandedPhase === si && (
               <div className="info-phase-body">
@@ -99,8 +109,11 @@ function InfoPanel({ section }) {
         {healthTipsInfo.sections.map((sec, si) => (
           <div key={si} className="glass-card info-phase">
             <div className="info-phase-header" onClick={() => setExpandedPhase(expandedPhase === si ? null : si)}>
-              <span>{sec.icon} {sec.title}</span>
-              <span>{expandedPhase === si ? '▲' : '▼'}</span>
+              <span className="info-phase-head-main">
+                <TokenIcon token={sec.icon} />
+                <span>{sec.title}</span>
+              </span>
+              <span className="info-phase-toggle"><ExpandIcon expanded={expandedPhase === si} /></span>
             </div>
             {expandedPhase === si && (
               <div className="info-phase-body">
@@ -127,8 +140,11 @@ function InfoPanel({ section }) {
         {supplementsDetailInfo.sections.map((sec, si) => (
           <div key={si} className="glass-card info-phase">
             <div className="info-phase-header" onClick={() => setExpandedPhase(expandedPhase === si ? null : si)}>
-              <span>{sec.icon} {sec.name}</span>
-              <span>{expandedPhase === si ? '▲' : '▼'}</span>
+              <span className="info-phase-head-main">
+                <TokenIcon token={sec.icon} />
+                <span>{sec.name}</span>
+              </span>
+              <span className="info-phase-toggle"><ExpandIcon expanded={expandedPhase === si} /></span>
             </div>
             {expandedPhase === si && (
               <div className="info-phase-body">
@@ -160,8 +176,11 @@ function InfoPanel({ section }) {
 
         <div className="glass-card info-phase">
           <div className="info-phase-header" onClick={() => setExpandedPhase(expandedPhase === 'schedule' ? null : 'schedule')}>
-            <span>⏰ Daily Schedule</span>
-            <span>{expandedPhase === 'schedule' ? '▲' : '▼'}</span>
+            <span className="info-phase-head-main">
+              <TokenIcon token="⏰" />
+              <span>Daily Schedule</span>
+            </span>
+            <span className="info-phase-toggle"><ExpandIcon expanded={expandedPhase === 'schedule'} /></span>
           </div>
           {expandedPhase === 'schedule' && (
             <div className="info-phase-body">
@@ -181,8 +200,11 @@ function InfoPanel({ section }) {
 
         <div className="glass-card info-phase">
           <div className="info-phase-header" onClick={() => setExpandedPhase(expandedPhase === 'tips' ? null : 'tips')}>
-            <span>💡 iHerb Tips & What NOT to Buy</span>
-            <span>{expandedPhase === 'tips' ? '▲' : '▼'}</span>
+            <span className="info-phase-head-main">
+              <TokenIcon token="💡" />
+              <span>iHerb Tips & What NOT to Buy</span>
+            </span>
+            <span className="info-phase-toggle"><ExpandIcon expanded={expandedPhase === 'tips'} /></span>
           </div>
           {expandedPhase === 'tips' && (
             <div className="info-phase-body">
@@ -229,7 +251,7 @@ function InfoPanel({ section }) {
                 <span className="name-kanji">{n.kanji}</span>
                 {n.tier === 1 && <span className="tier-badge">Top Pick</span>}
               </span>
-              <span>{expandedItem === `name-${ni}` ? '▲' : '▼'}</span>
+              <span className="info-phase-toggle"><ExpandIcon expanded={expandedItem === `name-${ni}`} /></span>
             </div>
             {expandedItem === `name-${ni}` && (
               <div className="info-phase-body">
@@ -260,8 +282,11 @@ function InfoPanel({ section }) {
 
         <div className="glass-card info-phase">
           <div className="info-phase-header" onClick={() => setExpandedItem(expandedItem === 'pnotes' ? null : 'pnotes')}>
-            <span>📝 Practical Notes</span>
-            <span>{expandedItem === 'pnotes' ? '▲' : '▼'}</span>
+            <span className="info-phase-head-main">
+              <TokenIcon token="📝" />
+              <span>Practical Notes</span>
+            </span>
+            <span className="info-phase-toggle"><ExpandIcon expanded={expandedItem === 'pnotes'} /></span>
           </div>
           {expandedItem === 'pnotes' && (
             <div className="info-phase-body">
@@ -304,8 +329,11 @@ function InfoPanel({ section }) {
 
         <div className="glass-card info-phase">
           <div className="info-phase-header" onClick={() => setExpandedPhase(expandedPhase === 'danchi' ? null : 'danchi')}>
-            <span>🏠 Danchi / Public Housing Tips</span>
-            <span>{expandedPhase === 'danchi' ? '▲' : '▼'}</span>
+            <span className="info-phase-head-main">
+              <TokenIcon token="🏠" />
+              <span>Danchi / Public Housing Tips</span>
+            </span>
+            <span className="info-phase-toggle"><ExpandIcon expanded={expandedPhase === 'danchi'} /></span>
           </div>
           {expandedPhase === 'danchi' && (
             <div className="info-phase-body">
@@ -333,7 +361,10 @@ function InfoPanel({ section }) {
           <div key={ci} className="glass-card info-phase">
             <div className="info-phase-header" onClick={() => setExpandedPhase(expandedPhase === ci ? null : ci)}>
               <span>{cat.title}</span>
-              <span className="info-item-value">{cat.total}</span>
+              <span className="info-item-value info-phase-toggle">
+                <span>{cat.total}</span>
+                <ExpandIcon expanded={expandedPhase === ci} />
+              </span>
             </div>
             {expandedPhase === ci && (
               <div className="info-phase-body">
@@ -365,7 +396,10 @@ function InfoPanel({ section }) {
 }
 
 export default function MoreTab() {
-  const { doctor, setDoctor, contacts, addContact, removeContact, updateContact } = useApp()
+  const {
+    doctor, setDoctor, contacts, addContact, removeContact, updateContact,
+    iconStyle, setIconStyle,
+  } = useApp()
   const [subTab, setSubTab] = useState('info')
   const [infoSection, setInfoSection] = useState('gov')
   const [photoCategory, setPhotoCategory] = useState('Ultrasound')
@@ -383,6 +417,7 @@ export default function MoreTab() {
   const fileRef = useRef()
   const restoreRef = useRef()
   const cloudEnabled = isCloudConfigured()
+  const activeIconStyle = resolveIconStyle(iconStyle)
 
   useEffect(() => {
     if (subTab === 'photos') loadPhotos()
@@ -404,7 +439,22 @@ export default function MoreTab() {
 
     cloudValidateSession(session)
       .then(validated => setCloudSession(validated))
-      .catch(() => setCloudSession(null))
+      .catch((err) => {
+        const msg = String(err?.message || '').toLowerCase()
+        const authError = (
+          msg.includes('jwt') ||
+          msg.includes('token') ||
+          msg.includes('expired') ||
+          msg.includes('unauthorized') ||
+          msg.includes('http 401')
+        )
+        if (authError) {
+          setCloudSession(null)
+          return
+        }
+        // Keep current session for transient network/deploy-time glitches.
+        setCloudSession(session)
+      })
   }, [cloudEnabled])
 
   const loadPhotos = async () => {
@@ -582,7 +632,10 @@ export default function MoreTab() {
       <div className="sub-tabs glass-tabs">
         {['info', 'photos', 'doctor', 'contacts', 'backup'].map(t => (
           <button key={t} className={`glass-tab ${subTab === t ? 'active' : ''}`} onClick={() => setSubTab(t)}>
-            {t === 'info' ? '📖 Info' : t === 'photos' ? '📷 Photos' : t === 'doctor' ? '👨‍⚕️ Doctor' : t === 'contacts' ? '📞 Contacts' : '💾 Backup'}
+            <span className="tab-icon-label">
+              <UiIcon icon={t === 'info' ? APP_ICONS.info : t === 'photos' ? APP_ICONS.photos : t === 'doctor' ? APP_ICONS.doctor : t === 'contacts' ? APP_ICONS.contacts : APP_ICONS.backup} />
+              <span>{t === 'info' ? 'Info' : t === 'photos' ? 'Photos' : t === 'doctor' ? 'Doctor' : t === 'contacts' ? 'Contacts' : 'Backup'}</span>
+            </span>
           </button>
         ))}
       </div>
@@ -590,7 +643,7 @@ export default function MoreTab() {
       {subTab === 'info' && (
         <section className="glass-section">
           <div className="section-header">
-            <span className="section-icon">📖</span>
+            <span className="section-icon"><UiIcon icon={APP_ICONS.info} /></span>
             <div>
               <h2>Knowledge Base</h2>
               <span className="section-count">All info from all guides</span>
@@ -605,7 +658,7 @@ export default function MoreTab() {
                 className={`info-nav-btn glass-inner ${infoSection === s.id ? 'active' : ''}`}
                 onClick={() => setInfoSection(s.id)}
               >
-                <span className="info-nav-icon">{s.icon}</span>
+                <span className="info-nav-icon"><TokenIcon token={s.icon} /></span>
                 <span className="info-nav-label">{s.label}</span>
               </button>
             ))}
@@ -618,7 +671,7 @@ export default function MoreTab() {
       {subTab === 'photos' && (
         <section className="glass-section">
           <div className="section-header">
-            <span className="section-icon">📷</span>
+            <span className="section-icon"><UiIcon icon={APP_ICONS.photos} /></span>
             <div>
               <h2>Photo Gallery</h2>
               <span className="section-count">{photos.length} photos</span>
@@ -677,7 +730,7 @@ export default function MoreTab() {
       {subTab === 'doctor' && (
         <section className="glass-section">
           <div className="section-header">
-            <span className="section-icon">👨‍⚕️</span>
+            <span className="section-icon"><UiIcon icon={APP_ICONS.doctor} /></span>
             <div><h2>Doctor / Hospital Info</h2></div>
           </div>
           <p className="section-note">Save your OB-GYN and hospital details for quick access.</p>
@@ -708,7 +761,7 @@ export default function MoreTab() {
       {subTab === 'contacts' && (
         <section className="glass-section">
           <div className="section-header">
-            <span className="section-icon">📞</span>
+            <span className="section-icon"><UiIcon icon={APP_ICONS.contacts} /></span>
             <div>
               <h2>Emergency Contacts</h2>
               <span className="section-count">{contacts.length} contacts</span>
@@ -737,7 +790,7 @@ export default function MoreTab() {
                       {c.phone && <div className="contact-phone">{c.phone}</div>}
                     </div>
                     <div className="contact-actions">
-                      {c.phone && <a href={`tel:${c.phone}`} className="btn-call">📞</a>}
+                      {c.phone && <a href={`tel:${c.phone}`} className="btn-call"><UiIcon icon={APP_ICONS.contacts} /></a>}
                       <button className="btn-delete-sm" onClick={() => removeContact(c.id)}>×</button>
                     </div>
                   </div>
@@ -759,7 +812,7 @@ export default function MoreTab() {
       {subTab === 'backup' && (
         <section className="glass-section">
           <div className="section-header">
-            <span className="section-icon">💾</span>
+            <span className="section-icon"><UiIcon icon={APP_ICONS.backup} /></span>
             <div><h2>Data Backup & Restore</h2></div>
           </div>
 
@@ -767,6 +820,24 @@ export default function MoreTab() {
             <p className="section-note">
               Your data is stored in localStorage + IndexedDB. Para safe talaga, mag-backup ka regularly!
             </p>
+
+            <div className="glass-card backup-card design-card">
+              <h3>UI Icon Style (Local Preview)</h3>
+              <p className="section-note">Choose the icon design you like. Saved on this device only.</p>
+              <div className="design-picker">
+                {ICON_STYLE_PRESETS.map(preset => (
+                  <button
+                    key={preset.id}
+                    type="button"
+                    className={`design-choice glass-inner ${activeIconStyle === preset.id ? 'active' : ''}`}
+                    onClick={() => setIconStyle(preset.id)}
+                  >
+                    <span className="design-choice-title">{preset.label}</span>
+                    <span className="design-choice-desc">{preset.description}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
 
             <div className="backup-actions">
               <div className="glass-card backup-card">

@@ -49,6 +49,69 @@ function toDoseDateKey(now) {
   return now.toDateString()
 }
 
+function ensureSentence(text) {
+  const safe = String(text || '').trim()
+  if (!safe) return ''
+  return /[.!?]$/.test(safe) ? safe : `${safe}.`
+}
+
+function expandStringArrayByFour(list, variantTails) {
+  const source = Array.isArray(list) ? list.filter(Boolean) : []
+  if (source.length === 0) return []
+  const tails = Array.isArray(variantTails) && variantTails.length >= 3
+    ? variantTails.slice(0, 3)
+    : ['Rotation variant A.', 'Rotation variant B.', 'Rotation variant C.']
+
+  return source.flatMap(item => {
+    const base = String(item).trim()
+    if (!base) return []
+    const sentence = ensureSentence(base)
+    return [
+      base,
+      `${sentence} ${tails[0]}`,
+      `${sentence} ${tails[1]}`,
+      `${sentence} ${tails[2]}`,
+    ]
+  })
+}
+
+function expandLevelMapByFour(levelMap, variantTails) {
+  const out = {}
+  for (const [level, list] of Object.entries(levelMap || {})) {
+    out[level] = expandStringArrayByFour(list, variantTails)
+  }
+  return out
+}
+
+function expandNestedLevelMapByFour(styleMap, variantTails) {
+  const out = {}
+  for (const [style, levelMap] of Object.entries(styleMap || {})) {
+    out[style] = expandLevelMapByFour(levelMap, variantTails)
+  }
+  return out
+}
+
+function expandTipArrayByFour(list, variantTails) {
+  const source = Array.isArray(list) ? list.filter(Boolean) : []
+  if (source.length === 0) return []
+  const tails = Array.isArray(variantTails) && variantTails.length >= 3
+    ? variantTails.slice(0, 3)
+    : ['Keep this in your notes.', 'Action step: do one tiny step now.', 'Review this in your next checkup.']
+
+  return source.flatMap(item => {
+    const category = String(item?.category || 'General').trim() || 'General'
+    const text = String(item?.text || '').trim()
+    if (!text) return []
+    const sentence = ensureSentence(text)
+    return [
+      { category, text },
+      { category, text: `${sentence} ${tails[0]}` },
+      { category, text: `${sentence} ${tails[1]}` },
+      { category, text: `${sentence} ${tails[2]}` },
+    ]
+  })
+}
+
 const LANGUAGE_STYLE_WEIGHTS = [
   { id: 'taglish', weight: 40 },
   { id: 'english_tagalog', weight: 16 },
@@ -527,6 +590,60 @@ const WITTY_TIP_DATABASE = [
   { category: 'Witty', text: 'If you forgot a dose, no guilt spiral. Reset quickly and continue the mission.' },
 ]
 
+const SUPP_TITLE_POOL = expandLevelMapByFour(SUPP_TITLE_DATABASE, [
+  'Quick-win edition.',
+  'Streak-protect mode.',
+  'Consistency compounding mode.',
+])
+
+const SUPP_STYLE_POOL = expandNestedLevelMapByFour(SUPP_STYLE_LINES, [
+  'One step now, less stress later.',
+  'Momentum beats overthinking.',
+  'Small action, strong outcome.',
+])
+
+const SUPP_PUSH_POOL = expandLevelMapByFour(SUPP_PUSH_LINES, [
+  'You only need one tap to restart momentum.',
+  'Protect the evening by acting now.',
+  'Future-you gets calmer with this done.',
+])
+
+const SUPP_JOKE_POOL = expandLevelMapByFour(SUPP_JOKE_LINES, [
+  'Comedy bonus unlocked for doing it now.',
+  'Tiny quest, big victory screen.',
+  'Mission control says this is worth it.',
+])
+
+const WORK_TITLE_POOL = expandLevelMapByFour(WORK_TITLE_DATABASE, [
+  'Fast-log edition.',
+  'No-backfill mode.',
+  'Memory-friendly pass.',
+])
+
+const WORK_STYLE_POOL = expandNestedLevelMapByFour(WORK_STYLE_LINES, [
+  'Fast tap, clean timeline.',
+  'Close this loop before it grows.',
+  'Tiny admin now saves future effort.',
+])
+
+const WORK_JOKE_POOL = expandLevelMapByFour(WORK_JOKE_LINES, [
+  'Paperwork goblins lose this round.',
+  'Admin quest XP +1.',
+  'Tomorrow-you sends thanks.',
+])
+
+const SERIOUS_TIP_POOL = expandTipArrayByFour(SERIOUS_TIP_DATABASE, [
+  'Clinical mindset: consistency matters.',
+  'Action step: set one concrete reminder today.',
+  'Note this for your next provider conversation.',
+])
+
+const WITTY_TIP_POOL = expandTipArrayByFour(WITTY_TIP_DATABASE, [
+  'Comedy aside, this one really helps.',
+  'Tiny move now beats panic later.',
+  'Make it easy: one action right now.',
+])
+
 export function getSupplementReminderContext({ dailySupp, suppSchedule, now = new Date() }) {
   const dateKey = toIsoDate(now)
   const doseDateKey = toDoseDateKey(now)
@@ -624,14 +741,15 @@ function buildReminderSubtitle({
 
 export function buildSupplementReminder(ctx, now = new Date(), seedSalt = 'home') {
   const level = resolveSuppLevel(ctx, now)
-  const intervalMinutes = level === 'urgent' ? 20 : level === 'nudge' ? 45 : 90
+  const intervalMinutes = level === 'urgent' ? 12 : level === 'nudge' ? 25 : 45
   const slot = Math.floor(minutesSinceMidnight(now) / intervalMinutes)
   const seedRoot = `${seedSalt}|supp|${ctx.dateKey}|${ctx.remainingDoses}|${ctx.overdueDoses}|${slot}|${level}`
   const style = weightedPick(LANGUAGE_STYLE_WEIGHTS, `${seedRoot}|style`) || 'taglish'
-  const title = pickBySeed(SUPP_TITLE_DATABASE[level], `${seedRoot}|title`)
-  const styleLine = pickBySeed(SUPP_STYLE_LINES[style][level], `${seedRoot}|line`)
-  const pushLine = pickBySeed(SUPP_PUSH_LINES[level], `${seedRoot}|push`)
-  const jokeLine = pickBySeed(SUPP_JOKE_LINES[level], `${seedRoot}|joke`)
+  const styleMap = SUPP_STYLE_POOL[style] || SUPP_STYLE_POOL.taglish
+  const title = pickBySeed(SUPP_TITLE_POOL[level], `${seedRoot}|title`)
+  const styleLine = pickBySeed(styleMap[level], `${seedRoot}|line`)
+  const pushLine = pickBySeed(SUPP_PUSH_POOL[level], `${seedRoot}|push`)
+  const jokeLine = pickBySeed(SUPP_JOKE_POOL[level], `${seedRoot}|joke`)
   const subtitle = buildReminderSubtitle({
     taken: ctx.takenDoses,
     total: ctx.totalDoses,
@@ -658,13 +776,14 @@ export function buildSupplementReminder(ctx, now = new Date(), seedSalt = 'home'
 
 export function buildWorkReminder(ctx, now = new Date(), seedSalt = 'home') {
   const level = resolveWorkLevel(ctx)
-  const intervalMinutes = level === 'urgent' ? 30 : level === 'nudge' ? 60 : 120
+  const intervalMinutes = level === 'urgent' ? 20 : level === 'nudge' ? 40 : 80
   const slot = Math.floor(minutesSinceMidnight(now) / intervalMinutes)
   const seedRoot = `${seedSalt}|work|${ctx.dateKey}|${ctx.hour}|${slot}|${level}`
   const style = weightedPick(LANGUAGE_STYLE_WEIGHTS, `${seedRoot}|style`) || 'taglish'
-  const title = pickBySeed(WORK_TITLE_DATABASE[level], `${seedRoot}|title`)
-  const styleLine = pickBySeed(WORK_STYLE_LINES[style][level], `${seedRoot}|line`)
-  const jokeLine = pickBySeed(WORK_JOKE_LINES[level], `${seedRoot}|joke`)
+  const styleMap = WORK_STYLE_POOL[style] || WORK_STYLE_POOL.taglish
+  const title = pickBySeed(WORK_TITLE_POOL[level], `${seedRoot}|title`)
+  const styleLine = pickBySeed(styleMap[level], `${seedRoot}|line`)
+  const jokeLine = pickBySeed(WORK_JOKE_POOL[level], `${seedRoot}|joke`)
   const subtitle = `${styleLine} ${jokeLine}`.trim()
 
   return {
@@ -686,7 +805,7 @@ export function buildDailyTip({ now = new Date(), weeksPregnant = null, complete
   const seedRoot = `${dateKey}|${slot}|${weeksPregnant ?? 'na'}|${completedCheckups}|${suppCtx?.remainingDoses ?? 0}|${suppCtx?.overdueDoses ?? 0}`
   const roll = hashString(`${seedRoot}|tone`) % 100
   const useWitty = roll < 18
-  const pool = useWitty ? WITTY_TIP_DATABASE : SERIOUS_TIP_DATABASE
+  const pool = useWitty ? WITTY_TIP_POOL : SERIOUS_TIP_POOL
   const tip = pickBySeed(pool, `${seedRoot}|tip`)
 
   return {
@@ -726,9 +845,54 @@ const NAME_JOKE_LINES = [
   'This name passed the playground shout test.',
 ]
 
+const NAME_STYLE_POOL = expandStringArrayByFour(NAME_STYLE_LINES, [
+  'Rotating mode keeps discovery active.',
+  'Same quality picks, fresher rhythm.',
+  'Variety pass enabled for today.',
+])
+
+const NAME_JOKE_POOL = expandStringArrayByFour(NAME_JOKE_LINES, [
+  'Name lab status: productive.',
+  'Another contender just got promoted.',
+  'Shortlist energy remains elite.',
+])
+
+const COMPANION_SUBTITLE_TEMPLATES = [
+  'Pregnancy Planning, Made Simple for @placeholder',
+  'Daily Pregnancy Guide for @placeholder',
+  'Track Pregnancy, Stay Prepared for @placeholder',
+  'Pregnancy Clarity, Every Day for @placeholder',
+  'A Simple Pregnancy Plan for @placeholder',
+]
+
+function extractBabyName(entry) {
+  if (!entry) return ''
+  if (typeof entry === 'string') return entry.trim()
+  return String(entry?.name || '').trim()
+}
+
+export function buildCompanionSubtitleRotation({ now = new Date(), babyNamesInfo, seedSalt = 'home' }) {
+  const slot = Math.floor(now.getTime() / 30000) // rotate every 30 seconds
+  const dateKey = toIsoDate(now)
+  const boy = Array.isArray(babyNamesInfo?.boyNames) ? babyNamesInfo.boyNames : []
+  const girl = Array.isArray(babyNamesInfo?.girlNames) ? babyNamesInfo.girlNames : []
+  const allNames = [...boy, ...girl].filter(name => extractBabyName(name))
+
+  const phrase = pickBySeed(COMPANION_SUBTITLE_TEMPLATES, `${seedSalt}|subtitle|${slot}|phrase`)
+    || 'Pregnancy Planning, Made Simple for @placeholder'
+  const nameEntry = pickBySeed(allNames, `${seedSalt}|subtitle|${slot}|name`)
+  const babyName = extractBabyName(nameEntry) || 'Baby'
+
+  return {
+    text: phrase.replace('@placeholder', babyName),
+    babyName,
+    slotKey: `${dateKey}|subtitle|${slot}`,
+  }
+}
+
 export function buildNameSpotlight({ now = new Date(), babyNamesInfo, seedSalt = 'home' }) {
   const dateKey = toIsoDate(now)
-  const halfDaySlot = Math.floor(minutesSinceMidnight(now) / 360)
+  const nameSlot = Math.floor(minutesSinceMidnight(now) / 240)
   const gender = (hashString(`${seedSalt}|${dateKey}|gender`) % 2 === 0) ? 'boy' : 'girl'
   const list = gender === 'boy' ? (babyNamesInfo?.boyNames || []) : (babyNamesInfo?.girlNames || [])
   const topPicks = list.filter(n => n?.tier === 1)
@@ -736,12 +900,12 @@ export function buildNameSpotlight({ now = new Date(), babyNamesInfo, seedSalt =
 
   const pinned = pickUniqueBySeed(
     topPicks.length >= 3 ? topPicks : allNames,
-    `${seedSalt}|${dateKey}|pinned`,
+    `${seedSalt}|${dateKey}|${nameSlot}|pinned`,
     Math.min(3, allNames.length),
   )
   const rotating = pickUniqueBySeed(
     allNames,
-    `${seedSalt}|${dateKey}|${halfDaySlot}|rotating`,
+    `${seedSalt}|${dateKey}|${nameSlot}|rotating`,
     1,
   )[0] || pinned[0] || null
 
@@ -751,9 +915,9 @@ export function buildNameSpotlight({ now = new Date(), babyNamesInfo, seedSalt =
     meaning: 'Pioneer with calm strength',
     tier: 1,
   }
-  const companion = pinned[0] || rotating || fallback
-  const styleLine = pickBySeed(NAME_STYLE_LINES, `${seedSalt}|${dateKey}|${halfDaySlot}|style`)
-  const jokeLine = pickBySeed(NAME_JOKE_LINES, `${seedSalt}|${dateKey}|${halfDaySlot}|joke`)
+  const companion = rotating || pinned[0] || fallback
+  const styleLine = pickBySeed(NAME_STYLE_POOL, `${seedSalt}|${dateKey}|${nameSlot}|style`)
+  const jokeLine = pickBySeed(NAME_JOKE_POOL, `${seedSalt}|${dateKey}|${nameSlot}|joke`)
 
   return {
     dateKey,
@@ -765,7 +929,7 @@ export function buildNameSpotlight({ now = new Date(), babyNamesInfo, seedSalt =
     pinnedTopPicks: pinned,
     spotlightLine: styleLine,
     jokeLine,
-    slotKey: `${dateKey}|name|${halfDaySlot}|${gender}`,
+    slotKey: `${dateKey}|name|${nameSlot}|${gender}`,
     notificationTitle: `New name spotlight: ${rotating?.name || companion.name}`,
     notificationBody: `${(rotating?.kanji || companion.kanji || '').trim()} ${rotating?.meaning || companion.meaning || ''}`.trim(),
   }

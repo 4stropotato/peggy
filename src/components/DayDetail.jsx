@@ -1,6 +1,7 @@
 import { useMemo } from 'react'
 import { supplements, checkupSchedule } from '../data'
 import { isoToDateString } from './Calendar'
+import { APP_ICONS, TokenIcon, UiIcon } from '../uiIcons'
 
 export default function DayDetail({ dateISO, onClose, dailySupp, suppSchedule, attendance, checkups, moods }) {
   if (!dateISO) return null
@@ -58,13 +59,13 @@ export default function DayDetail({ dateISO, onClose, dailySupp, suppSchedule, a
         {/* Supplements */}
         <div className="day-detail-group">
           <div className="day-detail-group-header">
-            <span>💊</span>
+            <UiIcon icon={APP_ICONS.supplements} />
             <span>Supplements ({suppTaken}/{suppTotal})</span>
           </div>
           <div className="day-detail-supp-list">
             {suppStatus.map(s => (
               <div key={s.id} className="day-detail-supp">
-                <span className="day-detail-supp-icon">{s.icon}</span>
+                <span className="day-detail-supp-icon"><TokenIcon token={s.icon} /></span>
                 <span className="day-detail-supp-name">{s.name}</span>
                 <span className="day-detail-supp-doses">
                   {s.doses.map((d, i) => (
@@ -81,7 +82,7 @@ export default function DayDetail({ dateISO, onClose, dailySupp, suppSchedule, a
         {/* Work */}
         <div className="day-detail-group">
           <div className="day-detail-group-header">
-            <span>💼</span>
+            <UiIcon icon={APP_ICONS.work} />
             <span>Work</span>
           </div>
           {att ? (
@@ -98,7 +99,7 @@ export default function DayDetail({ dateISO, onClose, dailySupp, suppSchedule, a
         {checkup && (
           <div className="day-detail-group">
             <div className="day-detail-group-header">
-              <span>🏥</span>
+              <UiIcon icon={APP_ICONS.checkup} />
               <span>Checkup Visit {checkup.visit.visit}</span>
             </div>
             <div className="day-detail-checkup">
@@ -115,11 +116,11 @@ export default function DayDetail({ dateISO, onClose, dailySupp, suppSchedule, a
         {mood && (
           <div className="day-detail-group">
             <div className="day-detail-group-header">
-              <span>😊</span>
+              <UiIcon icon={APP_ICONS.tip} />
               <span>Mood</span>
             </div>
             <div className="day-detail-mood">
-              <span className="day-detail-mood-emoji">{mood.mood}</span>
+              <span className="day-detail-mood-emoji"><TokenIcon token={mood.mood} /></span>
               <span>Energy: {mood.energy}/5</span>
               {mood.cravings && <div className="day-detail-craving">Craving: {mood.cravings}</div>}
               {mood.notes && <div className="day-detail-notes">{mood.notes}</div>}

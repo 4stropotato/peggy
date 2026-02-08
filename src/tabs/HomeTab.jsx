@@ -4,7 +4,9 @@ import { phases, supplements, moneyTracker, checkupSchedule } from '../data'
 import { babyNamesInfo } from '../infoData'
 import Calendar, { isoToDateString } from '../components/Calendar'
 import DayDetail from '../components/DayDetail'
+import { APP_ICONS, TokenIcon, UiIcon } from '../uiIcons'
 import {
+  buildCompanionSubtitleRotation,
   buildDailyTip,
   buildNameSpotlight,
   buildSupplementReminder,
@@ -82,7 +84,7 @@ export default function HomeTab() {
   const [notifStatus, setNotifStatus] = useState('')
 
   useEffect(() => {
-    const id = setInterval(() => setNowTick(Date.now()), 60 * 1000)
+    const id = setInterval(() => setNowTick(Date.now()), 30 * 1000)
     return () => clearInterval(id)
   }, [])
 
@@ -169,6 +171,10 @@ export default function HomeTab() {
     () => buildNameSpotlight({ now, babyNamesInfo, seedSalt: 'home' }),
     [nowTick],
   )
+  const companionSubtitle = useMemo(
+    () => buildCompanionSubtitleRotation({ now, babyNamesInfo, seedSalt: 'home' }),
+    [nowTick],
+  )
 
   const dailyTip = useMemo(
     () => buildDailyTip({
@@ -216,34 +222,51 @@ export default function HomeTab() {
   return (
     <div className="content">
       <header className="home-header">
-        <h1>Peggy</h1>
-        <p className="subtitle dynamic-companion">
-          Your Pregnancy Companion ({nameSpotlight.companionName})
-          {nameSpotlight.companionKanji ? <span className="subtitle-kanji"> {nameSpotlight.companionKanji}</span> : null}
-        </p>
-        {dueDate && daysUntilDue > 0 && !showDueInput && (
-          <div className="due-badge glass-inner" onClick={() => setShowDueInput(true)}>
-            {daysUntilDue} days to go {weeksPregnant !== null && `(Week ${weeksPregnant})`}
+        <div className="home-header-surface">
+          <div className="home-header-top">
+            <div className="home-header-brand">
+              <h1>Peggy</h1>
+              <p key={companionSubtitle.slotKey} className="subtitle dynamic-companion subtitle-no-card">
+                {companionSubtitle.text}
+              </p>
+            </div>
+            {dueDate && !showDueInput && (
+              <button
+                type="button"
+                className={`due-badge glass-inner ${daysUntilDue !== null && daysUntilDue <= 0 ? 'due-now' : ''}`}
+                onClick={() => setShowDueInput(true)}
+              >
+                {daysUntilDue !== null && daysUntilDue > 0 ? (
+                  <>
+                    <span className="due-badge-label">Due Countdown</span>
+                    <span className="due-badge-value">{daysUntilDue} days</span>
+                    {weeksPregnant !== null && <span className="due-badge-meta">Week {weeksPregnant}</span>}
+                  </>
+                ) : (
+                  <>
+                    <span className="due-badge-label">Delivery Window</span>
+                    <span className="due-badge-value">Any day now</span>
+                    <span className="due-badge-meta">Tap to update due date</span>
+                  </>
+                )}
+              </button>
+            )}
           </div>
-        )}
-        {dueDate && daysUntilDue !== null && daysUntilDue <= 0 && !showDueInput && (
-          <div className="due-badge due-now glass-inner" onClick={() => setShowDueInput(true)}>
-            Baby is here (or any day now!)
-          </div>
-        )}
-        {(!dueDate || showDueInput) && (
-          <div className="due-input">
-            <label>Due date: </label>
-            <input
-              type="date"
-              value={dueDate}
-              onChange={e => {
-                setDueDate(e.target.value)
-                setShowDueInput(false)
-              }}
-            />
-          </div>
-        )}
+          {(!dueDate || showDueInput) && (
+            <div className="due-input">
+              <label htmlFor="due-date-input">Due date</label>
+              <input
+                id="due-date-input"
+                type="date"
+                value={dueDate}
+                onChange={e => {
+                  setDueDate(e.target.value)
+                  setShowDueInput(false)
+                }}
+              />
+            </div>
+          )}
+        </div>
       </header>
 
       <div className="stats">
@@ -267,7 +290,7 @@ export default function HomeTab() {
       {(suppReminder || workReminder) && (
         <section className="glass-section reminder-section">
           <div className="section-header">
-            <span className="section-icon">🔔</span>
+            <span className="section-icon"><UiIcon icon={APP_ICONS.reminders} /></span>
             <div><h2>Reminders for Today</h2></div>
             <button
               type="button"
@@ -281,7 +304,7 @@ export default function HomeTab() {
           <div className="reminder-cards">
             {suppReminder && (
               <div className={`reminder-card glass-inner reminder-supps level-${suppReminder.level}`}>
-                <span className="reminder-icon">💊</span>
+                <span className="reminder-icon"><UiIcon icon={APP_ICONS.supplements} /></span>
                 <div className="reminder-content">
                   <div className="reminder-title">{suppReminder.title}</div>
                   <div className="reminder-subtitle">{suppReminder.subtitle}</div>
@@ -290,7 +313,7 @@ export default function HomeTab() {
             )}
             {workReminder && (
               <div className={`reminder-card glass-inner reminder-work level-${workReminder.level}`}>
-                <span className="reminder-icon">💼</span>
+                <span className="reminder-icon"><UiIcon icon={APP_ICONS.work} /></span>
                 <div className="reminder-content">
                   <div className="reminder-title">{workReminder.title}</div>
                   <div className="reminder-subtitle">{workReminder.subtitle}</div>
@@ -303,7 +326,7 @@ export default function HomeTab() {
 
       <section className="glass-section name-spotlight-card">
         <div className="section-header">
-          <span className="section-icon">🌟</span>
+          <span className="section-icon"><UiIcon icon={APP_ICONS.names} /></span>
           <div>
             <h2>Name Spotlight</h2>
             <span className="section-count">{nameSpotlight.gender === 'boy' ? 'Boy names' : 'Girl names'} - updates every few hours</span>
@@ -365,7 +388,11 @@ export default function HomeTab() {
             <div className="ring-detail">Trimester {weeksPregnant < 13 ? '1' : weeksPregnant < 27 ? '2' : '3'}</div>
             <div className="ring-detail">Checkups: {completedCheckups}/14</div>
             {latestMood && (
-              <div className="ring-detail">Mood: {latestMood.mood} {latestMood.energy && `Energy: ${latestMood.energy}/5`}</div>
+              <div className="ring-detail ring-mood-detail">
+                <span>Mood:</span>
+                <span className="ring-mood-icon"><TokenIcon token={latestMood.mood} /></span>
+                <span>{latestMood.energy && `Energy: ${latestMood.energy}/5`}</span>
+              </div>
             )}
           </div>
         </section>
@@ -373,7 +400,7 @@ export default function HomeTab() {
 
       <section className="glass-section">
         <div className="section-header">
-          <span className="section-icon">📅</span>
+          <span className="section-icon"><UiIcon icon={APP_ICONS.activity} /></span>
           <div><h2>All Activity</h2></div>
         </div>
         <Calendar
@@ -421,7 +448,7 @@ export default function HomeTab() {
       {nextCheckup && (
         <section className="glass-section">
           <div className="section-header">
-            <span className="section-icon">🏥</span>
+            <span className="section-icon"><UiIcon icon={APP_ICONS.checkup} /></span>
             <div>
               <h2>Next Checkup</h2>
               <span className="section-count">Visit {nextCheckup.visit} - Week {nextCheckup.weekRange}</span>
@@ -433,8 +460,15 @@ export default function HomeTab() {
 
       <section className="glass-section tip-card">
         <div className="section-header">
-          <span className="section-icon">💡</span>
+          <span className="section-icon"><UiIcon icon={APP_ICONS.tip} /></span>
           <div><h2>Daily Tip</h2></div>
+          <button
+            type="button"
+            className={`notif-toggle-btn glass-inner ${notifEnabled ? 'on' : ''}`}
+            onClick={handleNotifToggle}
+          >
+            {notifEnabled ? 'Notifications ON' : 'Enable Notifications'}
+          </button>
         </div>
         <div className={`tip-mode ${dailyTip.tone}`}>{dailyTip.modeLabel} - {dailyTip.category}</div>
         <p className="tip-text">{dailyTip.text}</p>
@@ -442,27 +476,27 @@ export default function HomeTab() {
 
       <section className="glass-section">
         <div className="section-header">
-          <span className="section-icon">📊</span>
+          <span className="section-icon"><UiIcon icon={APP_ICONS.overview} /></span>
           <div><h2>Quick Overview</h2></div>
         </div>
         <div className="quick-stats">
           <div className="quick-stat glass-inner">
-            <span className="qs-icon">📋</span>
+            <span className="qs-icon"><UiIcon icon={APP_ICONS.tasks} /></span>
             <span className="qs-label">Tasks</span>
             <span className="qs-value">{doneItems}/{totalItems}</span>
           </div>
           <div className="quick-stat glass-inner">
-            <span className="qs-icon">💰</span>
+            <span className="qs-icon"><UiIcon icon={APP_ICONS.benefits} /></span>
             <span className="qs-label">Benefits</span>
             <span className="qs-value">¥{claimedMoney.toLocaleString()}</span>
           </div>
           <div className="quick-stat glass-inner">
-            <span className="qs-icon">🏥</span>
+            <span className="qs-icon"><UiIcon icon={APP_ICONS.checkup} /></span>
             <span className="qs-label">Checkups</span>
             <span className="qs-value">{completedCheckups}/14</span>
           </div>
           <div className="quick-stat glass-inner">
-            <span className="qs-icon">💊</span>
+            <span className="qs-icon"><UiIcon icon={APP_ICONS.supplements} /></span>
             <span className="qs-label">Supps Today</span>
             <span className="qs-value">{suppTaken}/{suppTotal}</span>
           </div>

@@ -1,4 +1,4 @@
-const CACHE_NAME = 'baby-prep-v3';
+const CACHE_NAME = 'baby-prep-v5';
 const BASE = '/peggy/';
 const PRECACHE = [
   BASE,
