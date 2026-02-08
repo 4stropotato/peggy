@@ -1806,6 +1806,7 @@ input[type="range"]:focus {
   --text2: #8a5070;
   --pink: #d63384;
   --purple: #8b5cf6;
+  --gold: #b42370;
 }
 .app.light body,
 .app.light {
@@ -1860,8 +1861,11 @@ input[type="range"]:focus {
   background: rgba(255, 245, 248, 0.95);
 }
 .app.light .warn-card {
-  background: rgba(253, 203, 110, 0.12);
-  border-color: rgba(253, 203, 110, 0.25);
+  background: rgba(214, 51, 132, 0.1);
+  border-color: rgba(214, 51, 132, 0.25);
+}
+.app.light .detail-tip {
+  background: rgba(214, 51, 132, 0.1);
 }
 .app.light .checkbox {
   border-color: #b0708a;
@@ -1870,23 +1874,6 @@ input[type="range"]:focus {
   background: var(--green);
   border-color: var(--green);
   color: white;
-}
-.app.light .section-note.disclaimer,
-.app.light .money-card-top .money-amount,
-.app.light .money-amount,
-.app.light .detail-tip .detail-label,
-.app.light .detail-tip .detail-text,
-.app.light .ceil-row span:last-child,
-.app.light .dose-countdown.soon,
-.app.light .supp-card-note,
-.app.light .warn-card p,
-.app.light .mood-entry-craving,
-.app.light .info-item-value,
-.app.light .salary-amount,
-.app.light .sched-row.warn .sched-items,
-.app.light .supp-warning-info,
-.app.light .day-detail-craving {
-  color: #8a4f05;
 }
 
 /* ===== Theme Toggle Button ===== */
