@@ -483,7 +483,8 @@ export default function MoreTab() {
     try {
       setCloudBusy(true)
       setCloudStatus('Creating account...')
-      const result = await cloudSignUp(cloudEmail.trim(), cloudPassword)
+      const redirectTo = `${window.location.origin}${window.location.pathname}`
+      const result = await cloudSignUp(cloudEmail.trim(), cloudPassword, redirectTo)
       setCloudSession(result.session || null)
       setCloudStatus(result.message)
     } catch (err) {

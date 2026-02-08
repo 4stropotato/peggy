@@ -11,6 +11,6 @@ createRoot(document.getElementById('root')).render(
 
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
-    navigator.serviceWorker.register('/baby-prep-tracker/sw.js').catch(() => {})
+    navigator.serviceWorker.register('/peggy/sw.js').catch(() => {})
   })
 }

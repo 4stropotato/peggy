@@ -2,19 +2,19 @@
   "name": "Peggy",
   "short_name": "Peggy",
   "description": "Peggy - your pregnancy companion.",
-  "start_url": "/baby-prep-tracker/",
+  "start_url": "/peggy/",
   "display": "standalone",
   "orientation": "portrait",
   "theme_color": "#0f0f13",
   "background_color": "#0f0f13",
   "icons": [
     {
-      "src": "/baby-prep-tracker/icon-192.png",
+      "src": "/peggy/icon-192.png",
       "sizes": "192x192",
       "type": "image/png"
     },
     {
-      "src": "/baby-prep-tracker/icon-192.png",
+      "src": "/peggy/icon-192.png",
       "sizes": "512x512",
       "type": "image/png"
     }
