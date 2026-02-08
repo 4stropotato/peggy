@@ -5,6 +5,7 @@ import TasksTab from './tabs/TasksTab'
 import MoneyTab from './tabs/MoneyTab'
 import HealthTab from './tabs/HealthTab'
 import MoreTab from './tabs/MoreTab'
+import CloudSyncAgent from './components/CloudSyncAgent'
 import './App.css'
 
 const TABS = [
@@ -51,6 +52,7 @@ function AppInner() {
 export default function App() {
   return (
     <AppProvider>
+      <CloudSyncAgent />
       <AppInner />
     </AppProvider>
   )

@@ -5,12 +5,14 @@ import { supplements, OPTIMAL_SUPP_SCHEDULE } from './data'
 const AppContext = createContext()
 
 function useLS(key, initial) {
+  const initialRef = useRef(initial)
   const [value, setValue] = useState(() => {
     try {
       const saved = localStorage.getItem(key)
       return saved ? JSON.parse(saved) : initial
     } catch { return initial }
   })
+  const hasMountedRef = useRef(false)
 
   // Try to recover from IndexedDB if localStorage was cleared
   useEffect(() => {
@@ -30,8 +32,30 @@ function useLS(key, initial) {
   }, [key])
 
   useEffect(() => {
+    if (typeof window === 'undefined') return undefined
+
+    const syncFromStorage = () => {
+      try {
+        const raw = localStorage.getItem(key)
+        setValue(raw ? JSON.parse(raw) : initialRef.current)
+      } catch {
+        setValue(initialRef.current)
+      }
+    }
+
+    window.addEventListener('peggy-backup-restored', syncFromStorage)
+    return () => window.removeEventListener('peggy-backup-restored', syncFromStorage)
+  }, [key])
+
+  useEffect(() => {
     localStorage.setItem(key, JSON.stringify(value))
     saveState(key, value)
+    const isSyncApplying = typeof window !== 'undefined' && window.__peggySyncApplying
+    if (hasMountedRef.current && typeof window !== 'undefined' && !isSyncApplying) {
+      window.dispatchEvent(new CustomEvent('peggy-local-changed', { detail: { key } }))
+    } else {
+      hasMountedRef.current = true
+    }
   }, [key, value])
 
   return [value, setValue]
@@ -44,17 +68,13 @@ export function AppProvider({ children }) {
   const [checked, setChecked] = useLS('baby-prep-checked', {})
   const [dailySupp, setDailySupp] = useLS('baby-prep-daily', {})
   const [moneyClaimed, setMoneyClaimed] = useLS('baby-prep-money', {})
-  const [dueDate, setDueDate] = useLS('baby-prep-due', '2026-10-04')
+  const [dueDate, setDueDate] = useLS('baby-prep-due', '')
   const [theme, setTheme] = useLS('baby-prep-theme', 'dark')
   const [salary, setSalary] = useLS('baby-prep-salary', [])
   const [checkups, setCheckups] = useLS('baby-prep-checkups', {})
   const [moods, setMoods] = useLS('baby-prep-moods', [])
   const [doctor, setDoctor] = useLS('baby-prep-doctor', { name: '', hospital: '', phone: '', address: '', notes: '' })
-  const [contacts, setContacts] = useLS('baby-prep-contacts', [
-    { id: '1', name: 'Naomi', phone: '', relationship: 'Wife / Mommy' },
-    { id: '2', name: 'Shinji', phone: '', relationship: 'Husband / Dada' },
-    { id: '3', name: 'Tom', phone: '', relationship: 'Ate / Sister' },
-  ])
+  const [contacts, setContacts] = useLS('baby-prep-contacts', [])
   const [taxInputs, setTaxInputs] = useLS('baby-prep-tax', {
     annualIncome: '',
     spouseIncome: '',
@@ -76,10 +96,6 @@ export function AppProvider({ children }) {
   const suppToggleGuard = useRef(new Set())
 
   // Auto-set due date if empty (Naomi: 5w6d on Feb 7, 2026 → EDD Oct 4, 2026)
-  useEffect(() => {
-    if (!dueDate) setDueDate('2026-10-04')
-  }, [])
-
   const toggle = (id) => setChecked(prev => ({ ...prev, [id]: !prev[id] }))
 
   const toggleSupp = (id, doseIndex = 0) => {

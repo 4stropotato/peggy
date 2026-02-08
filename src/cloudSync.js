@@ -1,4 +1,11 @@
 const CLOUD_SESSION_KEY = 'baby-prep-cloud-session';
+const CLOUD_SESSION_EVENT = 'peggy-cloud-session-changed';
+
+function notifySessionChanged(session) {
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent(CLOUD_SESSION_EVENT, { detail: { session: session || null } }));
+  }
+}
 
 function getCloudConfig() {
   const url = String(import.meta.env.VITE_SUPABASE_URL || '').trim();
@@ -24,6 +31,7 @@ function readSession() {
 
 function writeSession(session) {
   localStorage.setItem(CLOUD_SESSION_KEY, JSON.stringify(session));
+  notifySessionChanged(session);
   return session;
 }
 
@@ -95,6 +103,7 @@ export function getCloudSession() {
 
 export function clearCloudSession() {
   localStorage.removeItem(CLOUD_SESSION_KEY);
+  notifySessionChanged(null);
 }
 
 export async function cloudSignUp(email, password, redirectTo = '') {

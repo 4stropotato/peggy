@@ -389,6 +389,15 @@ export default function MoreTab() {
   }, [photoCategory, subTab])
 
   useEffect(() => {
+    if (typeof window === 'undefined') return undefined
+    const onCloudSessionChanged = (event) => {
+      setCloudSession(event?.detail?.session || null)
+    }
+    window.addEventListener('peggy-cloud-session-changed', onCloudSessionChanged)
+    return () => window.removeEventListener('peggy-cloud-session-changed', onCloudSessionChanged)
+  }, [])
+
+  useEffect(() => {
     if (!cloudEnabled) return
     const session = getCloudSession()
     if (!session) return
@@ -463,7 +472,7 @@ export default function MoreTab() {
     try {
       setBackupStatus('Restoring...')
       const result = await importBackup(file)
-      setBackupStatus(`Restored! ${result.items} data items + ${result.photos} photos. Reload the app to see changes.`)
+      setBackupStatus(`Restored! ${result.items} data items + ${result.photos} photos.`)
     } catch (err) {
       setBackupStatus('Restore failed: ' + err.message)
     }
@@ -509,7 +518,7 @@ export default function MoreTab() {
       setCloudStatus('Signing in...')
       const session = await cloudSignIn(cloudEmail.trim(), cloudPassword)
       setCloudSession(session)
-      setCloudStatus(`Signed in as ${session.user.email || session.user.id}`)
+      setCloudStatus(`Signed in as ${session.user.email || session.user.id}. Syncing account data...`)
     } catch (err) {
       setCloudStatus('Sign in failed: ' + err.message)
     } finally {
@@ -560,7 +569,7 @@ export default function MoreTab() {
       setCloudStatus('Downloading cloud backup...')
       const { backup } = await cloudDownloadBackup(cloudSession)
       const result = await restoreBackupObject(backup)
-      setCloudStatus(`Cloud restore complete: ${result.items} items + ${result.photos} photos. Reload app to see changes.`)
+      setCloudStatus(`Cloud restore complete: ${result.items} items + ${result.photos} photos.`)
     } catch (err) {
       setCloudStatus('Cloud download failed: ' + err.message)
     } finally {
@@ -777,7 +786,7 @@ export default function MoreTab() {
                   <p className="section-note">Not configured yet. Add `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` in `app/.env.local`.</p>
                 ) : (
                   <>
-                    <p className="section-note">Local-first pa rin. Cloud sync is optional and per-account.</p>
+                    <p className="section-note">Auto-sync is enabled per account. On sign in, your cloud data is applied automatically.</p>
                     {cloudSession ? (
                       <p className="cloud-user">Signed in: {cloudSession.user.email || cloudSession.user.id}</p>
                     ) : (
@@ -811,8 +820,8 @@ export default function MoreTab() {
 
                     {cloudSession && (
                       <div className="backup-cloud-actions">
-                        <button className="btn-glass-primary" onClick={handleCloudUpload} disabled={cloudBusy}>Upload to Cloud</button>
-                        <button className="btn-glass-secondary" onClick={handleCloudDownload} disabled={cloudBusy}>Download from Cloud</button>
+                        <button className="btn-glass-primary" onClick={handleCloudUpload} disabled={cloudBusy}>Force Upload</button>
+                        <button className="btn-glass-secondary" onClick={handleCloudDownload} disabled={cloudBusy}>Force Download</button>
                         <button className="btn-glass-secondary" onClick={handleCloudSignOut} disabled={cloudBusy}>Sign Out</button>
                       </div>
                     )}

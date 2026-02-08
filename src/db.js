@@ -2,6 +2,39 @@ const DB_NAME = 'baby-prep-photos';
 const DB_VERSION = 2;
 const PHOTO_STORE = 'photos';
 const STATE_STORE = 'appState';
+const STORAGE_PREFIX = 'baby-prep-';
+const RESERVED_STORAGE_KEYS = new Set(['baby-prep-cloud-session']);
+
+function isAppStorageKey(key) {
+  return Boolean(key && key.startsWith(STORAGE_PREFIX) && !RESERVED_STORAGE_KEYS.has(key));
+}
+
+function listAppStorageKeys() {
+  const keys = [];
+  for (let i = 0; i < localStorage.length; i++) {
+    const key = localStorage.key(i);
+    if (isAppStorageKey(key)) keys.push(key);
+  }
+  return keys;
+}
+
+function setSyncApplying(flag) {
+  if (typeof window !== 'undefined') {
+    window.__peggySyncApplying = Boolean(flag);
+  }
+}
+
+function notifyBackupRestored() {
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent('peggy-backup-restored'));
+  }
+}
+
+function notifyPhotoChanged() {
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent('peggy-photo-changed'));
+  }
+}
 
 function openDB() {
   return new Promise((resolve, reject) => {
@@ -61,7 +94,10 @@ export async function savePhoto(category, file) {
   return new Promise((resolve, reject) => {
     const t = db.transaction(PHOTO_STORE, 'readwrite');
     t.objectStore(PHOTO_STORE).put(photo);
-    t.oncomplete = () => resolve(photo);
+    t.oncomplete = () => {
+      notifyPhotoChanged();
+      resolve(photo);
+    };
     t.onerror = () => reject(t.error);
   });
 }
@@ -83,7 +119,10 @@ export async function deletePhoto(id) {
   return new Promise((resolve, reject) => {
     const t = db.transaction(PHOTO_STORE, 'readwrite');
     t.objectStore(PHOTO_STORE).delete(id);
-    t.oncomplete = () => resolve();
+    t.oncomplete = () => {
+      notifyPhotoChanged();
+      resolve();
+    };
     t.onerror = () => reject(t.error);
   });
 }
@@ -132,16 +171,39 @@ export async function getAllState() {
   } catch { return {}; }
 }
 
+async function clearObjectStore(storeName) {
+  const db = await openDB();
+  return new Promise((resolve, reject) => {
+    const t = db.transaction(storeName, 'readwrite');
+    t.objectStore(storeName).clear();
+    t.oncomplete = () => resolve();
+    t.onerror = () => reject(t.error);
+  });
+}
+
+export async function clearLocalAppData() {
+  setSyncApplying(true);
+  try {
+    for (const key of listAppStorageKeys()) {
+      localStorage.removeItem(key);
+    }
+
+    await clearObjectStore(STATE_STORE);
+    await clearObjectStore(PHOTO_STORE);
+    notifyBackupRestored();
+    notifyPhotoChanged();
+  } finally {
+    setSyncApplying(false);
+  }
+}
+
 // ===== Backup & Restore =====
 
 function collectAppDataFromLocalStorage() {
   const lsData = {};
-  for (let i = 0; i < localStorage.length; i++) {
-    const key = localStorage.key(i);
-    if (key.startsWith('baby-prep-')) {
-      try { lsData[key] = JSON.parse(localStorage.getItem(key)); }
-      catch { lsData[key] = localStorage.getItem(key); }
-    }
+  for (const key of listAppStorageKeys()) {
+    try { lsData[key] = JSON.parse(localStorage.getItem(key)); }
+    catch { lsData[key] = localStorage.getItem(key); }
   }
   return lsData;
 }
@@ -176,31 +238,41 @@ export async function restoreBackupObject(backup) {
     throw new Error('Invalid backup data');
   }
 
-  // Restore localStorage
-  for (const [key, value] of Object.entries(backup.appData)) {
-    localStorage.setItem(key, JSON.stringify(value));
-  }
-
-  // Restore IndexedDB state mirror
-  for (const [key, value] of Object.entries(backup.appData)) {
-    await saveState(key, value);
-  }
-
-  // Restore photos
-  const photos = Array.isArray(backup.photos) ? backup.photos : [];
-  if (photos.length) {
-    const db = await openDB();
-    for (const photo of photos) {
-      await new Promise((res, rej) => {
-        const t = db.transaction(PHOTO_STORE, 'readwrite');
-        t.objectStore(PHOTO_STORE).put(photo);
-        t.oncomplete = () => res();
-        t.onerror = () => rej(t.error);
-      });
+  setSyncApplying(true);
+  try {
+    // Clear current app-scoped data first so account switching does not keep stale values.
+    for (const key of listAppStorageKeys()) {
+      localStorage.removeItem(key);
     }
-  }
+    await clearObjectStore(STATE_STORE);
 
-  return { items: Object.keys(backup.appData).length, photos: photos.length };
+    // Restore localStorage + IndexedDB state mirror
+    for (const [key, value] of Object.entries(backup.appData)) {
+      localStorage.setItem(key, JSON.stringify(value));
+      await saveState(key, value);
+    }
+
+    // Replace photos fully to avoid mixing photos from different accounts.
+    await clearObjectStore(PHOTO_STORE);
+    const photos = Array.isArray(backup.photos) ? backup.photos : [];
+    if (photos.length) {
+      const db = await openDB();
+      for (const photo of photos) {
+        await new Promise((res, rej) => {
+          const t = db.transaction(PHOTO_STORE, 'readwrite');
+          t.objectStore(PHOTO_STORE).put(photo);
+          t.oncomplete = () => res();
+          t.onerror = () => rej(t.error);
+        });
+      }
+    }
+
+    notifyBackupRestored();
+    notifyPhotoChanged();
+    return { items: Object.keys(backup.appData).length, photos: photos.length };
+  } finally {
+    setSyncApplying(false);
+  }
 }
 
 export async function exportBackup() {
