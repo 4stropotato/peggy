@@ -10,9 +10,26 @@ import {
 
 const ACTIVE_USER_KEY = 'peggy-cloud-active-user-id'
 const SESSION_EVENT = 'peggy-cloud-session-changed'
+const NON_MEANINGFUL_KEYS = new Set(['baby-prep-theme'])
 
 function hasCloudBackupError(err) {
   return String(err?.message || '').toLowerCase().includes('no cloud backup found')
+}
+
+function hasMeaningfulBackupData(backup) {
+  if (!backup || typeof backup !== 'object') return false
+  if (Array.isArray(backup.photos) && backup.photos.length > 0) return true
+
+  const appData = backup.appData || {}
+  for (const [key, value] of Object.entries(appData)) {
+    if (NON_MEANINGFUL_KEYS.has(key)) continue
+    if (Array.isArray(value) && value.length > 0) return true
+    if (value && typeof value === 'object' && Object.keys(value).length > 0) return true
+    if (typeof value === 'string' && value.trim() !== '') return true
+    if (typeof value === 'number' && value !== 0) return true
+    if (typeof value === 'boolean' && value) return true
+  }
+  return false
 }
 
 export default function CloudSyncAgent() {
@@ -67,6 +84,16 @@ export default function CloudSyncAgent() {
         const switchedUser = Boolean(activeUser && activeUser !== validated.user.id)
         if (switchedUser) {
           try { await clearLocalAppData() } catch {}
+        }
+
+        // First-time account linking on this device: keep meaningful local data for this user.
+        if (!activeUser) {
+          const localBackup = await buildBackupObject()
+          if (hasMeaningfulBackupData(localBackup)) {
+            await cloudUploadBackup(localBackup, validated)
+            localStorage.setItem(ACTIVE_USER_KEY, validated.user.id)
+            return
+          }
         }
 
         try {
