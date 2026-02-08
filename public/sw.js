@@ -1,4 +1,4 @@
-const CACHE_NAME = 'baby-prep-v2';
+const CACHE_NAME = 'baby-prep-v3';
 const BASE = '/peggy/';
 const PRECACHE = [
   BASE,
@@ -27,6 +27,25 @@ self.addEventListener('activate', (e) => {
 
 self.addEventListener('fetch', (e) => {
   if (e.request.method !== 'GET') return;
+  const isDocument = e.request.mode === 'navigate' || e.request.destination === 'document';
+  if (isDocument) {
+    e.respondWith(
+      fetch(e.request)
+        .then(response => {
+          if (response && response.status === 200) {
+            const clone = response.clone();
+            caches.open(CACHE_NAME).then(cache => cache.put(e.request, clone));
+          }
+          return response;
+        })
+        .catch(async () => {
+          const cached = await caches.match(e.request);
+          if (cached) return cached;
+          return caches.match(BASE + 'index.html');
+        })
+    );
+    return;
+  }
   e.respondWith(
     caches.match(e.request).then(cached => {
       const fetchPromise = fetch(e.request).then(response => {
