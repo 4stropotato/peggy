@@ -1,4 +1,4 @@
-const CACHE_NAME = 'baby-prep-v7';
+const CACHE_NAME = 'baby-prep-v8';
 
 function resolveBasePath() {
   const swPath = self.location?.pathname || '/sw.js';
