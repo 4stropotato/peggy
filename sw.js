@@ -1,5 +1,5 @@
 const CACHE_NAME = 'baby-prep-v2';
-const BASE = '/baby-prep-tracker/';
+const BASE = '/peggy/';
 const PRECACHE = [
   BASE,
   BASE + 'index.html',
