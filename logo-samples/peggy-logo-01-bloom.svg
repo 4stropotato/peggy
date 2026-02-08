@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-labelledby="t d">
+  <title id="t">Peggy Logo 01 Bloom</title>
+  <desc id="d">Circular gradient badge with stylized P and spark.</desc>
+  <defs>
+    <linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#ff5fa2"/>
+      <stop offset="100%" stop-color="#7b6dff"/>
+    </linearGradient>
+  </defs>
+  <rect width="512" height="512" rx="140" fill="url(#g)"/>
+  <circle cx="256" cy="256" r="170" fill="none" stroke="rgba(255,255,255,.28)" stroke-width="16"/>
+  <path d="M206 344V168h98c55 0 90 31 90 79s-35 79-90 79h-58" fill="none" stroke="#fff" stroke-width="34" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M352 126l10 22 24 4-18 16 4 24-20-12-20 12 4-24-18-16 24-4z" fill="#fff"/>
+</svg>

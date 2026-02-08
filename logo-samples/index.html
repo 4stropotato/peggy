@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Peggy Logo Samples</title>
+  <style>
+    :root {
+      --bg: #0f0f15;
+      --card: #171723;
+      --line: #2a2a3b;
+      --text: #f3f2ff;
+      --muted: #b3b2c7;
+      --accent: #ff6eae;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: "Segoe UI", Arial, sans-serif;
+      background: radial-gradient(circle at top, #1a1730, #0f0f15 60%);
+      color: var(--text);
+      min-height: 100vh;
+      padding: 28px;
+    }
+    h1 { margin: 0 0 6px; font-size: 30px; }
+    p { margin: 0 0 18px; color: var(--muted); }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+      gap: 16px;
+    }
+    .card {
+      background: linear-gradient(180deg, rgba(255,255,255,0.04), rgba(255,255,255,0.02));
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      padding: 12px;
+    }
+    .label {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 10px;
+      font-size: 13px;
+      color: var(--muted);
+    }
+    img {
+      width: 100%;
+      display: block;
+      border-radius: 10px;
+      background: #0c0c14;
+      border: 1px solid #26263b;
+    }
+    .tip {
+      margin-top: 16px;
+      padding: 10px 12px;
+      border: 1px dashed rgba(255,110,174,.45);
+      border-radius: 10px;
+      color: #ffd7ea;
+      font-size: 13px;
+    }
+    a { color: var(--accent); text-decoration: none; }
+  </style>
+</head>
+<body>
+  <h1>Peggy Logo Samples</h1>
+  <p>Pick your favorite direction. Files are in <code>app/public/logo-samples/</code>.</p>
+
+  <div class="grid">
+    <div class="card">
+      <div class="label"><span>01 Bloom</span><a href="peggy-logo-01-bloom.svg" target="_blank">open</a></div>
+      <img src="peggy-logo-01-bloom.svg" alt="Bloom logo" />
+    </div>
+    <div class="card">
+      <div class="label"><span>02 Ribbon</span><a href="peggy-logo-02-ribbon.svg" target="_blank">open</a></div>
+      <img src="peggy-logo-02-ribbon.svg" alt="Ribbon logo" />
+    </div>
+    <div class="card">
+      <div class="label"><span>03 Monogram</span><a href="peggy-logo-03-monogram.svg" target="_blank">open</a></div>
+      <img src="peggy-logo-03-monogram.svg" alt="Monogram logo" />
+    </div>
+    <div class="card">
+      <div class="label"><span>04 Seal</span><a href="peggy-logo-04-seal.svg" target="_blank">open</a></div>
+      <img src="peggy-logo-04-seal.svg" alt="Seal logo" />
+    </div>
+    <div class="card">
+      <div class="label"><span>05 Wordmark</span><a href="peggy-logo-05-wordmark.svg" target="_blank">open</a></div>
+      <img src="peggy-logo-05-wordmark.svg" alt="Wordmark logo" />
+    </div>
+    <div class="card">
+      <div class="label"><span>06 Crest</span><a href="peggy-logo-06-crest.svg" target="_blank">open</a></div>
+      <img src="peggy-logo-06-crest.svg" alt="Crest logo" />
+    </div>
+  </div>
+
+  <div class="tip">
+    Reply with your picks like: <strong>"Top: 03, 05. Try mix: icon ng 03 + text ng 05"</strong>.
+  </div>
+</body>
+</html>
