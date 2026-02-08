@@ -6,6 +6,7 @@ import MoneyTab from './tabs/MoneyTab'
 import HealthTab from './tabs/HealthTab'
 import MoreTab from './tabs/MoreTab'
 import CloudSyncAgent from './components/CloudSyncAgent'
+import PushSyncAgent from './components/PushSyncAgent'
 import SmartReminderAgent from './components/SmartReminderAgent'
 import { THEME_ICONS, UiIcon, getNavIcons, resolveIconStyle } from './uiIcons'
 import './App.css'
@@ -217,6 +218,7 @@ export default function App() {
   return (
     <AppProvider>
       <CloudSyncAgent />
+      <PushSyncAgent />
       <SmartReminderAgent />
       <AppInner />
     </AppProvider>

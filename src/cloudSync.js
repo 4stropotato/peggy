@@ -275,3 +275,58 @@ export async function cloudDownloadBackup(session) {
     updatedAt: data[0].updated_at || null
   };
 }
+
+export async function cloudUpsertPushSubscription(payload, session) {
+  const body = {
+    action: 'upsert',
+    ...(payload && typeof payload === 'object' ? payload : {})
+  };
+
+  const { result } = await withSessionRetry(session, async (workingSession) => {
+    return cloudFetch(
+      '/functions/v1/push-subscriptions',
+      {
+        method: 'POST',
+        body
+      },
+      workingSession.accessToken
+    );
+  });
+
+  return result;
+}
+
+export async function cloudDisablePushSubscription(payload, session) {
+  const body = {
+    action: 'disable',
+    ...(payload && typeof payload === 'object' ? payload : {})
+  };
+
+  const { result } = await withSessionRetry(session, async (workingSession) => {
+    return cloudFetch(
+      '/functions/v1/push-subscriptions',
+      {
+        method: 'POST',
+        body
+      },
+      workingSession.accessToken
+    );
+  });
+
+  return result;
+}
+
+export async function cloudSendPushTest(session) {
+  const { result } = await withSessionRetry(session, async (workingSession) => {
+    return cloudFetch(
+      '/functions/v1/push-subscriptions',
+      {
+        method: 'POST',
+        body: { action: 'send_test' }
+      },
+      workingSession.accessToken
+    );
+  });
+
+  return result;
+}

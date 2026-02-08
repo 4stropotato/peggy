@@ -12,6 +12,9 @@ import {
   readSmartNotifEnabled,
 } from '../reminderContent'
 
+const APP_BASE = import.meta.env.BASE_URL || '/'
+const NOTIF_ICON = `${APP_BASE.replace(/\/+$/, '/')}icon-192.png`
+
 function canNotifyNow() {
   if (typeof document === 'undefined') return true
   if (document.visibilityState === 'hidden') return true
@@ -24,8 +27,8 @@ function fireNotification(title, body, slotKey, urgent = false) {
     // Browser notification payload for PWA + desktop tab sessions.
     new Notification(title, {
       body,
-      icon: '/peggy/icon-192.png',
-      badge: '/peggy/icon-192.png',
+      icon: NOTIF_ICON,
+      badge: NOTIF_ICON,
       tag: slotKey,
       renotify: false,
       requireInteraction: urgent,

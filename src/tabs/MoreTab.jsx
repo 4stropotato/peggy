@@ -10,8 +10,14 @@ import {
 } from '../infoData'
 import {
   isCloudConfigured, getCloudSession, cloudSignUp, cloudSignIn, cloudSignOut,
-  cloudValidateSession, cloudUploadBackup, cloudDownloadBackup
+  cloudValidateSession, cloudUploadBackup, cloudDownloadBackup, cloudSendPushTest
 } from '../cloudSync'
+import { readSmartNotifEnabled } from '../reminderContent'
+import {
+  disableCurrentPushSubscription,
+  isPushSupported,
+  upsertCurrentPushSubscription,
+} from '../pushSync'
 import { APP_ICONS, ExpandIcon, ICON_STYLE_PRESETS, TokenIcon, UiIcon, resolveIconStyle } from '../uiIcons'
 
 const PHOTO_CATEGORIES = ['Ultrasound', 'Documents', 'Receipts', 'Boshi Techo', 'Other']
@@ -410,6 +416,7 @@ export default function MoreTab() {
   const [contactForm, setContactForm] = useState({ name: '', phone: '', relationship: '' })
   const [backupStatus, setBackupStatus] = useState('')
   const [cloudStatus, setCloudStatus] = useState('')
+  const [pushStatus, setPushStatus] = useState('')
   const [cloudBusy, setCloudBusy] = useState(false)
   const [cloudEmail, setCloudEmail] = useState('')
   const [cloudPassword, setCloudPassword] = useState('')
@@ -417,6 +424,8 @@ export default function MoreTab() {
   const fileRef = useRef()
   const restoreRef = useRef()
   const cloudEnabled = isCloudConfigured()
+  const pushSupported = isPushSupported()
+  const pushVapidReady = Boolean(String(import.meta.env.VITE_WEB_PUSH_PUBLIC_KEY || '').trim())
   const activeIconStyle = resolveIconStyle(iconStyle)
 
   useEffect(() => {
@@ -579,6 +588,14 @@ export default function MoreTab() {
   const handleCloudSignOut = async () => {
     try {
       setCloudBusy(true)
+      setPushStatus('')
+      if (cloudSession) {
+        try {
+          await disableCurrentPushSubscription(cloudSession, { unsubscribeLocal: true })
+        } catch {
+          // keep sign-out flow resilient
+        }
+      }
       await cloudSignOut()
       setCloudSession(null)
       setCloudStatus('Signed out.')
@@ -622,6 +639,43 @@ export default function MoreTab() {
       setCloudStatus(`Cloud restore complete: ${result.items} items + ${result.photos} photos.`)
     } catch (err) {
       setCloudStatus('Cloud download failed: ' + err.message)
+    } finally {
+      setCloudBusy(false)
+    }
+  }
+
+  const handlePushTest = async () => {
+    if (!cloudSession) {
+      setPushStatus('Sign in first to test push notifications.')
+      return
+    }
+    if (!pushSupported) {
+      setPushStatus('Push notifications are not supported on this browser/device.')
+      return
+    }
+    if (!pushVapidReady) {
+      setPushStatus('Missing VITE_WEB_PUSH_PUBLIC_KEY in app env config.')
+      return
+    }
+    if (Notification.permission !== 'granted') {
+      setPushStatus('Enable notifications first in Home tab, then retry test push.')
+      return
+    }
+
+    try {
+      setCloudBusy(true)
+      setPushStatus('Registering this device and sending test push...')
+      await upsertCurrentPushSubscription(cloudSession, { notifEnabled: readSmartNotifEnabled() })
+      const result = await cloudSendPushTest(cloudSession)
+      const sent = Number(result?.sent || 0)
+      const total = Number(result?.total || sent)
+      if (sent > 0) {
+        setPushStatus(`Test push sent (${sent}/${total} device${total === 1 ? '' : 's'}).`)
+      } else {
+        setPushStatus('No active push device found yet. Open Peggy as installed PWA and allow notifications.')
+      }
+    } catch (err) {
+      setPushStatus('Test push failed: ' + err.message)
     } finally {
       setCloudBusy(false)
     }
@@ -893,9 +947,15 @@ export default function MoreTab() {
                       <div className="backup-cloud-actions">
                         <button className="btn-glass-primary" onClick={handleCloudUpload} disabled={cloudBusy}>Force Upload</button>
                         <button className="btn-glass-secondary" onClick={handleCloudDownload} disabled={cloudBusy}>Force Download</button>
+                        <button className="btn-glass-secondary" onClick={handlePushTest} disabled={cloudBusy}>Send Test Push</button>
                         <button className="btn-glass-secondary" onClick={handleCloudSignOut} disabled={cloudBusy}>Sign Out</button>
                       </div>
                     )}
+                    <p className="section-note">
+                      Push status: {pushSupported ? (pushVapidReady ? 'Ready for Web Push setup.' : 'Missing VAPID key in frontend env.') : 'Not supported on this browser.'}
+                    </p>
+                    <p className="section-note">iPhone note: install Peggy to Home Screen, then allow notifications when prompted.</p>
+                    {pushStatus && <p className="section-note">{pushStatus}</p>}
                   </>
                 )}
               </div>

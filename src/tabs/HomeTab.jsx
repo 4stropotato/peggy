@@ -13,6 +13,7 @@ import {
   buildWorkReminder,
   getSupplementReminderContext,
   getWorkReminderContext,
+  SMART_NOTIF_PREF_EVENT,
   readSmartNotifEnabled,
   writeSmartNotifEnabled,
 } from '../reminderContent'
@@ -93,6 +94,23 @@ export default function HomeTab() {
     const id = setTimeout(() => setNotifStatus(''), 4000)
     return () => clearTimeout(id)
   }, [notifStatus])
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return undefined
+
+    const syncNotifEnabled = () => {
+      setNotifEnabled(readSmartNotifEnabled())
+    }
+
+    window.addEventListener(SMART_NOTIF_PREF_EVENT, syncNotifEnabled)
+    window.addEventListener('peggy-backup-restored', syncNotifEnabled)
+    window.addEventListener('storage', syncNotifEnabled)
+    return () => {
+      window.removeEventListener(SMART_NOTIF_PREF_EVENT, syncNotifEnabled)
+      window.removeEventListener('peggy-backup-restored', syncNotifEnabled)
+      window.removeEventListener('storage', syncNotifEnabled)
+    }
+  }, [])
 
   const totalItems = phases.reduce((acc, p) => acc + p.items.length, 0)
   const doneItems = phases.reduce((acc, p) => acc + p.items.filter(i => checked[i.id]).length, 0)

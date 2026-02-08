@@ -935,17 +935,34 @@ export function buildNameSpotlight({ now = new Date(), babyNamesInfo, seedSalt =
   }
 }
 
-export const SMART_NOTIF_PREF_KEY = 'peggy-smart-notifs-enabled'
+export const SMART_NOTIF_PREF_KEY = 'baby-prep-smart-notifs-enabled'
+export const LEGACY_SMART_NOTIF_PREF_KEY = 'peggy-smart-notifs-enabled'
+export const SMART_NOTIF_PREF_EVENT = 'peggy-smart-notif-pref-changed'
 export const SMART_NOTIF_LOG_KEY = 'peggy-smart-notifs-log-v1'
 
 export function readSmartNotifEnabled() {
   if (typeof window === 'undefined') return false
-  return window.localStorage.getItem(SMART_NOTIF_PREF_KEY) === '1'
+  const value = window.localStorage.getItem(SMART_NOTIF_PREF_KEY)
+  if (value === '1' || value === '0') return value === '1'
+
+  // One-time migration for older builds that stored this outside backup scope.
+  const legacy = window.localStorage.getItem(LEGACY_SMART_NOTIF_PREF_KEY)
+  if (legacy === '1' || legacy === '0') {
+    window.localStorage.setItem(SMART_NOTIF_PREF_KEY, legacy)
+    return legacy === '1'
+  }
+
+  return false
 }
 
 export function writeSmartNotifEnabled(enabled) {
   if (typeof window === 'undefined') return
-  window.localStorage.setItem(SMART_NOTIF_PREF_KEY, enabled ? '1' : '0')
+  const value = enabled ? '1' : '0'
+  window.localStorage.setItem(SMART_NOTIF_PREF_KEY, value)
+  // Keep legacy key mirrored so existing local-only flows remain stable.
+  window.localStorage.setItem(LEGACY_SMART_NOTIF_PREF_KEY, value)
+  window.dispatchEvent(new CustomEvent(SMART_NOTIF_PREF_EVENT, { detail: { enabled: Boolean(enabled) } }))
+  window.dispatchEvent(new CustomEvent('peggy-local-changed', { detail: { key: SMART_NOTIF_PREF_KEY } }))
 }
 
 function readNotifLog() {
