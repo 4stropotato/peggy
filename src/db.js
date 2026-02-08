@@ -248,6 +248,7 @@ export async function restoreBackupObject(backup) {
 
     // Restore localStorage + IndexedDB state mirror
     for (const [key, value] of Object.entries(backup.appData)) {
+      if (!isAppStorageKey(key)) continue;
       localStorage.setItem(key, JSON.stringify(value));
       await saveState(key, value);
     }
