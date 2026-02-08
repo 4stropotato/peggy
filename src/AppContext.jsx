@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useEffect, useRef } from 'react'
+﻿import { createContext, useContext, useState, useEffect, useRef } from 'react'
 import { saveState, loadState } from './db'
 import { supplements, OPTIMAL_SUPP_SCHEDULE } from './data'
 
@@ -61,7 +61,7 @@ function useLS(key, initial) {
   return [value, setValue]
 }
 
-// Locked optimal schedule — no user editing
+// Locked optimal schedule â€” no user editing
 const defaultSuppSchedule = OPTIMAL_SUPP_SCHEDULE
 
 export function AppProvider({ children }) {
@@ -95,7 +95,6 @@ export function AppProvider({ children }) {
   // Synchronous guard ref - prevents rapid clicks from bypassing stale state check
   const suppToggleGuard = useRef(new Set())
 
-  // Auto-set due date if empty (Naomi: 5w6d on Feb 7, 2026 → EDD Oct 4, 2026)
   const toggle = (id) => setChecked(prev => ({ ...prev, [id]: !prev[id] }))
 
   const toggleSupp = (id, doseIndex = 0) => {
