@@ -483,7 +483,7 @@ export default function MoreTab() {
     try {
       setCloudBusy(true)
       setCloudStatus('Creating account...')
-      const redirectTo = `${window.location.origin}${window.location.pathname}`
+      const redirectTo = new URL(import.meta.env.BASE_URL, window.location.origin).toString()
       const result = await cloudSignUp(cloudEmail.trim(), cloudPassword, redirectTo)
       setCloudSession(result.session || null)
       setCloudStatus(result.message)
