@@ -1,8 +1,19 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import { useApp } from '../AppContext'
-import { phases, supplements, moneyTracker, checkupSchedule, taglishTips } from '../data'
+import { phases, supplements, moneyTracker, checkupSchedule } from '../data'
+import { babyNamesInfo } from '../infoData'
 import Calendar, { isoToDateString } from '../components/Calendar'
 import DayDetail from '../components/DayDetail'
+import {
+  buildDailyTip,
+  buildNameSpotlight,
+  buildSupplementReminder,
+  buildWorkReminder,
+  getSupplementReminderContext,
+  getWorkReminderContext,
+  readSmartNotifEnabled,
+  writeSmartNotifEnabled,
+} from '../reminderContent'
 
 // Find earliest date any supplement was tracked
 function getFirstTrackingDate(dailySupp) {
@@ -10,18 +21,18 @@ function getFirstTrackingDate(dailySupp) {
   for (const key of Object.keys(dailySupp)) {
     // Keys are like "prenatal-0-Sat Feb 08 2026"
     const parts = key.split('-')
-    const dateStr = parts.slice(2).join('-') // rejoin in case dateString has dashes
+    const dateStr = parts.slice(2).join('-') // Rejoin in case dateString has dashes
     const d = new Date(dateStr)
-    if (!isNaN(d) && (!earliest || d < earliest)) earliest = d
+    if (!Number.isNaN(d) && (!earliest || d < earliest)) earliest = d
   }
   return earliest
 }
 
-// Helper: supp status for a date
+// Helper: supplement status for a date
 function getSuppDayStatus(dailySupp, suppSchedule, dateISO, firstTrackDate) {
   const ds = isoToDateString(dateISO)
   const today = new Date()
-  const todayISO = `${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,'0')}-${String(today.getDate()).padStart(2,'0')}`
+  const todayISO = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`
   if (dateISO > todayISO) return null
 
   // Don't show anything for dates before user started tracking
@@ -29,16 +40,17 @@ function getSuppDayStatus(dailySupp, suppSchedule, dateISO, firstTrackDate) {
     const cellDate = new Date(ds)
     if (cellDate < firstTrackDate) return null
   } else {
-    return null // no tracking data at all
+    return null
   }
 
-  let total = 0, taken = 0
+  let total = 0
+  let taken = 0
   supplements.forEach(s => {
     const sched = suppSchedule[s.id]
     const times = sched?.times || s.defaultTimes
     times.forEach((_, i) => {
-      total++
-      if (dailySupp[`${s.id}-${i}-${ds}`]) taken++
+      total += 1
+      if (dailySupp[`${s.id}-${i}-${ds}`]) taken += 1
     })
   })
   if (total === 0) return null
@@ -49,13 +61,36 @@ function getSuppDayStatus(dailySupp, suppSchedule, dateISO, firstTrackDate) {
 
 export default function HomeTab() {
   const {
-    checked, dailySupp, isSuppTaken, moneyClaimed, dueDate, setDueDate,
-    checkups, moods, suppSchedule, attendance
+    checked,
+    dailySupp,
+    isSuppTaken,
+    moneyClaimed,
+    dueDate,
+    setDueDate,
+    checkups,
+    moods,
+    suppSchedule,
+    attendance,
   } = useApp()
+
   const [showDueInput, setShowDueInput] = useState(!dueDate)
-  const now = new Date()
+  const [nowTick, setNowTick] = useState(() => Date.now())
+  const now = useMemo(() => new Date(nowTick), [nowTick])
   const [calState, setCalState] = useState({ y: now.getFullYear(), m: now.getMonth() + 1 })
   const [selectedDay, setSelectedDay] = useState(null)
+  const [notifEnabled, setNotifEnabled] = useState(() => readSmartNotifEnabled())
+  const [notifStatus, setNotifStatus] = useState('')
+
+  useEffect(() => {
+    const id = setInterval(() => setNowTick(Date.now()), 60 * 1000)
+    return () => clearInterval(id)
+  }, [])
+
+  useEffect(() => {
+    if (!notifStatus) return undefined
+    const id = setTimeout(() => setNotifStatus(''), 4000)
+    return () => clearTimeout(id)
+  }, [notifStatus])
 
   const totalItems = phases.reduce((acc, p) => acc + p.items.length, 0)
   const doneItems = phases.reduce((acc, p) => acc + p.items.filter(i => checked[i.id]).length, 0)
@@ -69,20 +104,17 @@ export default function HomeTab() {
   const suppTotal = supplements.length
 
   const totalMoney = moneyTracker.reduce((acc, m) => acc + m.amount, 0)
-  const claimedMoney = moneyTracker.filter(m => moneyClaimed[m.id]).reduce((acc, m) => acc + m.amount, 0)
+  const claimedMoney = moneyTracker
+    .filter(m => moneyClaimed[m.id])
+    .reduce((acc, m) => acc + m.amount, 0)
 
   const daysUntilDue = dueDate
-    ? Math.ceil((new Date(dueDate) - new Date()) / (1000 * 60 * 60 * 24))
+    ? Math.ceil((new Date(dueDate) - now) / (1000 * 60 * 60 * 24))
     : null
 
   const weeksPregnant = dueDate
     ? Math.max(0, 40 - Math.ceil(daysUntilDue / 7))
     : null
-
-  const dailyTip = useMemo(() => {
-    const dayOfYear = Math.floor((new Date() - new Date(new Date().getFullYear(), 0, 0)) / (1000 * 60 * 60 * 24))
-    return taglishTips[dayOfYear % taglishTips.length]
-  }, [])
 
   const nextCheckup = useMemo(() => {
     for (const visit of checkupSchedule) {
@@ -94,7 +126,6 @@ export default function HomeTab() {
   const completedCheckups = checkupSchedule.filter(v => checkups[v.id]?.completed).length
   const latestMood = moods.length > 0 ? moods[0] : null
 
-  // Checkup dates lookup
   const checkupDates = useMemo(() => {
     const map = {}
     checkupSchedule.forEach(v => {
@@ -104,32 +135,92 @@ export default function HomeTab() {
     return map
   }, [checkups])
 
-  // Mood by date
   const moodByDate = useMemo(() => {
     const map = {}
     moods.forEach(m => {
       const d = new Date(m.date)
-      const iso = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`
+      const iso = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
       if (!map[iso]) map[iso] = m
     })
     return map
   }, [moods])
 
-  // First date any supp was tracked (so we don't show "missed" before tracking started)
   const firstTrackDate = useMemo(() => getFirstTrackingDate(dailySupp), [dailySupp])
 
-  // Reminder checks
-  const todayStr = now.toISOString().split('T')[0]
-  const todayDay = now.getDay()
-  const isWeekday = todayDay >= 1 && todayDay <= 5
-  const todayAttendance = attendance[todayStr]
-  const allSuppsTaken = suppTaken === suppTotal
+  const suppReminderCtx = useMemo(
+    () => getSupplementReminderContext({ dailySupp, suppSchedule, now }),
+    [dailySupp, suppSchedule, nowTick],
+  )
+  const workReminderCtx = useMemo(
+    () => getWorkReminderContext({ attendance, now }),
+    [attendance, nowTick],
+  )
+
+  const suppReminder = useMemo(
+    () => (suppReminderCtx.remainingDoses > 0 ? buildSupplementReminder(suppReminderCtx, now, 'home') : null),
+    [suppReminderCtx, nowTick],
+  )
+  const workReminder = useMemo(
+    () => (workReminderCtx.needsReminder ? buildWorkReminder(workReminderCtx, now, 'home') : null),
+    [workReminderCtx, nowTick],
+  )
+
+  const nameSpotlight = useMemo(
+    () => buildNameSpotlight({ now, babyNamesInfo, seedSalt: 'home' }),
+    [nowTick],
+  )
+
+  const dailyTip = useMemo(
+    () => buildDailyTip({
+      now,
+      weeksPregnant,
+      completedCheckups,
+      suppCtx: suppReminderCtx,
+    }),
+    [nowTick, weeksPregnant, completedCheckups, suppReminderCtx.remainingDoses, suppReminderCtx.overdueDoses],
+  )
+
+  const handleNotifToggle = async () => {
+    if (typeof Notification === 'undefined') {
+      setNotifStatus('Browser notifications are not supported on this device/browser.')
+      return
+    }
+
+    if (notifEnabled) {
+      writeSmartNotifEnabled(false)
+      setNotifEnabled(false)
+      setNotifStatus('Reminders paused.')
+      return
+    }
+
+    if (Notification.permission === 'denied') {
+      setNotifStatus('Notifications are blocked in browser settings.')
+      return
+    }
+
+    let permission = Notification.permission
+    if (permission !== 'granted') {
+      permission = await Notification.requestPermission()
+    }
+
+    if (permission === 'granted') {
+      writeSmartNotifEnabled(true)
+      setNotifEnabled(true)
+      setNotifStatus('Smart reminders enabled.')
+      return
+    }
+
+    setNotifStatus('Permission not granted.')
+  }
 
   return (
     <div className="content">
       <header className="home-header">
         <h1>Peggy</h1>
-        <p className="subtitle">Your Pregnancy Companion</p>
+        <p className="subtitle dynamic-companion">
+          Your Pregnancy Companion ({nameSpotlight.companionName})
+          {nameSpotlight.companionKanji ? <span className="subtitle-kanji"> {nameSpotlight.companionKanji}</span> : null}
+        </p>
         {dueDate && daysUntilDue > 0 && !showDueInput && (
           <div className="due-badge glass-inner" onClick={() => setShowDueInput(true)}>
             {daysUntilDue} days to go {weeksPregnant !== null && `(Week ${weeksPregnant})`}
@@ -146,7 +237,10 @@ export default function HomeTab() {
             <input
               type="date"
               value={dueDate}
-              onChange={e => { setDueDate(e.target.value); setShowDueInput(false) }}
+              onChange={e => {
+                setDueDate(e.target.value)
+                setShowDueInput(false)
+              }}
             />
           </div>
         )}
@@ -170,29 +264,36 @@ export default function HomeTab() {
         </div>
       </div>
 
-      {/* Daily Reminders */}
-      {(!allSuppsTaken || (isWeekday && !todayAttendance)) && (
+      {(suppReminder || workReminder) && (
         <section className="glass-section reminder-section">
           <div className="section-header">
             <span className="section-icon">🔔</span>
             <div><h2>Reminders for Today</h2></div>
+            <button
+              type="button"
+              className={`notif-toggle-btn glass-inner ${notifEnabled ? 'on' : ''}`}
+              onClick={handleNotifToggle}
+            >
+              {notifEnabled ? 'Notifications ON' : 'Enable Notifications'}
+            </button>
           </div>
+          {notifStatus && <p className="section-note">{notifStatus}</p>}
           <div className="reminder-cards">
-            {!allSuppsTaken && (
-              <div className="reminder-card glass-inner reminder-supps">
+            {suppReminder && (
+              <div className={`reminder-card glass-inner reminder-supps level-${suppReminder.level}`}>
                 <span className="reminder-icon">💊</span>
                 <div className="reminder-content">
-                  <div className="reminder-title">Uminom ka na ba ng supplements?</div>
-                  <div className="reminder-subtitle">{suppTaken}/{suppTotal} taken - {suppTotal - suppTaken} remaining today</div>
+                  <div className="reminder-title">{suppReminder.title}</div>
+                  <div className="reminder-subtitle">{suppReminder.subtitle}</div>
                 </div>
               </div>
             )}
-            {isWeekday && !todayAttendance && (
-              <div className="reminder-card glass-inner reminder-work">
+            {workReminder && (
+              <div className={`reminder-card glass-inner reminder-work level-${workReminder.level}`}>
                 <span className="reminder-icon">💼</span>
                 <div className="reminder-content">
-                  <div className="reminder-title">Pumasok ka ba sa work ngayon?</div>
-                  <div className="reminder-subtitle">Don't forget to log today's attendance!</div>
+                  <div className="reminder-title">{workReminder.title}</div>
+                  <div className="reminder-subtitle">{workReminder.subtitle}</div>
                 </div>
               </div>
             )}
@@ -200,14 +301,50 @@ export default function HomeTab() {
         </section>
       )}
 
+      <section className="glass-section name-spotlight-card">
+        <div className="section-header">
+          <span className="section-icon">🌟</span>
+          <div>
+            <h2>Name Spotlight</h2>
+            <span className="section-count">{nameSpotlight.gender === 'boy' ? 'Boy names' : 'Girl names'} - updates every few hours</span>
+          </div>
+          <button
+            type="button"
+            className={`notif-toggle-btn glass-inner ${notifEnabled ? 'on' : ''}`}
+            onClick={handleNotifToggle}
+          >
+            {notifEnabled ? 'Notifications ON' : 'Enable Notifications'}
+          </button>
+        </div>
+        {notifStatus && !suppReminder && !workReminder && <p className="section-note">{notifStatus}</p>}
+        <div className="name-spotlight-main glass-inner">
+          <div className="name-spotlight-title">{nameSpotlight.spotlight.name} {nameSpotlight.spotlight.kanji}</div>
+          <div className="name-spotlight-subtitle">{nameSpotlight.spotlight.meaning}</div>
+          <div className="name-spotlight-line">{nameSpotlight.spotlightLine} {nameSpotlight.jokeLine}</div>
+        </div>
+        <div className="name-chip-row">
+          {nameSpotlight.pinnedTopPicks.map((pick, idx) => (
+            <div key={`${pick.name}-${idx}`} className="name-chip glass-inner">
+              <span className="name-chip-main">{pick.name}</span>
+              <span className="name-chip-kanji">{pick.kanji}</span>
+              <span className="name-chip-badge">Top Pick</span>
+            </div>
+          ))}
+        </div>
+      </section>
+
       {weeksPregnant !== null && weeksPregnant >= 0 && (
         <section className="glass-section home-progress-ring">
           <div className="ring-container">
             <svg viewBox="0 0 120 120" className="progress-svg">
               <circle cx="60" cy="60" r="52" fill="none" stroke="rgba(255,255,255,0.1)" strokeWidth="8" />
               <circle
-                cx="60" cy="60" r="52" fill="none"
-                stroke="url(#ringGradient)" strokeWidth="8"
+                cx="60"
+                cy="60"
+                r="52"
+                fill="none"
+                stroke="url(#ringGradient)"
+                strokeWidth="8"
                 strokeLinecap="round"
                 strokeDasharray={`${(weeksPregnant / 40) * 327} 327`}
                 transform="rotate(-90 60 60)"
@@ -234,18 +371,18 @@ export default function HomeTab() {
         </section>
       )}
 
-      {/* Master Calendar */}
       <section className="glass-section">
         <div className="section-header">
           <span className="section-icon">📅</span>
           <div><h2>All Activity</h2></div>
         </div>
         <Calendar
-          year={calState.y} month={calState.m}
+          year={calState.y}
+          month={calState.m}
           onMonthChange={(y, m) => setCalState({ y, m })}
           selectedDate={selectedDay}
-          onDayClick={(d) => setSelectedDay(d)}
-          renderDay={(dateISO) => {
+          onDayClick={d => setSelectedDay(d)}
+          renderDay={dateISO => {
             const suppSt = getSuppDayStatus(dailySupp, suppSchedule, dateISO, firstTrackDate)
             const att = attendance[dateISO]
             const hasCheckup = checkupDates[dateISO]
@@ -299,7 +436,8 @@ export default function HomeTab() {
           <span className="section-icon">💡</span>
           <div><h2>Daily Tip</h2></div>
         </div>
-        <p className="tip-text">{dailyTip}</p>
+        <div className={`tip-mode ${dailyTip.tone}`}>{dailyTip.modeLabel} - {dailyTip.category}</div>
+        <p className="tip-text">{dailyTip.text}</p>
       </section>
 
       <section className="glass-section">

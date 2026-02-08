@@ -985,6 +985,70 @@ export const babyNamesInfo = {
       readability: 'Instant',
       nicknames: 'Ko, Haku'
     },
+    {
+      name: 'Reizen', kanji: '玲禅', tier: 1,
+      meaning: 'Clear Bell Zen / Refined Calm',
+      pairing: '雷禅 + 玲禅 = Thunder Zen + Clear Zen',
+      why: 'Keeps the zen identity while sounding modern and international. Very close family signature without copying.',
+      readability: 'Natural',
+      nicknames: 'Rei, Zen'
+    },
+    {
+      name: 'Raiku', kanji: '雷空', tier: 1,
+      meaning: 'Thunder Sky / Sky that carries lightning',
+      pairing: '雷禅 + 雷空 = Thunder Zen + Thunder Sky',
+      why: 'One is thunder with peace, the other is the sky that holds the storm. Clean sibling symmetry.',
+      readability: 'Instant',
+      nicknames: 'Rai, Ku'
+    },
+    {
+      name: 'Soren', kanji: '蒼蓮', tier: 1,
+      meaning: 'Blue Lotus / Calm strength in deep waters',
+      pairing: '雷禅 + 蒼蓮 = Thunder Zen + Blue Lotus',
+      why: 'Balances power with serenity. Lotus motif links naturally with your existing spiritual naming direction.',
+      readability: 'Natural',
+      nicknames: 'So, Ren'
+    },
+    {
+      name: 'Hibiki', kanji: '響', tier: 2,
+      meaning: 'Resonance / Echo that stays',
+      pairing: '雷禅 + 響 = Thunder Zen + Resonance',
+      why: 'After thunder comes echo. The name implies lasting influence and presence.',
+      readability: 'Instant',
+      nicknames: 'Hibi'
+    },
+    {
+      name: 'Tsubasa', kanji: '翼', tier: 2,
+      meaning: 'Wings / Ability to fly far',
+      pairing: '雷禅 + 翼 = Thunder Zen + Wings',
+      why: 'Grounded kuya and soaring sibling. Great aspirational meaning with simple readability.',
+      readability: 'Instant',
+      nicknames: 'Tsuba'
+    },
+    {
+      name: 'Akito', kanji: '暁斗', tier: 2,
+      meaning: 'Dawn Star Fighter / Dawn strength',
+      pairing: '雷禅 + 暁斗 = Thunder Zen + Dawn Fighter',
+      why: 'Storm at night, dawn after. Symbolizes recovery and resilience.',
+      readability: 'Natural',
+      nicknames: 'Aki, To'
+    },
+    {
+      name: 'Haruki', kanji: '陽輝', tier: 2,
+      meaning: 'Sunlight Brilliance / Warm shining child',
+      pairing: '雷禅 + 陽輝 = Thunder Zen + Sunlight Radiance',
+      why: 'Thunder and sun create a complete sky story. Warm counterpart to Ryzen’s electric motif.',
+      readability: 'Instant',
+      nicknames: 'Haru'
+    },
+    {
+      name: 'Souma', kanji: '蒼真', tier: 2,
+      meaning: 'Blue Truth / True deep spirit',
+      pairing: '雷禅 + 蒼真 = Thunder Zen + Blue Truth',
+      why: 'Simple, modern, and grounded. Keeps strong Japanese identity while easy internationally.',
+      readability: 'Instant',
+      nicknames: 'Sou'
+    },
   ],
   girlNames: [
     {
@@ -1066,6 +1130,70 @@ export const babyNamesInfo = {
       why: '凛 = dignity from enduring hardship. For a family facing hard times, this flower doesn\'t wilt.',
       readability: 'Instant',
       nicknames: 'Rin-chan'
+    },
+    {
+      name: 'Reina', kanji: '玲奈', tier: 1,
+      meaning: 'Clear Bell Grace / Elegant resonance',
+      pairing: '雷禅 + 玲奈 = Thunder Zen + Clear Grace',
+      why: 'Soft, elegant, and international. Keeps the clear-bell motif without losing Japanese roots.',
+      readability: 'Instant',
+      nicknames: 'Rei, Reina-chan'
+    },
+    {
+      name: 'Hoshika', kanji: '星花', tier: 1,
+      meaning: 'Star Flower / Flower lit by stars',
+      pairing: '雷禅 + 星花 = Thunder Zen + Star Flower',
+      why: 'Pairs naturally with storm-sky imagery and keeps the poetic style of your current top picks.',
+      readability: 'Natural',
+      nicknames: 'Hoshi, Ka'
+    },
+    {
+      name: 'Airi', kanji: '愛凛', tier: 1,
+      meaning: 'Beloved Dignity / Loving strength',
+      pairing: '雷禅 + 愛凛 = Thunder Zen + Loving Dignity',
+      why: 'Warm emotional core with strong character. A gentle but powerful sibling contrast.',
+      readability: 'Instant',
+      nicknames: 'Ai, Riri'
+    },
+    {
+      name: 'Akari', kanji: '灯里', tier: 2,
+      meaning: 'Village Light / Guiding lamp',
+      pairing: '雷禅 + 灯里 = Thunder Zen + Guiding Light',
+      why: 'Ryzen as lightning and Akari as steady lamp. Same light theme, different personality.',
+      readability: 'Instant',
+      nicknames: 'Aka, Kari'
+    },
+    {
+      name: 'Yuzuki', kanji: '柚月', tier: 2,
+      meaning: 'Yuzu Moon / Bright gentle moon',
+      pairing: '雷禅 + 柚月 = Thunder Zen + Yuzu Moon',
+      why: 'Soft seasonal name with Japanese charm and modern feel.',
+      readability: 'Instant',
+      nicknames: 'Yuzu, Zuki'
+    },
+    {
+      name: 'Rinon', kanji: '凛音', tier: 2,
+      meaning: 'Dignified Sound / Strong clear voice',
+      pairing: '雷禅 + 凛音 = Thunder Zen + Dignified Sound',
+      why: 'Sound motif connects with thunder while keeping a graceful, feminine profile.',
+      readability: 'Instant',
+      nicknames: 'Rin, Non-chan'
+    },
+    {
+      name: 'Kohana', kanji: '心花', tier: 2,
+      meaning: 'Heart Flower / Heart that blooms',
+      pairing: '雷禅 + 心花 = Thunder Zen + Heart Flower',
+      why: 'Directly speaks to family warmth and emotional resilience.',
+      readability: 'Natural',
+      nicknames: 'Koha'
+    },
+    {
+      name: 'Natsuki', kanji: '夏輝', tier: 2,
+      meaning: 'Summer Radiance / Warm seasonal light',
+      pairing: '雷禅 + 夏輝 = Thunder Zen + Summer Radiance',
+      why: 'Bright and energetic with a clear hopeful vibe. Very easy to call in daily life.',
+      readability: 'Instant',
+      nicknames: 'Natsu, Tsuki'
     },
   ],
   practicalNotes: [

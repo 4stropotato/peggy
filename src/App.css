@@ -244,6 +244,23 @@ body {
   font-size: 0.9rem;
   margin-top: 0.2rem;
 }
+.subtitle.dynamic-companion {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.25rem;
+  font-weight: 600;
+  letter-spacing: 0.2px;
+  animation: companionGlow 7s ease-in-out infinite;
+}
+.subtitle-kanji {
+  font-size: 0.8rem;
+  opacity: 0.9;
+}
+@keyframes companionGlow {
+  0% { transform: translateY(0px); text-shadow: 0 0 0 rgba(255, 255, 255, 0); }
+  50% { transform: translateY(-1px); text-shadow: 0 2px 14px rgba(255, 255, 255, 0.28); }
+  100% { transform: translateY(0px); text-shadow: 0 0 0 rgba(255, 255, 255, 0); }
+}
 .due-badge {
   display: inline-block;
   margin-top: 0.8rem;
@@ -1013,6 +1030,28 @@ ul { list-style: none; }
 /* ===== Tip Card ===== */
 .tip-card {
   border-left: 3px solid var(--gold);
+}
+.tip-mode {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.22rem 0.55rem;
+  border-radius: 999px;
+  font-size: 0.66rem;
+  font-weight: 700;
+  letter-spacing: 0.3px;
+  margin-bottom: 0.35rem;
+  color: var(--text);
+  background: rgba(108, 92, 231, 0.15);
+  border: 1px solid rgba(108, 92, 231, 0.25);
+}
+.tip-mode.witty {
+  background: rgba(233, 30, 139, 0.14);
+  border-color: rgba(233, 30, 139, 0.24);
+}
+.tip-mode.serious {
+  background: rgba(108, 92, 231, 0.14);
+  border-color: rgba(108, 92, 231, 0.24);
 }
 .tip-text {
   font-size: 0.85rem;
@@ -1875,6 +1914,28 @@ input[type="range"]:focus {
   border-color: var(--green);
   color: white;
 }
+.app.light .notif-toggle-btn {
+  border-color: rgba(200, 100, 140, 0.24);
+  color: #8a5070;
+  background: rgba(255, 255, 255, 0.65);
+}
+.app.light .notif-toggle-btn.on {
+  color: #057a57;
+  border-color: rgba(0, 184, 148, 0.3);
+  background: rgba(0, 184, 148, 0.14);
+}
+.app.light .name-spotlight-main {
+  background: linear-gradient(120deg, rgba(139, 92, 246, 0.15), rgba(214, 51, 132, 0.12));
+  border-color: rgba(139, 92, 246, 0.22);
+}
+.app.light .name-chip-badge {
+  color: #8a1f58;
+  background: rgba(214, 51, 132, 0.14);
+  border-color: rgba(214, 51, 132, 0.22);
+}
+.app.light .tip-mode {
+  color: #5a2743;
+}
 
 /* ===== Theme Toggle Button ===== */
 .theme-toggle {
@@ -2212,6 +2273,24 @@ input[type="range"]:focus {
 .reminder-section {
   border-left: 3px solid var(--orange);
 }
+.notif-toggle-btn {
+  margin-left: auto;
+  border: 1px solid var(--glass-border);
+  border-radius: 999px;
+  background: var(--glass-highlight);
+  color: var(--text2);
+  font-size: 0.62rem;
+  font-weight: 700;
+  padding: 0.28rem 0.6rem;
+  letter-spacing: 0.2px;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.notif-toggle-btn.on {
+  color: var(--green);
+  border-color: rgba(0, 184, 148, 0.35);
+  background: rgba(0, 184, 148, 0.12);
+}
 .reminder-cards {
   display: flex;
   flex-direction: column;
@@ -2232,6 +2311,17 @@ input[type="range"]:focus {
   background: rgba(108, 92, 231, 0.06);
   border-color: rgba(108, 92, 231, 0.15);
 }
+.reminder-card.level-gentle {
+  animation: reminderFloat 7s ease-in-out infinite;
+}
+.reminder-card.level-nudge {
+  animation: reminderFloat 5.5s ease-in-out infinite;
+  box-shadow: 0 0 0 1px rgba(253, 203, 110, 0.15);
+}
+.reminder-card.level-urgent {
+  animation: reminderPulse 1.8s ease-in-out infinite;
+  box-shadow: 0 0 0 1px rgba(255, 71, 87, 0.18);
+}
 .reminder-icon { font-size: 1.4rem; }
 .reminder-content { flex: 1; }
 .reminder-title {
@@ -2243,6 +2333,82 @@ input[type="range"]:focus {
   font-size: 0.7rem;
   color: var(--text2);
   margin-top: 0.1rem;
+}
+@keyframes reminderPulse {
+  0% { transform: translateY(0px); }
+  50% { transform: translateY(-1px); }
+  100% { transform: translateY(0px); }
+}
+@keyframes reminderFloat {
+  0% { transform: translateY(0px); }
+  50% { transform: translateY(-0.5px); }
+  100% { transform: translateY(0px); }
+}
+
+.name-spotlight-card {
+  border-left: 3px solid var(--purple);
+}
+.name-spotlight-main {
+  padding: 0.65rem 0.75rem;
+  border-radius: 12px;
+  background: linear-gradient(120deg, rgba(108, 92, 231, 0.16), rgba(233, 30, 139, 0.1));
+  border: 1px solid rgba(108, 92, 231, 0.2);
+}
+.name-spotlight-title {
+  font-size: 0.95rem;
+  font-weight: 800;
+  color: var(--text);
+}
+.name-spotlight-subtitle {
+  margin-top: 0.16rem;
+  font-size: 0.74rem;
+  color: var(--gold);
+  font-weight: 600;
+}
+.name-spotlight-line {
+  margin-top: 0.25rem;
+  font-size: 0.72rem;
+  line-height: 1.45;
+  color: var(--text2);
+}
+.name-chip-row {
+  margin-top: 0.45rem;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.4rem;
+}
+.name-chip {
+  display: flex;
+  flex-direction: column;
+  gap: 0.08rem;
+  border-radius: 10px;
+  padding: 0.46rem 0.5rem;
+  border: 1px solid rgba(108, 92, 231, 0.15);
+}
+.name-chip-main {
+  font-size: 0.76rem;
+  font-weight: 700;
+  color: var(--text);
+}
+.name-chip-kanji {
+  font-size: 0.66rem;
+  color: var(--text2);
+}
+.name-chip-badge {
+  margin-top: 0.1rem;
+  align-self: flex-start;
+  font-size: 0.56rem;
+  font-weight: 700;
+  padding: 0.08rem 0.3rem;
+  border-radius: 999px;
+  background: rgba(233, 30, 139, 0.18);
+  color: #ffd9ef;
+  border: 1px solid rgba(233, 30, 139, 0.25);
+}
+@media (max-width: 380px) {
+  .name-chip-row {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }
 
 /* ===== Calendar Component ===== */

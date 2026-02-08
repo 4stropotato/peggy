@@ -1,0 +1,827 @@
+import { supplements } from './data'
+
+function hashString(value) {
+  let hash = 0
+  const text = String(value || '')
+  for (let i = 0; i < text.length; i += 1) {
+    hash = ((hash << 5) - hash + text.charCodeAt(i)) | 0
+  }
+  return Math.abs(hash)
+}
+
+function pickBySeed(list, seed) {
+  if (!Array.isArray(list) || list.length === 0) return ''
+  const idx = hashString(seed) % list.length
+  return list[idx]
+}
+
+function weightedPick(options, seed) {
+  const safe = Array.isArray(options) ? options.filter(o => o && o.weight > 0) : []
+  if (safe.length === 0) return null
+  const total = safe.reduce((acc, o) => acc + o.weight, 0)
+  const roll = hashString(seed) % total
+  let cursor = 0
+  for (const option of safe) {
+    cursor += option.weight
+    if (roll < cursor) return option.id
+  }
+  return safe[0].id
+}
+
+function minutesSinceMidnight(now) {
+  return now.getHours() * 60 + now.getMinutes()
+}
+
+function parseClockMinutes(value) {
+  const [h, m] = String(value || '00:00').split(':').map(Number)
+  if (Number.isNaN(h) || Number.isNaN(m)) return 0
+  return (h * 60) + m
+}
+
+function toIsoDate(now) {
+  const y = now.getFullYear()
+  const m = String(now.getMonth() + 1).padStart(2, '0')
+  const d = String(now.getDate()).padStart(2, '0')
+  return `${y}-${m}-${d}`
+}
+
+function toDoseDateKey(now) {
+  return now.toDateString()
+}
+
+const LANGUAGE_STYLE_WEIGHTS = [
+  { id: 'taglish', weight: 40 },
+  { id: 'english_tagalog', weight: 16 },
+  { id: 'nihongo_tagalog', weight: 13 },
+  { id: 'english', weight: 16 },
+  { id: 'bisaya_tagalog', weight: 5 },
+  { id: 'bisaya_english', weight: 3 },
+  { id: 'nihongo_tagalog_english_bisaya', weight: 2 },
+]
+
+const SUPP_TITLE_DATABASE = {
+  gentle: [
+    'Love check-in: supplement time audit.',
+    'Friendly nudge from Peggy.',
+    'Health mission update, mommy.',
+    'Quick body-and-baby check.',
+    'Tiny reminder, big impact.',
+    'Brain-and-bones shift incoming.',
+    'Micro habit, macro benefit.',
+    'Just checking your dose streak.',
+  ],
+  nudge: [
+    'Nudge mode: may pending doses pa.',
+    'Midday ping: supplements still waiting.',
+    'Gentle pressure activated.',
+    'Status red-ish: unfinished doses today.',
+    'Checklist says we still have work.',
+    'Recharge ping: baby fuel not complete.',
+    'Kaya pa habulin ang streak.',
+    'Reminder wave #2 just landed.',
+  ],
+  urgent: [
+    'Escalation: may overdue doses na.',
+    'Alert mode: supplement window is slipping.',
+    'Mission critical: tapusin natin today.',
+    'Red alert-ish but still fixable.',
+    'Overdue detected. We can still recover.',
+    'Final stretch reminder activated.',
+    'Clock is loud today. Dose now.',
+    'Priority ping: overdue stack growing.',
+  ],
+}
+
+const SUPP_STYLE_LINES = {
+  taglish: {
+    gentle: [
+      'Konting consistency lang, malaking tulong sa baby development.',
+      'Slow and steady lang tayo, mommy.',
+      'Daily wins beat perfect plans.',
+      'Small repeat actions build a safer pregnancy.',
+    ],
+    nudge: [
+      'Pwede pa habulin before evening.',
+      'Hindi pa late, pero wag na patagalin.',
+      'Let us convert this into a quick win.',
+      'One round now, less stress mamaya.',
+    ],
+    urgent: [
+      'Overdue na, so best move is take next dose now.',
+      'Kung kaya now, gawin na natin agad.',
+      'Quick action now saves next-hours stress.',
+      'Habol na tayo before bedtime.',
+    ],
+  },
+  english_tagalog: {
+    gentle: [
+      'One clean dose at a time, then tuloy ang day.',
+      'Progress over perfection, tuloy lang.',
+      'Today still has room for a clean finish.',
+      'Your future self will thank you mamaya.',
+    ],
+    nudge: [
+      'You still have runway today, pero move na.',
+      'Short task now, calmer night later.',
+      'Do one now, then we reassess.',
+      'Lock one dose first, then momentum follows.',
+    ],
+    urgent: [
+      'Clock is tight. Best move: execute now.',
+      'Overdue already, kaya immediate action na.',
+      'One tap now clears the highest risk.',
+      'Do not negotiate with this timer.',
+    ],
+  },
+  nihongo_tagalog: {
+    gentle: [
+      'Daijoubu, konti konti lang pero tuloy tuloy.',
+      'Yoshi, one dose muna then continue ka na.',
+      'Genki track tayo kapag consistent ang doses.',
+      'Muri shinaide, pero wag kalimot.',
+    ],
+    nudge: [
+      'Mou sukoshi, kaya mo pa habulin today.',
+      'Ima nara safe pa, inom na muna.',
+      'Ganbatte, one set now then pahinga.',
+      'Ato de ja delikado, ngayon na.',
+    ],
+    urgent: [
+      'Ima sugu dose na. Overdue na tayo.',
+      'Hayaku one round now, then breathe.',
+      'Daiji na timing ito, act now.',
+      'Osoku naru mae ni tapusin na.',
+    ],
+  },
+  english: {
+    gentle: [
+      'Steady rhythm keeps the day smooth.',
+      'A quick dose now protects the whole plan.',
+      'Tiny action, high return for mom and baby.',
+      'Consistency wins more than intensity.',
+    ],
+    nudge: [
+      'You are still on time if you move now.',
+      'This is the perfect moment to recover pace.',
+      'Do one now and the rest gets easier.',
+      'Pending doses are manageable right now.',
+    ],
+    urgent: [
+      'Overdue marker is up. Act now.',
+      'Delay costs more energy later.',
+      'Run the next dose immediately.',
+      'Critical reminder: clear one dose now.',
+    ],
+  },
+  bisaya_tagalog: {
+    gentle: [
+      'Hinay hinay lang, basta padayon ta.',
+      'Ayaw kalimot ha, konti na effort lang.',
+      'Sakto ra ni, one step then okay na.',
+      'Kaya ra nimo, tuloy tuloy lang.',
+    ],
+    nudge: [
+      'Naay pending pa, lihok na gamay.',
+      'Pwede pa maapas, inom na karon.',
+      'Dali ra ni tapuson, go na.',
+      'Ayaw paabti ug gabii, karon na.',
+    ],
+    urgent: [
+      'Overdue na ni, inom dayon.',
+      'Dili na ni pa-urong, action na.',
+      'Karon jud dapat, para dili maipon.',
+      'Lihok dayon, mommy, kaya pa ni.',
+    ],
+  },
+  bisaya_english: {
+    gentle: [
+      'Padayon lang, one dose and keep rolling.',
+      'Small move now, better night later.',
+      'Ayaw skip, this one matters.',
+      'You are doing great, keep the rhythm.',
+    ],
+    nudge: [
+      'Pending ni, best time is now.',
+      'Catch up run starts with one tap.',
+      'Dali lang ni, then back to chill.',
+      'Go now before this turns stressful.',
+    ],
+    urgent: [
+      'Overdue na, execute now.',
+      'This is the must-do item right now.',
+      'Do not delay this one anymore.',
+      'One action now solves a lot.',
+    ],
+  },
+  nihongo_tagalog_english_bisaya: {
+    gentle: [
+      'Ganbatte mommy, kaya ra ni, one dose now.',
+      'Daijoubu pa, inom gamay then continue.',
+      'Yoshi, small step lang then relax.',
+      'Mou ippai not coffee, supplement muna.',
+    ],
+    nudge: [
+      'Hayaku gamay, pending pa ni today.',
+      'Ima now na, para smooth ang gabi.',
+      'One quick run now then chill ta.',
+      'Ganbatte, one dose then done na half.',
+    ],
+    urgent: [
+      'Ima sugu na, overdue jud.',
+      'Hayaku please, this is urgent na.',
+      'Action now, para dili ma-stack.',
+      'Karon na, no delay mode.',
+    ],
+  },
+}
+
+const SUPP_PUSH_LINES = {
+  gentle: [
+    'Baby brain, blood, and bones love routine.',
+    'Consistency helps reduce decision fatigue later.',
+    'One dose now is easier than three later.',
+    'Future-you sends thanks in advance.',
+  ],
+  nudge: [
+    'Catch-up is still easy at this point.',
+    'Take one now to avoid night-time backlog.',
+    'A 30-second action clears mental load.',
+    'Momentum starts with one tap.',
+  ],
+  urgent: [
+    'Overdue stacks become stressful, so clear one now.',
+    'Prioritize this before any low-value task.',
+    'Fast action now protects your evening rest.',
+    'Execute first, then celebrate with a snack.',
+  ],
+}
+
+const SUPP_JOKE_LINES = {
+  gentle: [
+    'Peggy payroll says: supplement compliance bonus unlocked.',
+    'Ryzen quality control approves this reminder.',
+    'Your vitamins are waiting like loyal side quests.',
+    'This is your tiny boss fight. Easy clear.',
+  ],
+  nudge: [
+    'The supplements are filing a polite complaint.',
+    'Reminder team brought snacks if you tap now. Imaginary snacks, but still.',
+    'Pending doses are louder than notifications today.',
+    'No pressure, just strategic panic with love.',
+  ],
+  urgent: [
+    'Emergency joke: this is the good kind of panic.',
+    'Supplements are now knocking at the front door.',
+    'Last call before the guilt DLC unlocks.',
+    'Critical meme status: do it now, then breathe.',
+  ],
+}
+
+const WORK_TITLE_DATABASE = {
+  gentle: [
+    'Work log check-in.',
+    'Attendance ping from Peggy.',
+    'Quick shift-status reminder.',
+    'Small admin nudge.',
+    'Paperwork whisper: log today.',
+  ],
+  nudge: [
+    'Attendance still not logged.',
+    'Midday reminder: mark work status.',
+    'Shift tracker needs one tap.',
+    'Log today before it gets forgotten.',
+    'Daily work record still pending.',
+  ],
+  urgent: [
+    'Late-day alert: attendance still empty.',
+    'End-of-day push: log work now.',
+    'Final call for today attendance.',
+    'Overtime for memory starts now. Log it.',
+    'Urgent admin ping: complete work log.',
+  ],
+}
+
+const WORK_STYLE_LINES = {
+  taglish: {
+    gentle: [
+      'Isang tap lang para walang backtracking bukas.',
+      'Quick log now para clean ang records.',
+      'Mas madali pag real-time nilalagay.',
+      'Admin now, peace later.',
+    ],
+    nudge: [
+      'Nasa gitna na tayo ng day, mark na natin.',
+      'Para hindi hulaan later, log now.',
+      'One minute task lang ito.',
+      'Iwas memory tax tonight.',
+    ],
+    urgent: [
+      'Gabi mode na, kaya log na agad.',
+      'Bago matapos ang araw, close this loop.',
+      'Habol na natin habang fresh pa details.',
+      'Do not carry this to tomorrow.',
+    ],
+  },
+  english_tagalog: {
+    gentle: [
+      'Keep records clean, then move on.',
+      'One tap now para zero guesswork later.',
+      'Fast log, long-term clarity.',
+      'Simple admin, big peace of mind.',
+    ],
+    nudge: [
+      'Still pending, better lock it now.',
+      'Leave no loose ends today.',
+      'Quick status entry then done ka na.',
+      'Past-you will thank current-you.',
+    ],
+    urgent: [
+      'High chance makalimutan pag inantay pa.',
+      'Close this now before day rollover.',
+      'Do the log first, then chill.',
+      'This is the highest ROI tap right now.',
+    ],
+  },
+  nihongo_tagalog: {
+    gentle: [
+      'Kintai log check, onegaishimasu.',
+      'Ima one tap lang then okay.',
+      'Yoshi, attendance muna before next task.',
+      'Mou 1 minute lang ito.',
+    ],
+    nudge: [
+      'Mada mitourokku, log na natin.',
+      'Ima yareba easy, later mas hassle.',
+      'Ganbatte, attendance first.',
+      'Ato de ja risky, now na.',
+    ],
+    urgent: [
+      'Kyou no kintai, ima sugu.',
+      'Hayaku log now bago matapos ang araw.',
+      'Overtime sa memory wag na, tap now.',
+      'Shimekiri vibe na, close this item.',
+    ],
+  },
+  english: {
+    gentle: [
+      'A fast work log keeps data reliable.',
+      'Capture now while details are fresh.',
+      'This takes under a minute.',
+      'Clean tracking reduces future stress.',
+    ],
+    nudge: [
+      'Still pending. Best time is now.',
+      'Log now before context disappears.',
+      'One quick update prevents backfill pain.',
+      'Do the simple thing now.',
+    ],
+    urgent: [
+      'Day is closing. Log attendance now.',
+      'Final reminder before date rollover.',
+      'Do this now or tomorrow gets messier.',
+      'Immediate action recommended.',
+    ],
+  },
+  bisaya_tagalog: {
+    gentle: [
+      'Gamaya ra ni, log na dayon.',
+      'Ayaw kalimot sa attendance ha.',
+      'One tap lang, human dayon.',
+      'Padayon ta, clear ang record.',
+    ],
+    nudge: [
+      'Pending pa gihapon, lihok na.',
+      'Karon na para dili makalimtan.',
+      'Dali ra kaayo ni buhaton.',
+      'Tap na, then balik sa pahulay.',
+    ],
+    urgent: [
+      'Last na ni, log dayon.',
+      'Gabii na, ayaw na i-delay.',
+      'Karon jud para clean ang adlaw.',
+      'Dili na ni pwede later pa.',
+    ],
+  },
+  bisaya_english: {
+    gentle: [
+      'Quick log now, no stress later.',
+      'Simple admin task, kaya ra.',
+      'Capture while fresh pa details.',
+      'One minute check and done.',
+    ],
+    nudge: [
+      'Pending pa, finish this now.',
+      'No need overthink, just log it.',
+      'Dali ra ni, then done.',
+      'Do this first then relax.',
+    ],
+    urgent: [
+      'Late na, attendance now.',
+      'Immediate tap needed here.',
+      'Close this before midnight.',
+      'Critical admin item, run now.',
+    ],
+  },
+  nihongo_tagalog_english_bisaya: {
+    gentle: [
+      'Kintai check, one tap lang ni.',
+      'Daijoubu, quick log then chill ta.',
+      'Ima now, para smooth ang later.',
+      'Yoshi, admin quest clear ta.',
+    ],
+    nudge: [
+      'Mada pending, do it karon.',
+      'Hayaku one tap, then done na.',
+      'Now na, ayaw pa-late.',
+      'Ganbatte, attendance first.',
+    ],
+    urgent: [
+      'Ima sugu log dayon.',
+      'Karon na gyud, close this.',
+      'Hayaku, day rollover incoming.',
+      'No delay mode, execute now.',
+    ],
+  },
+}
+
+const WORK_JOKE_LINES = {
+  gentle: [
+    'Spreadsheet spirits are calmer when logs are complete.',
+    'Admin goblins dislike missing attendance.',
+    'One tiny tap defeats tomorrow confusion.',
+    'Boring task, heroic impact.',
+  ],
+  nudge: [
+    'The calendar is asking for closure.',
+    'Your future brain requested less detective work.',
+    'Pending admin quests are multiplying.',
+    'Log first, memes after.',
+  ],
+  urgent: [
+    'This is the boss fight of tiny tasks.',
+    'Final warning from the kingdom of paperwork.',
+    'Do not let midnight win this round.',
+    'Emergency admin mode: one tap now.',
+  ],
+}
+
+const SERIOUS_TIP_DATABASE = [
+  { category: 'Supplements', text: 'Iron from prenatal vitamins absorbs better away from high-dose calcium. Keep at least a 2-hour gap when possible.' },
+  { category: 'Supplements', text: 'DHA is fat-soluble. Taking it with a meal that has healthy fat usually improves absorption and reduces fishy burps.' },
+  { category: 'Supplements', text: 'If nausea is strong, splitting supplements across meals can improve tolerance better than forcing everything in one sitting.' },
+  { category: 'Supplements', text: 'Choline supports fetal brain and neural tube development. Eggs are one of the easiest food boosts on top of supplements.' },
+  { category: 'Supplements', text: 'Magnesium and calcium can support leg cramps, but persistent severe cramps should still be discussed with your OB.' },
+  { category: 'Hydration', text: 'Hydration target is usually spread through the day, not one-time chugging. Pale yellow urine is a practical hydration check.' },
+  { category: 'Hydration', text: 'Frequent small sips can work better than big glasses if reflux or nausea is active.' },
+  { category: 'Blood Pressure', text: 'Home BP checks become useful when done at similar times daily. Trend changes matter more than one random reading.' },
+  { category: 'Blood Pressure', text: 'Call your provider urgently for severe headache, vision changes, right upper abdominal pain, or sudden swelling.' },
+  { category: 'Nutrition', text: 'Protein spacing across meals helps energy stability. A protein-rich breakfast often reduces afternoon crashes.' },
+  { category: 'Nutrition', text: 'If appetite is low, use dense small meals: yogurt, eggs, tofu, nut butter toast, banana, soup with protein.' },
+  { category: 'Nutrition', text: 'Food safety matters more in pregnancy: avoid undercooked meat/eggs and unpasteurized dairy.' },
+  { category: 'Food Safety', text: 'Heat deli meats until steaming when possible. It is a practical step for reducing listeria risk.' },
+  { category: 'Food Safety', text: 'Wash produce well and separate raw meat cutting boards from ready-to-eat foods to reduce contamination risk.' },
+  { category: 'Dental', text: 'Pregnancy hormones can increase gum bleeding. Gentle brushing plus flossing lowers inflammation and supports overall health.' },
+  { category: 'Dental', text: 'Schedule dental cleaning/check early. Oral infections during pregnancy are linked with worse outcomes when ignored.' },
+  { category: 'Sleep', text: 'Left-side sleeping can improve comfort and circulation in later pregnancy, but the best sleep position is the one you can sustain.' },
+  { category: 'Sleep', text: 'A wind-down routine beats random bedtime: low light, warm shower, no heavy meals right before sleep.' },
+  { category: 'Exercise', text: 'Regular low-intensity movement improves glucose control and mood. Consistency matters more than workout intensity.' },
+  { category: 'Exercise', text: 'If a workout causes dizziness, pain, bleeding, or contractions, stop and contact your provider.' },
+  { category: 'Checkups', text: 'Bring a short question list to each checkup. Anxiety drops when concerns are documented and answered in order.' },
+  { category: 'Checkups', text: 'Track fetal movement pattern in late pregnancy. Sudden reduced movement is a same-day call to your provider.' },
+  { category: 'Logistics', text: 'Pre-pack document pouch: insurance card, Boshi Techo, IDs, and key phone numbers. This removes panic during labor start.' },
+  { category: 'Logistics', text: 'Hospital route rehearsal helps: best route, night route, taxi fallback, and estimated travel time.' },
+  { category: 'Finance', text: 'Keep every medical receipt and transport note. Small expenses become significant when combined for tax deduction.' },
+  { category: 'Finance', text: 'Set a monthly admin day for applications and forms. Batch processing reduces missed deadlines.' },
+  { category: 'Finance', text: 'Benefits often require consultation or formal application. Automatic payout is rare without completing forms.' },
+  { category: 'Mental Health', text: 'Daily 5-minute emotional check-ins can catch burnout early. Naming stress lowers its intensity.' },
+  { category: 'Mental Health', text: 'Support requests work best when concrete: task, time, and expected outcome.' },
+  { category: 'Postpartum', text: 'Plan postpartum logistics now: meals, sleep shifts, and emergency contacts. Early planning protects recovery.' },
+  { category: 'Postpartum', text: 'Breastfeeding support contacts should be pre-saved before delivery, not searched while exhausted.' },
+  { category: 'Work', text: 'Log attendance daily while memory is fresh. Late backfilling usually creates errors and stress.' },
+  { category: 'Work', text: 'If work symptoms worsen, document time and trigger. Specific patterns help doctors and managers respond faster.' },
+  { category: 'Communication', text: 'When calling offices, prepare: your ID details, purpose, and exact question. Short scripts save time.' },
+  { category: 'Communication', text: 'If language barrier appears, ask for simpler Japanese, written notes, or interpreter services early.' },
+  { category: 'Planning', text: 'Use a two-layer system: today actions and this-week actions. It keeps urgent tasks from hiding inside long lists.' },
+  { category: 'Planning', text: 'Link reminders to real anchors: breakfast, lunch, bedtime. Context-based cues outperform random-time alarms.' },
+  { category: 'Medical', text: 'Do not add herbs or new supplements without provider review. "Natural" does not always mean pregnancy-safe.' },
+  { category: 'Medical', text: 'Bring current supplement list to appointments so drug-supplement interactions can be checked.' },
+  { category: 'Medical', text: 'Persistent vomiting, dehydration signs, bleeding, fever, or severe pain are direct call triggers, not wait-and-see items.' },
+  { category: 'Japan Admin', text: 'For Japan paperwork, deadlines are strict. Completing forms early is often worth more than finding perfect wording.' },
+  { category: 'Japan Admin', text: 'Save agency phone numbers with labels. In urgent moments, navigation speed matters more than memory.' },
+  { category: 'Family', text: 'Define backup caregivers and transport options now. Contingency plans reduce delivery-day chaos.' },
+  { category: 'Family', text: 'Short daily updates between parents keep expectations aligned and reduce silent stress buildup.' },
+]
+
+const WITTY_TIP_DATABASE = [
+  { category: 'Witty', text: 'Hydration check: if your water bottle has not moved in 2 hours, it is now decorative furniture.' },
+  { category: 'Witty', text: 'Supplements are tiny, but their attitude is huge when ignored.' },
+  { category: 'Witty', text: 'Admin forms are like laundry. Fold them early or they become emotional support piles.' },
+  { category: 'Witty', text: 'Sleep strategy: less doom scroll, more pillow diplomacy.' },
+  { category: 'Witty', text: 'If today feels heavy: one dose, one form, one glass of water. Three wins beats drama.' },
+  { category: 'Witty', text: 'Your baby is running a premium growth subscription. Consistent inputs keep the service smooth.' },
+  { category: 'Witty', text: 'Reminder: "later" is a scammer when paperwork is involved.' },
+  { category: 'Witty', text: 'Ganbatte mode: small actions now so future-you can flex less panic, more peace.' },
+  { category: 'Witty', text: 'Bisaya mini-mode: hinay lang pero padayon. Slow is still forward.' },
+  { category: 'Witty', text: 'Nurse-level trick: write the question before appointment, because memory turns shy inside clinics.' },
+  { category: 'Witty', text: 'Healthy routine is not glamorous. It is mostly repeating boring good decisions like a champion.' },
+  { category: 'Witty', text: 'If you forgot a dose, no guilt spiral. Reset quickly and continue the mission.' },
+]
+
+export function getSupplementReminderContext({ dailySupp, suppSchedule, now = new Date() }) {
+  const dateKey = toIsoDate(now)
+  const doseDateKey = toDoseDateKey(now)
+  const nowMinutes = minutesSinceMidnight(now)
+
+  let totalDoses = 0
+  let takenDoses = 0
+  let remainingDoses = 0
+  let overdueDoses = 0
+  let nextDoseMinutes = Number.POSITIVE_INFINITY
+
+  supplements.forEach(supp => {
+    const schedule = suppSchedule?.[supp.id]
+    const times = schedule?.times?.length ? schedule.times : supp.defaultTimes
+    times.forEach((clock, idx) => {
+      totalDoses += 1
+      const doseKey = `${supp.id}-${idx}-${doseDateKey}`
+      const taken = Boolean(dailySupp?.[doseKey])
+      if (taken) {
+        takenDoses += 1
+        return
+      }
+
+      remainingDoses += 1
+      const dueMinutes = parseClockMinutes(clock)
+      if (dueMinutes <= nowMinutes) {
+        overdueDoses += 1
+      } else {
+        nextDoseMinutes = Math.min(nextDoseMinutes, dueMinutes - nowMinutes)
+      }
+    })
+  })
+
+  return {
+    dateKey,
+    totalDoses,
+    takenDoses,
+    remainingDoses,
+    overdueDoses,
+    nextDoseMinutes: Number.isFinite(nextDoseMinutes) ? nextDoseMinutes : null,
+  }
+}
+
+export function getWorkReminderContext({ attendance, now = new Date() }) {
+  const dateKey = toIsoDate(now)
+  const day = now.getDay()
+  const isWeekday = day >= 1 && day <= 5
+  const hasAttendance = Boolean(attendance?.[dateKey])
+  const hour = now.getHours()
+  return {
+    dateKey,
+    hour,
+    isWeekday,
+    hasAttendance,
+    needsReminder: isWeekday && !hasAttendance,
+  }
+}
+
+function resolveSuppLevel(ctx, now) {
+  if (ctx.overdueDoses >= 2) return 'urgent'
+  if (ctx.overdueDoses >= 1 && now.getHours() >= 16) return 'urgent'
+  if (ctx.overdueDoses >= 1) return 'nudge'
+  if (ctx.remainingDoses >= 3 && now.getHours() >= 14) return 'nudge'
+  if (ctx.remainingDoses >= 1 && now.getHours() >= 20) return 'urgent'
+  return 'gentle'
+}
+
+function resolveWorkLevel(ctx) {
+  if (ctx.hour >= 17) return 'urgent'
+  if (ctx.hour >= 11) return 'nudge'
+  return 'gentle'
+}
+
+function buildReminderSubtitle({
+  taken,
+  total,
+  remaining,
+  overdue,
+  styleLine,
+  pushLine,
+  jokeLine,
+  nextDoseMinutes,
+}) {
+  const pieces = [
+    `${taken}/${total} doses done.`,
+    `${remaining} left today.`,
+    overdue > 0 ? `${overdue} overdue.` : 'Still recoverable.',
+    nextDoseMinutes && overdue === 0 ? `Next window in ~${nextDoseMinutes} min.` : '',
+    styleLine,
+    pushLine,
+    jokeLine,
+  ].filter(Boolean)
+  return pieces.join(' ')
+}
+
+export function buildSupplementReminder(ctx, now = new Date(), seedSalt = 'home') {
+  const level = resolveSuppLevel(ctx, now)
+  const intervalMinutes = level === 'urgent' ? 20 : level === 'nudge' ? 45 : 90
+  const slot = Math.floor(minutesSinceMidnight(now) / intervalMinutes)
+  const seedRoot = `${seedSalt}|supp|${ctx.dateKey}|${ctx.remainingDoses}|${ctx.overdueDoses}|${slot}|${level}`
+  const style = weightedPick(LANGUAGE_STYLE_WEIGHTS, `${seedRoot}|style`) || 'taglish'
+  const title = pickBySeed(SUPP_TITLE_DATABASE[level], `${seedRoot}|title`)
+  const styleLine = pickBySeed(SUPP_STYLE_LINES[style][level], `${seedRoot}|line`)
+  const pushLine = pickBySeed(SUPP_PUSH_LINES[level], `${seedRoot}|push`)
+  const jokeLine = pickBySeed(SUPP_JOKE_LINES[level], `${seedRoot}|joke`)
+  const subtitle = buildReminderSubtitle({
+    taken: ctx.takenDoses,
+    total: ctx.totalDoses,
+    remaining: ctx.remainingDoses,
+    overdue: ctx.overdueDoses,
+    styleLine,
+    pushLine,
+    jokeLine,
+    nextDoseMinutes: ctx.nextDoseMinutes,
+  })
+
+  return {
+    type: 'supp',
+    level,
+    intervalMinutes,
+    slotKey: `${ctx.dateKey}|supp|${intervalMinutes}|${slot}`,
+    priorityScore: level === 'urgent' ? 4 : level === 'nudge' ? 3 : 2,
+    title,
+    subtitle,
+    notificationTitle: 'Peggy reminder: Supplements',
+    notificationBody: `${ctx.remainingDoses} doses left today${ctx.overdueDoses ? `, ${ctx.overdueDoses} overdue` : ''}.`,
+  }
+}
+
+export function buildWorkReminder(ctx, now = new Date(), seedSalt = 'home') {
+  const level = resolveWorkLevel(ctx)
+  const intervalMinutes = level === 'urgent' ? 30 : level === 'nudge' ? 60 : 120
+  const slot = Math.floor(minutesSinceMidnight(now) / intervalMinutes)
+  const seedRoot = `${seedSalt}|work|${ctx.dateKey}|${ctx.hour}|${slot}|${level}`
+  const style = weightedPick(LANGUAGE_STYLE_WEIGHTS, `${seedRoot}|style`) || 'taglish'
+  const title = pickBySeed(WORK_TITLE_DATABASE[level], `${seedRoot}|title`)
+  const styleLine = pickBySeed(WORK_STYLE_LINES[style][level], `${seedRoot}|line`)
+  const jokeLine = pickBySeed(WORK_JOKE_LINES[level], `${seedRoot}|joke`)
+  const subtitle = `${styleLine} ${jokeLine}`.trim()
+
+  return {
+    type: 'work',
+    level,
+    intervalMinutes,
+    slotKey: `${ctx.dateKey}|work|${intervalMinutes}|${slot}`,
+    priorityScore: level === 'urgent' ? 3 : level === 'nudge' ? 2 : 1,
+    title,
+    subtitle,
+    notificationTitle: 'Peggy reminder: Attendance',
+    notificationBody: 'Please log today attendance before day rollover.',
+  }
+}
+
+export function buildDailyTip({ now = new Date(), weeksPregnant = null, completedCheckups = 0, suppCtx = null }) {
+  const dateKey = toIsoDate(now)
+  const slot = Math.floor(minutesSinceMidnight(now) / 240) // rotate every 4 hours
+  const seedRoot = `${dateKey}|${slot}|${weeksPregnant ?? 'na'}|${completedCheckups}|${suppCtx?.remainingDoses ?? 0}|${suppCtx?.overdueDoses ?? 0}`
+  const roll = hashString(`${seedRoot}|tone`) % 100
+  const useWitty = roll < 18
+  const pool = useWitty ? WITTY_TIP_DATABASE : SERIOUS_TIP_DATABASE
+  const tip = pickBySeed(pool, `${seedRoot}|tip`)
+
+  return {
+    category: tip?.category || 'General',
+    tone: useWitty ? 'witty' : 'serious',
+    modeLabel: useWitty ? 'Witty break' : 'Deep info mode',
+    text: tip?.text || 'One small healthy action now beats perfect plans later.',
+  }
+}
+
+function pickUniqueBySeed(list, seed, count = 1) {
+  const safe = Array.isArray(list) ? [...list] : []
+  const out = []
+  if (safe.length === 0 || count <= 0) return out
+  let cursorSeed = String(seed)
+
+  while (safe.length > 0 && out.length < count) {
+    const idx = hashString(cursorSeed) % safe.length
+    out.push(safe.splice(idx, 1)[0])
+    cursorSeed = `${cursorSeed}|${out.length}`
+  }
+  return out
+}
+
+const NAME_STYLE_LINES = [
+  'Top picks stay visible. Rotating pick keeps it fresh.',
+  'Core choices remain stable, spotlight changes by time.',
+  'Priority names are pinned, wildcards rotate for variety.',
+  'Main picks stay. Discovery picks rotate all day.',
+]
+
+const NAME_JOKE_LINES = [
+  'Baby naming committee is now in session.',
+  'Kanji + vibes + future nickname test: approved.',
+  'One more strong candidate entered the chat.',
+  'Portfolio-level name drop detected.',
+  'This name passed the playground shout test.',
+]
+
+export function buildNameSpotlight({ now = new Date(), babyNamesInfo, seedSalt = 'home' }) {
+  const dateKey = toIsoDate(now)
+  const halfDaySlot = Math.floor(minutesSinceMidnight(now) / 360)
+  const gender = (hashString(`${seedSalt}|${dateKey}|gender`) % 2 === 0) ? 'boy' : 'girl'
+  const list = gender === 'boy' ? (babyNamesInfo?.boyNames || []) : (babyNamesInfo?.girlNames || [])
+  const topPicks = list.filter(n => n?.tier === 1)
+  const allNames = list.filter(Boolean)
+
+  const pinned = pickUniqueBySeed(
+    topPicks.length >= 3 ? topPicks : allNames,
+    `${seedSalt}|${dateKey}|pinned`,
+    Math.min(3, allNames.length),
+  )
+  const rotating = pickUniqueBySeed(
+    allNames,
+    `${seedSalt}|${dateKey}|${halfDaySlot}|rotating`,
+    1,
+  )[0] || pinned[0] || null
+
+  const fallback = {
+    name: 'Kaizen',
+    kanji: '魁禅',
+    meaning: 'Pioneer with calm strength',
+    tier: 1,
+  }
+  const companion = pinned[0] || rotating || fallback
+  const styleLine = pickBySeed(NAME_STYLE_LINES, `${seedSalt}|${dateKey}|${halfDaySlot}|style`)
+  const jokeLine = pickBySeed(NAME_JOKE_LINES, `${seedSalt}|${dateKey}|${halfDaySlot}|joke`)
+
+  return {
+    dateKey,
+    gender,
+    companionName: companion.name,
+    companionKanji: companion.kanji,
+    companionLabel: `${companion.name}${companion.kanji ? ` (${companion.kanji})` : ''}`,
+    spotlight: rotating || companion,
+    pinnedTopPicks: pinned,
+    spotlightLine: styleLine,
+    jokeLine,
+    slotKey: `${dateKey}|name|${halfDaySlot}|${gender}`,
+    notificationTitle: `New name spotlight: ${rotating?.name || companion.name}`,
+    notificationBody: `${(rotating?.kanji || companion.kanji || '').trim()} ${rotating?.meaning || companion.meaning || ''}`.trim(),
+  }
+}
+
+export const SMART_NOTIF_PREF_KEY = 'peggy-smart-notifs-enabled'
+export const SMART_NOTIF_LOG_KEY = 'peggy-smart-notifs-log-v1'
+
+export function readSmartNotifEnabled() {
+  if (typeof window === 'undefined') return false
+  return window.localStorage.getItem(SMART_NOTIF_PREF_KEY) === '1'
+}
+
+export function writeSmartNotifEnabled(enabled) {
+  if (typeof window === 'undefined') return
+  window.localStorage.setItem(SMART_NOTIF_PREF_KEY, enabled ? '1' : '0')
+}
+
+function readNotifLog() {
+  if (typeof window === 'undefined') return {}
+  try {
+    const raw = window.localStorage.getItem(SMART_NOTIF_LOG_KEY)
+    return raw ? JSON.parse(raw) : {}
+  } catch {
+    return {}
+  }
+}
+
+function writeNotifLog(map) {
+  if (typeof window === 'undefined') return
+  try {
+    window.localStorage.setItem(SMART_NOTIF_LOG_KEY, JSON.stringify(map))
+  } catch {
+    // Ignore storage write failures.
+  }
+}
+
+function pruneNotifLog(map, now = new Date()) {
+  const keepSince = now.getTime() - (5 * 24 * 60 * 60 * 1000)
+  const out = {}
+  for (const [k, ts] of Object.entries(map || {})) {
+    const n = Number(ts)
+    if (Number.isFinite(n) && n >= keepSince) out[k] = n
+  }
+  return out
+}
+
+export function hasSentNotificationSlot(slotKey, now = new Date()) {
+  if (!slotKey) return false
+  const pruned = pruneNotifLog(readNotifLog(), now)
+  return Boolean(pruned[slotKey])
+}
+
+export function markNotificationSlotSent(slotKey, now = new Date()) {
+  if (!slotKey) return
+  const pruned = pruneNotifLog(readNotifLog(), now)
+  pruned[slotKey] = now.getTime()
+  writeNotifLog(pruned)
+}
