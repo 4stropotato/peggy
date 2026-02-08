@@ -1,4 +1,4 @@
-const CACHE_NAME = 'baby-prep-v6';
+const CACHE_NAME = 'baby-prep-v7';
 
 function resolveBasePath() {
   const swPath = self.location?.pathname || '/sw.js';
@@ -11,7 +11,9 @@ const PRECACHE = [
   BASE,
   `${BASE}index.html`,
   `${BASE}manifest.json`,
-  `${BASE}icon-192.png`
+  `${BASE}apple-touch-icon-180.png`,
+  `${BASE}icon-192.png`,
+  `${BASE}icon-512.png`
 ];
 
 function toAbsoluteUrl(url) {
