@@ -99,13 +99,14 @@ export function clearCloudSession() {
 
 export async function cloudSignUp(email, password, redirectTo = '') {
   const body = { email, password };
-  if (redirectTo) {
-    // GoTrue accepts snake_case for REST payload.
-    body.email_redirect_to = redirectTo;
-  }
+  const signupPath = redirectTo
+    ? `/auth/v1/signup?redirect_to=${encodeURIComponent(redirectTo)}`
+    : '/auth/v1/signup';
+  const headers = redirectTo ? { redirect_to: redirectTo } : undefined;
 
-  const data = await cloudFetch('/auth/v1/signup', {
+  const data = await cloudFetch(signupPath, {
     method: 'POST',
+    headers,
     body
   });
 
