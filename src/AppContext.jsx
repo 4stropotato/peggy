@@ -68,13 +68,17 @@ export function AppProvider({ children }) {
   const [checked, setChecked] = useLS('baby-prep-checked', {})
   const [dailySupp, setDailySupp] = useLS('baby-prep-daily', {})
   const [moneyClaimed, setMoneyClaimed] = useLS('baby-prep-money', {})
-  const [dueDate, setDueDate] = useLS('baby-prep-due', '')
+  const [dueDate, setDueDate] = useLS('baby-prep-due', '2026-10-04')
   const [theme, setTheme] = useLS('baby-prep-theme', 'dark')
   const [salary, setSalary] = useLS('baby-prep-salary', [])
   const [checkups, setCheckups] = useLS('baby-prep-checkups', {})
   const [moods, setMoods] = useLS('baby-prep-moods', [])
   const [doctor, setDoctor] = useLS('baby-prep-doctor', { name: '', hospital: '', phone: '', address: '', notes: '' })
-  const [contacts, setContacts] = useLS('baby-prep-contacts', [])
+  const [contacts, setContacts] = useLS('baby-prep-contacts', [
+    { id: '1', name: 'Naomi', phone: '', relationship: 'Wife / Mommy' },
+    { id: '2', name: 'Shinji', phone: '', relationship: 'Husband / Dada' },
+    { id: '3', name: 'Tom', phone: '', relationship: 'Ate / Sister' },
+  ])
   const [taxInputs, setTaxInputs] = useLS('baby-prep-tax', {
     annualIncome: '',
     spouseIncome: '',

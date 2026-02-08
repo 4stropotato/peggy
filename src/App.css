@@ -1871,6 +1871,23 @@ input[type="range"]:focus {
   border-color: var(--green);
   color: white;
 }
+.app.light .section-note.disclaimer,
+.app.light .money-card-top .money-amount,
+.app.light .money-amount,
+.app.light .detail-tip .detail-label,
+.app.light .detail-tip .detail-text,
+.app.light .ceil-row span:last-child,
+.app.light .dose-countdown.soon,
+.app.light .supp-card-note,
+.app.light .warn-card p,
+.app.light .mood-entry-craving,
+.app.light .info-item-value,
+.app.light .salary-amount,
+.app.light .sched-row.warn .sched-items,
+.app.light .supp-warning-info,
+.app.light .day-detail-craving {
+  color: #8a4f05;
+}
 
 /* ===== Theme Toggle Button ===== */
 .theme-toggle {
