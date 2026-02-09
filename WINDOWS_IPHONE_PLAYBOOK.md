@@ -72,6 +72,8 @@ When Mac is available:
 - You can prepare build config from Windows.
 - For real iPhone native install/distribution, Apple Developer membership is still required.
 - Keep this as Phase 2 after PWA is stable.
+- Owner action list is here:
+- `CLOUD_NATIVE_BUILD_OWNER_CHECKLIST.md`
 
 ## 6. Safety + Recovery Rules
 
@@ -98,4 +100,3 @@ When Mac is available:
 ### Phase C (Release)
 - TestFlight/App Store distribution
 - long-term telemetry and crash tracking
-
