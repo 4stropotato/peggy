@@ -8,6 +8,7 @@ import MoreTab from './tabs/MoreTab'
 import CloudSyncAgent from './components/CloudSyncAgent'
 import PushSyncAgent from './components/PushSyncAgent'
 import SmartReminderAgent from './components/SmartReminderAgent'
+import WidgetSyncAgent from './components/WidgetSyncAgent'
 import { THEME_ICONS, UiIcon, getNavIcons, resolveIconStyle } from './uiIcons'
 import './App.css'
 
@@ -220,6 +221,7 @@ export default function App() {
       <CloudSyncAgent />
       <PushSyncAgent />
       <SmartReminderAgent />
+      <WidgetSyncAgent />
       <AppInner />
     </AppProvider>
   )

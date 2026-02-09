@@ -57,3 +57,13 @@ Without "Always", background auto-log will be limited.
 - Web mode: foreground-only (Peggy must be open).
 
 Health tab now shows the active tracking mode so you can verify.
+
+## 6. Widget Continuation
+
+For home-screen/lock-screen widget setup, follow:
+
+- `NATIVE_WIDGET_SETUP.md`
+
+Template files are included in:
+
+- `native/widgetkit-template/`
