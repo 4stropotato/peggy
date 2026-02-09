@@ -78,6 +78,7 @@ export default function HomeTab() {
 
   const [showDueInput, setShowDueInput] = useState(!dueDate)
   const [nowTick, setNowTick] = useState(() => Date.now())
+  const [subtitleTick, setSubtitleTick] = useState(() => Date.now())
   const now = useMemo(() => new Date(nowTick), [nowTick])
   const [calState, setCalState] = useState({ y: now.getFullYear(), m: now.getMonth() + 1 })
   const [selectedDay, setSelectedDay] = useState(null)
@@ -86,6 +87,11 @@ export default function HomeTab() {
 
   useEffect(() => {
     const id = setInterval(() => setNowTick(Date.now()), 30 * 1000)
+    return () => clearInterval(id)
+  }, [])
+
+  useEffect(() => {
+    const id = setInterval(() => setSubtitleTick(Date.now()), 6 * 1000)
     return () => clearInterval(id)
   }, [])
 
@@ -190,8 +196,8 @@ export default function HomeTab() {
     [nowTick],
   )
   const companionSubtitle = useMemo(
-    () => buildCompanionSubtitleRotation({ now, babyNamesInfo, seedSalt: 'home' }),
-    [nowTick],
+    () => buildCompanionSubtitleRotation({ now: new Date(subtitleTick), babyNamesInfo, seedSalt: 'home' }),
+    [subtitleTick],
   )
 
   const dailyTip = useMemo(

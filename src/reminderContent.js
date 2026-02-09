@@ -872,21 +872,22 @@ function extractBabyName(entry) {
 }
 
 export function buildCompanionSubtitleRotation({ now = new Date(), babyNamesInfo, seedSalt = 'home' }) {
-  const slot = Math.floor(now.getTime() / 30000) // rotate every 30 seconds
+  const phraseSlot = Math.floor(now.getTime() / 18000) // phrase rotates every 18 seconds
+  const nameSlot = Math.floor(now.getTime() / 6000) // placeholder name rotates every 6 seconds
   const dateKey = toIsoDate(now)
   const boy = Array.isArray(babyNamesInfo?.boyNames) ? babyNamesInfo.boyNames : []
   const girl = Array.isArray(babyNamesInfo?.girlNames) ? babyNamesInfo.girlNames : []
   const allNames = [...boy, ...girl].filter(name => extractBabyName(name))
 
-  const phrase = pickBySeed(COMPANION_SUBTITLE_TEMPLATES, `${seedSalt}|subtitle|${slot}|phrase`)
+  const phrase = pickBySeed(COMPANION_SUBTITLE_TEMPLATES, `${seedSalt}|subtitle|${phraseSlot}|phrase`)
     || 'Pregnancy Planning, Made Simple for @placeholder'
-  const nameEntry = pickBySeed(allNames, `${seedSalt}|subtitle|${slot}|name`)
+  const nameEntry = pickBySeed(allNames, `${seedSalt}|subtitle|${nameSlot}|name`)
   const babyName = extractBabyName(nameEntry) || 'Baby'
 
   return {
     text: phrase.replace('@placeholder', babyName),
     babyName,
-    slotKey: `${dateKey}|subtitle|${slot}`,
+    slotKey: `${dateKey}|subtitle|${phraseSlot}|${nameSlot}`,
   }
 }
 
