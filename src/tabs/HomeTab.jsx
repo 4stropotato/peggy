@@ -11,15 +11,8 @@ import {
   buildNameSpotlight,
   buildSupplementReminder,
   buildWorkReminder,
-  formatSmartNotifQuietHoursLabel,
   getSupplementReminderContext,
   getWorkReminderContext,
-  SMART_NOTIF_PREF_EVENT,
-  SMART_NOTIF_QUIET_HOURS_EVENT,
-  readSmartNotifEnabled,
-  readSmartNotifQuietHours,
-  writeSmartNotifEnabled,
-  writeSmartNotifQuietHours,
 } from '../reminderContent'
 
 // Find earliest date any supplement was tracked
@@ -91,9 +84,6 @@ export default function HomeTab() {
   const now = useMemo(() => new Date(nowTick), [nowTick])
   const [calState, setCalState] = useState({ y: now.getFullYear(), m: now.getMonth() + 1 })
   const [selectedDay, setSelectedDay] = useState(null)
-  const [notifEnabled, setNotifEnabled] = useState(() => readSmartNotifEnabled())
-  const [quietHours, setQuietHours] = useState(() => readSmartNotifQuietHours())
-  const [notifStatus, setNotifStatus] = useState('')
 
   useEffect(() => {
     const id = setInterval(() => setNowTick(Date.now()), 30 * 1000)
@@ -103,39 +93,6 @@ export default function HomeTab() {
   useEffect(() => {
     const id = setInterval(() => setSubtitleTick(Date.now()), 6 * 1000)
     return () => clearInterval(id)
-  }, [])
-
-  useEffect(() => {
-    if (!notifStatus) return undefined
-    const id = setTimeout(() => setNotifStatus(''), 4000)
-    return () => clearTimeout(id)
-  }, [notifStatus])
-
-  useEffect(() => {
-    if (typeof window === 'undefined') return undefined
-
-    const syncNotifEnabled = () => {
-      setNotifEnabled(readSmartNotifEnabled())
-    }
-    const syncQuietHours = () => {
-      setQuietHours(readSmartNotifQuietHours())
-    }
-
-    const syncAllNotifSettings = () => {
-      syncNotifEnabled()
-      syncQuietHours()
-    }
-
-    window.addEventListener(SMART_NOTIF_PREF_EVENT, syncNotifEnabled)
-    window.addEventListener(SMART_NOTIF_QUIET_HOURS_EVENT, syncQuietHours)
-    window.addEventListener('peggy-backup-restored', syncAllNotifSettings)
-    window.addEventListener('storage', syncAllNotifSettings)
-    return () => {
-      window.removeEventListener(SMART_NOTIF_PREF_EVENT, syncNotifEnabled)
-      window.removeEventListener(SMART_NOTIF_QUIET_HOURS_EVENT, syncQuietHours)
-      window.removeEventListener('peggy-backup-restored', syncAllNotifSettings)
-      window.removeEventListener('storage', syncAllNotifSettings)
-    }
   }, [])
 
   const totalItems = phases.reduce((acc, p) => acc + p.items.length, 0)
@@ -230,55 +187,6 @@ export default function HomeTab() {
     [nowTick, weeksPregnant, completedCheckups, suppReminderCtx.remainingDoses, suppReminderCtx.overdueDoses],
   )
 
-  const handleNotifToggle = async () => {
-    if (typeof Notification === 'undefined') {
-      setNotifStatus('Browser notifications are not supported on this device/browser.')
-      return
-    }
-
-    if (notifEnabled) {
-      writeSmartNotifEnabled(false)
-      setNotifEnabled(false)
-      setNotifStatus('Reminders paused.')
-      return
-    }
-
-    if (Notification.permission === 'denied') {
-      setNotifStatus('Notifications are blocked in browser settings.')
-      return
-    }
-
-    let permission = Notification.permission
-    if (permission !== 'granted') {
-      permission = await Notification.requestPermission()
-    }
-
-    if (permission === 'granted') {
-      writeSmartNotifEnabled(true)
-      setNotifEnabled(true)
-      setNotifStatus('Smart reminders enabled.')
-      return
-    }
-
-    setNotifStatus('Permission not granted.')
-  }
-
-  const handleQuietHoursToggle = () => {
-    const next = { ...quietHours, enabled: !quietHours.enabled }
-    setQuietHours(next)
-    writeSmartNotifQuietHours(next)
-    setNotifStatus(next.enabled ? `Quiet hours enabled (${formatSmartNotifQuietHoursLabel(next)}).` : 'Quiet hours disabled.')
-  }
-
-  const handleQuietHoursTimeChange = (field, value) => {
-    const next = { ...quietHours, [field]: value }
-    setQuietHours(next)
-    writeSmartNotifQuietHours(next)
-    if (next.enabled) {
-      setNotifStatus(`Quiet hours updated (${formatSmartNotifQuietHoursLabel(next)}).`)
-    }
-  }
-
   return (
     <div className="content">
       <header className="home-header">
@@ -347,67 +255,21 @@ export default function HomeTab() {
         </div>
       </div>
 
-      <section className="glass-section notif-settings-card">
+      <section className="glass-section tip-card">
         <div className="section-header">
-          <span className="section-icon"><UiIcon icon={APP_ICONS.reminders} /></span>
-          <div>
-            <h2>Notification Settings</h2>
-            <span className="section-count">Per-account settings</span>
-          </div>
-          <button
-            type="button"
-            className={`notif-toggle-btn glass-inner ${notifEnabled ? 'on' : ''}`}
-            onClick={handleNotifToggle}
-          >
-            {notifEnabled ? 'Notifications ON' : 'Enable Notifications'}
-          </button>
+          <span className="section-icon"><UiIcon icon={APP_ICONS.tip} /></span>
+          <div><h2>Daily Tip</h2></div>
         </div>
-        <div className="notif-settings-grid">
-          <button
-            type="button"
-            className={`notif-pill-btn glass-inner ${quietHours.enabled ? 'on' : ''}`}
-            onClick={handleQuietHoursToggle}
-          >
-            {quietHours.enabled ? 'Quiet Hours ON' : 'Quiet Hours OFF'}
-          </button>
-          <label className="notif-time-field">
-            <span>Start</span>
-            <input
-              type="time"
-              value={quietHours.start}
-              disabled={!quietHours.enabled}
-              onChange={e => handleQuietHoursTimeChange('start', e.target.value)}
-            />
-          </label>
-          <label className="notif-time-field">
-            <span>End</span>
-            <input
-              type="time"
-              value={quietHours.end}
-              disabled={!quietHours.enabled}
-              onChange={e => handleQuietHoursTimeChange('end', e.target.value)}
-            />
-          </label>
-        </div>
-        <p className="section-note">
-          Quiet hours: {formatSmartNotifQuietHoursLabel(quietHours)}. During quiet hours, reminders stay silent pero badge updates continue.
-        </p>
-        {notifStatus && <p className="section-note">{notifStatus}</p>}
+        <div className={`tip-mode ${dailyTip.tone}`}>{dailyTip.modeLabel} - {dailyTip.category}</div>
+        <p className="tip-text">{dailyTip.text}</p>
       </section>
 
-      {(suppReminder || workReminder) && (
-        <section className="glass-section reminder-section">
-          <div className="section-header">
-            <span className="section-icon"><UiIcon icon={APP_ICONS.reminders} /></span>
-            <div><h2>Reminders for Today</h2></div>
-            <button
-              type="button"
-              className={`notif-toggle-btn glass-inner ${notifEnabled ? 'on' : ''}`}
-              onClick={handleNotifToggle}
-            >
-              {notifEnabled ? 'Notifications ON' : 'Enable Notifications'}
-            </button>
-          </div>
+      <section className="glass-section reminder-section">
+        <div className="section-header">
+          <span className="section-icon"><UiIcon icon={APP_ICONS.reminders} /></span>
+          <div><h2>Reminders for Today</h2></div>
+        </div>
+        {(suppReminder || workReminder) ? (
           <div className="reminder-cards">
             {suppReminder && (
               <div className={`reminder-card glass-inner reminder-supps level-${suppReminder.level}`}>
@@ -428,86 +290,19 @@ export default function HomeTab() {
               </div>
             )}
           </div>
-        </section>
-      )}
-
-      <section className="glass-section name-spotlight-card">
-        <div className="section-header">
-          <span className="section-icon"><UiIcon icon={APP_ICONS.names} /></span>
-          <div>
-            <h2>Name Spotlight</h2>
-            <span className="section-count">{nameSpotlight.gender === 'boy' ? 'Boy names' : 'Girl names'} - updates every few hours</span>
-          </div>
-          <button
-            type="button"
-            className={`notif-toggle-btn glass-inner ${notifEnabled ? 'on' : ''}`}
-            onClick={handleNotifToggle}
-          >
-            {notifEnabled ? 'Notifications ON' : 'Enable Notifications'}
-          </button>
-        </div>
-        <div className="name-spotlight-main glass-inner">
-          <div className="name-spotlight-title">{nameSpotlight.spotlight.name} {nameSpotlight.spotlight.kanji}</div>
-          <div className="name-spotlight-subtitle">{nameSpotlight.spotlight.meaning}</div>
-          <div className="name-spotlight-line">{nameSpotlight.spotlightLine} {nameSpotlight.jokeLine}</div>
-        </div>
-        <div className="name-chip-row">
-          {nameSpotlight.pinnedTopPicks.map((pick, idx) => (
-            <div key={`${pick.name}-${idx}`} className="name-chip glass-inner">
-              <span className="name-chip-main">{pick.name}</span>
-              <span className="name-chip-kanji">{pick.kanji}</span>
-              <span className="name-chip-badge">Top Pick</span>
-            </div>
-          ))}
-        </div>
+        ) : (
+          <p className="section-note">All good. No reminders right now.</p>
+        )}
+        <p className="section-note">Notification settings are now in More.</p>
       </section>
-
-      {weeksPregnant !== null && weeksPregnant >= 0 && (
-        <section className="glass-section home-progress-ring">
-          <div className="ring-container">
-            <svg viewBox="0 0 120 120" className="progress-svg">
-              <circle cx="60" cy="60" r="52" fill="none" stroke="rgba(255,255,255,0.1)" strokeWidth="8" />
-              <circle
-                cx="60"
-                cy="60"
-                r="52"
-                fill="none"
-                stroke="url(#ringGradient)"
-                strokeWidth="8"
-                strokeLinecap="round"
-                strokeDasharray={`${(weeksPregnant / 40) * 327} 327`}
-                transform="rotate(-90 60 60)"
-              />
-              <defs>
-                <linearGradient id="ringGradient" x1="0%" y1="0%" x2="100%" y2="100%">
-                  <stop offset="0%" stopColor="#e91e8b" />
-                  <stop offset="100%" stopColor="#6c5ce7" />
-                </linearGradient>
-              </defs>
-            </svg>
-            <div className="ring-text">
-              <div className="ring-number">{weeksPregnant}</div>
-              <div className="ring-label">weeks</div>
-            </div>
-          </div>
-          <div className="ring-info">
-            <div className="ring-detail">Trimester {weeksPregnant < 13 ? '1' : weeksPregnant < 27 ? '2' : '3'}</div>
-            <div className="ring-detail">Checkups: {completedCheckups}/14</div>
-            {latestMood && (
-              <div className="ring-detail ring-mood-detail">
-                <span>Mood:</span>
-                <span className="ring-mood-icon"><TokenIcon token={latestMood.mood} /></span>
-                <span>{latestMood.energy && `Energy: ${latestMood.energy}/5`}</span>
-              </div>
-            )}
-          </div>
-        </section>
-      )}
 
       <section className="glass-section">
         <div className="section-header">
           <span className="section-icon"><UiIcon icon={APP_ICONS.activity} /></span>
-          <div><h2>All Activity</h2></div>
+          <div>
+            <h2>Calendar</h2>
+            <span className="section-count">Tap a date to add plans</span>
+          </div>
         </div>
         <Calendar
           year={calState.y}
@@ -560,6 +355,72 @@ export default function HomeTab() {
         />
       )}
 
+      {weeksPregnant !== null && weeksPregnant >= 0 && (
+        <section className="glass-section home-progress-ring">
+          <div className="ring-container">
+            <svg viewBox="0 0 120 120" className="progress-svg">
+              <circle cx="60" cy="60" r="52" fill="none" stroke="rgba(255,255,255,0.1)" strokeWidth="8" />
+              <circle
+                cx="60"
+                cy="60"
+                r="52"
+                fill="none"
+                stroke="url(#ringGradient)"
+                strokeWidth="8"
+                strokeLinecap="round"
+                strokeDasharray={`${(weeksPregnant / 40) * 327} 327`}
+                transform="rotate(-90 60 60)"
+              />
+              <defs>
+                <linearGradient id="ringGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                  <stop offset="0%" stopColor="#e91e8b" />
+                  <stop offset="100%" stopColor="#6c5ce7" />
+                </linearGradient>
+              </defs>
+            </svg>
+            <div className="ring-text">
+              <div className="ring-number">{weeksPregnant}</div>
+              <div className="ring-label">weeks</div>
+            </div>
+          </div>
+          <div className="ring-info">
+            <div className="ring-detail">Trimester {weeksPregnant < 13 ? '1' : weeksPregnant < 27 ? '2' : '3'}</div>
+            <div className="ring-detail">Checkups: {completedCheckups}/14</div>
+            {latestMood && (
+              <div className="ring-detail ring-mood-detail">
+                <span>Mood:</span>
+                <span className="ring-mood-icon"><TokenIcon token={latestMood.mood} /></span>
+                <span>{latestMood.energy && `Energy: ${latestMood.energy}/5`}</span>
+              </div>
+            )}
+          </div>
+        </section>
+      )}
+
+      <section className="glass-section name-spotlight-card">
+        <div className="section-header">
+          <span className="section-icon"><UiIcon icon={APP_ICONS.names} /></span>
+          <div>
+            <h2>Name Spotlight</h2>
+            <span className="section-count">{nameSpotlight.gender === 'boy' ? 'Boy names' : 'Girl names'} - updates every few hours</span>
+          </div>
+        </div>
+        <div className="name-spotlight-main glass-inner">
+          <div className="name-spotlight-title">{nameSpotlight.spotlight.name} {nameSpotlight.spotlight.kanji}</div>
+          <div className="name-spotlight-subtitle">{nameSpotlight.spotlight.meaning}</div>
+          <div className="name-spotlight-line">{nameSpotlight.spotlightLine} {nameSpotlight.jokeLine}</div>
+        </div>
+        <div className="name-chip-row">
+          {nameSpotlight.pinnedTopPicks.map((pick, idx) => (
+            <div key={`${pick.name}-${idx}`} className="name-chip glass-inner">
+              <span className="name-chip-main">{pick.name}</span>
+              <span className="name-chip-kanji">{pick.kanji}</span>
+              <span className="name-chip-badge">Top Pick</span>
+            </div>
+          ))}
+        </div>
+      </section>
+
       {nextCheckup && (
         <section className="glass-section">
           <div className="section-header">
@@ -572,22 +433,6 @@ export default function HomeTab() {
           <p className="tip-text">{nextCheckup.label}</p>
         </section>
       )}
-
-      <section className="glass-section tip-card">
-        <div className="section-header">
-          <span className="section-icon"><UiIcon icon={APP_ICONS.tip} /></span>
-          <div><h2>Daily Tip</h2></div>
-          <button
-            type="button"
-            className={`notif-toggle-btn glass-inner ${notifEnabled ? 'on' : ''}`}
-            onClick={handleNotifToggle}
-          >
-            {notifEnabled ? 'Notifications ON' : 'Enable Notifications'}
-          </button>
-        </div>
-        <div className={`tip-mode ${dailyTip.tone}`}>{dailyTip.modeLabel} - {dailyTip.category}</div>
-        <p className="tip-text">{dailyTip.text}</p>
-      </section>
 
       <section className="glass-section">
         <div className="section-header">
