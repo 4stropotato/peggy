@@ -3,11 +3,8 @@ import { useApp } from '../AppContext'
 import { supplements, checkupSchedule, optimalSchedule } from '../data'
 import Calendar, { isoToDateString } from '../components/Calendar'
 import { APP_ICONS, TokenIcon, UiIcon } from '../uiIcons'
-import {
-  getCurrentAppLocation,
-  isNativeIos,
-  startAppLocationWatcher,
-} from '../native/locationBridge'
+import { getCurrentAppLocation, isNativeIos } from '../native/locationBridge'
+import { GEO_TELEMETRY_EVENT, getGeoTelemetry } from '../locationTelemetry'
 
 const MOOD_EMOJIS = ['😊', '😐', '😢', '🤢', '😴', '😤', '🥰', '😰']
 
@@ -18,11 +15,17 @@ const DEFAULT_AUTO_HOURS = 8
 const DEFAULT_AWAY_MINUTES = 90
 const MAX_GEOFENCE_RADIUS_METERS = 3000
 const MAX_AWAY_MINUTES = 720
-const MAX_ALLOWED_ACCURACY_METERS = 60
 
-function getTodayISO() {
-  const now = new Date()
-  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`
+const DEFAULT_GEO_LIVE = {
+  tracking: false,
+  inside: false,
+  insideWork: false,
+  insideHome: false,
+  distanceMeters: null,
+  distanceWorkMeters: null,
+  distanceHomeMeters: null,
+  accuracyMeters: null,
+  updatedAt: '',
 }
 
 function isValidLatLng(lat, lng) {
@@ -36,20 +39,6 @@ function isValidLatLng(lat, lng) {
     lngNum >= -180 &&
     lngNum <= 180
   )
-}
-
-function toRad(value) {
-  return (Number(value) * Math.PI) / 180
-}
-
-function calcDistanceMeters(lat1, lng1, lat2, lng2) {
-  const earthRadius = 6371000
-  const dLat = toRad(lat2 - lat1)
-  const dLng = toRad(lng2 - lng1)
-  const a = Math.sin(dLat / 2) ** 2 +
-    Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLng / 2) ** 2
-  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
-  return earthRadius * c
 }
 
 function normalizeRadius(value, fallback = DEFAULT_WORK_RADIUS_METERS) {
@@ -318,32 +307,15 @@ export default function HealthTab() {
 
   const [attendanceDate, setAttendanceDate] = useState(now.toISOString().split('T')[0])
   const [attendanceForm, setAttendanceForm] = useState({ worked: true, hours: 8, note: '' })
-  const [geoStatus, setGeoStatus] = useState('')
-  const [geoLive, setGeoLive] = useState({
-    tracking: false,
-    inside: false,
-    insideWork: false,
-    insideHome: false,
-    distanceMeters: null,
-    distanceWorkMeters: null,
-    distanceHomeMeters: null,
-    accuracyMeters: null,
-    updatedAt: '',
-  })
+  const [geoMessage, setGeoMessage] = useState('')
+  const [geoStatus, setGeoStatus] = useState(() => String(getGeoTelemetry()?.status || ''))
+  const [geoLive, setGeoLive] = useState(() => ({
+    ...DEFAULT_GEO_LIVE,
+    ...(getGeoTelemetry()?.live || {})
+  }))
   const [locationDraft, setLocationDraft] = useState(() => toLocationDraft(workLocation))
-  const stopWatcherRef = useRef(null)
-  const attendanceRef = useRef(attendance)
-  const markAttendanceRef = useRef(markAttendance)
   const draftDirtyRef = useRef(false)
-  const awayStartRef = useRef(null)
-
-  useEffect(() => {
-    attendanceRef.current = attendance
-  }, [attendance])
-
-  useEffect(() => {
-    markAttendanceRef.current = markAttendance
-  }, [markAttendance])
+  const geoMessageTimerRef = useRef(null)
 
   useEffect(() => {
     if (draftDirtyRef.current) return
@@ -371,6 +343,32 @@ export default function HealthTab() {
   const savedHomeTargetValid = isValidLatLng(workLocation.homeLat, workLocation.homeLng)
   const hasSavedGeoTarget = savedWorkTargetValid || savedHomeTargetValid
   const nativeTrackingMode = isNativeIos()
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return undefined
+
+    const applyTelemetry = (next) => {
+      const payload = next && typeof next === 'object' ? next : getGeoTelemetry()
+      setGeoStatus(String(payload?.status || ''))
+      setGeoLive({ ...DEFAULT_GEO_LIVE, ...(payload?.live || {}) })
+    }
+
+    applyTelemetry(getGeoTelemetry())
+    const onTelemetry = (event) => applyTelemetry(event?.detail)
+    window.addEventListener(GEO_TELEMETRY_EVENT, onTelemetry)
+    return () => window.removeEventListener(GEO_TELEMETRY_EVENT, onTelemetry)
+  }, [])
+
+  useEffect(() => {
+    if (!geoMessage) return undefined
+    if (geoMessageTimerRef.current) clearTimeout(geoMessageTimerRef.current)
+    geoMessageTimerRef.current = setTimeout(() => {
+      setGeoMessage('')
+    }, 10000)
+    return () => {
+      if (geoMessageTimerRef.current) clearTimeout(geoMessageTimerRef.current)
+    }
+  }, [geoMessage])
 
   const handleVisitSave = (visitId) => {
     updateCheckup(visitId, { ...visitForm, completed: true })
@@ -405,12 +403,12 @@ export default function HealthTab() {
     const hasHomeCoordsInput = String(locationDraft.homeLat || '').trim() !== '' || String(locationDraft.homeLng || '').trim() !== ''
 
     if (hasWorkCoordsInput && !isValidLatLng(locationDraft.workLat, locationDraft.workLng)) {
-      setGeoStatus('Work pin is invalid. Enter valid latitude and longitude.')
+      setGeoMessage('Work pin is invalid. Enter valid latitude and longitude.')
       return
     }
 
     if (hasHomeCoordsInput && !isValidLatLng(locationDraft.homeLat, locationDraft.homeLng)) {
-      setGeoStatus('Home pin is invalid. Enter valid latitude and longitude.')
+      setGeoMessage('Home pin is invalid. Enter valid latitude and longitude.')
       return
     }
 
@@ -429,15 +427,15 @@ export default function HealthTab() {
     }))
 
     draftDirtyRef.current = false
-    setGeoStatus('Saved location settings. You can now enable tracker.')
+    setGeoMessage('Saved location settings. You can now enable tracker.')
   }
 
   const handleUseCurrentLocation = async (target = 'work') => {
     try {
-      setGeoStatus('Getting current location...')
+      setGeoMessage('Getting current location...')
       const loc = await getCurrentAppLocation()
       if (!loc) {
-        setGeoStatus('Could not get current location. Try again.')
+        setGeoMessage('Could not get current location. Try again.')
         return
       }
 
@@ -449,7 +447,7 @@ export default function HealthTab() {
           homeLng: lng.toFixed(6),
           homeName: String(locationDraft.homeName || '').trim() || 'Home',
         })
-        setGeoStatus('Current location captured for Home. Tap Save Locations.')
+        setGeoMessage('Current location captured for Home. Tap Save Locations.')
         return
       }
 
@@ -458,31 +456,29 @@ export default function HealthTab() {
         workLng: lng.toFixed(6),
         workName: String(locationDraft.workName || '').trim() || 'Work',
       })
-      setGeoStatus('Current location captured for Work. Tap Save Locations.')
+      setGeoMessage('Current location captured for Work. Tap Save Locations.')
     } catch (err) {
       const msg = String(err?.message || '').toLowerCase()
       if (msg.includes('permission')) {
-        setGeoStatus('Location permission denied. Enable location access first.')
+        setGeoMessage('Location permission denied. Enable location access first.')
       } else {
-        setGeoStatus('Could not get current location. Try again.')
+        setGeoMessage('Could not get current location. Try again.')
       }
     }
   }
 
   const handleEnableTracker = () => {
     if (!hasSavedGeoTarget) {
-      setGeoStatus('Save at least one valid location (Work or Home) before enabling tracker.')
+      setGeoMessage('Save at least one valid location (Work or Home) before enabling tracker.')
       return
     }
-    awayStartRef.current = null
     setWorkLocation(prev => ({ ...prev, enabled: true }))
-    setGeoStatus('Location tracker enabled.')
+    setGeoMessage('Location tracker enabled.')
   }
 
   const handleDisableTracker = () => {
-    awayStartRef.current = null
     setWorkLocation(prev => ({ ...prev, enabled: false }))
-    setGeoStatus('Location tracker disabled.')
+    setGeoMessage('Location tracker disabled.')
   }
 
   const toggleCalendar = (tab) => {
@@ -524,200 +520,6 @@ export default function HealthTab() {
     })
     return map
   }, [checkups])
-
-  useEffect(() => {
-    const stopExistingWatcher = async () => {
-      const stop = stopWatcherRef.current
-      stopWatcherRef.current = null
-      if (typeof stop !== 'function') return
-      try {
-        await stop()
-      } catch {
-        // ignore cleanup errors
-      }
-    }
-
-    if (!workLocation.enabled) {
-      void stopExistingWatcher()
-      awayStartRef.current = null
-      setGeoLive(prev => ({ ...prev, tracking: false }))
-      return undefined
-    }
-
-    const workTargetValid = isValidLatLng(workLocation.lat, workLocation.lng)
-    const homeTargetValid = isValidLatLng(workLocation.homeLat, workLocation.homeLng)
-    if (!workTargetValid && !homeTargetValid) {
-      void stopExistingWatcher()
-      awayStartRef.current = null
-      setGeoLive(prev => ({ ...prev, tracking: false }))
-      setGeoStatus('Tracker enabled, but no valid saved location found. Save Work or Home first.')
-      return undefined
-    }
-
-    const workLat = Number(workLocation.lat)
-    const workLng = Number(workLocation.lng)
-    const homeLat = Number(workLocation.homeLat)
-    const homeLng = Number(workLocation.homeLng)
-    const workRadius = normalizeRadius(workLocation.radiusMeters, DEFAULT_WORK_RADIUS_METERS)
-    const homeRadius = normalizeRadius(workLocation.homeRadiusMeters, DEFAULT_HOME_RADIUS_METERS)
-    const autoHours = normalizeAutoHours(workLocation.autoHours)
-    const awayMinutes = normalizeAwayMinutes(workLocation.awayMinutesForWork)
-
-    awayStartRef.current = null
-    void stopExistingWatcher()
-    if (workTargetValid) {
-      setGeoStatus(`Location tracker active (work radius ${Math.round(workRadius)}m).`)
-    } else {
-      setGeoStatus(`Location tracker active (home-away mode, ${Math.round(awayMinutes)} min).`)
-    }
-
-    let cancelled = false
-    const startWatcher = async () => {
-      try {
-        const stopWatcher = await startAppLocationWatcher({
-          distanceFilter: 15,
-          background: true,
-          onLocation: (loc) => {
-            if (cancelled || !loc) return
-
-            const lat = Number(loc.latitude)
-            const lng = Number(loc.longitude)
-            const accuracy = Number(loc.accuracy)
-            const hasAcceptableAccuracy = !Number.isFinite(accuracy) || accuracy <= MAX_ALLOWED_ACCURACY_METERS
-            const nowMs = Date.now()
-
-            const distanceWork = workTargetValid ? calcDistanceMeters(lat, lng, workLat, workLng) : null
-            const distanceHome = homeTargetValid ? calcDistanceMeters(lat, lng, homeLat, homeLng) : null
-            const roundedDistanceWork = distanceWork === null ? null : Math.round(distanceWork)
-            const roundedDistanceHome = distanceHome === null ? null : Math.round(distanceHome)
-            const insideWork = roundedDistanceWork !== null && roundedDistanceWork <= workRadius
-            const insideHome = roundedDistanceHome !== null && roundedDistanceHome <= homeRadius
-            const inside = insideWork || insideHome
-
-            setGeoLive({
-              tracking: true,
-              inside,
-              insideWork,
-              insideHome,
-              distanceMeters: insideWork ? roundedDistanceWork : roundedDistanceHome,
-              distanceWorkMeters: roundedDistanceWork,
-              distanceHomeMeters: roundedDistanceHome,
-              accuracyMeters: Number.isFinite(accuracy) ? Math.round(accuracy) : null,
-              updatedAt: new Date().toISOString(),
-            })
-
-            if (!hasAcceptableAccuracy) {
-              setGeoStatus('GPS accuracy is weak right now. Waiting for a stronger signal before auto logging.')
-              return
-            }
-
-            if (insideHome) {
-              awayStartRef.current = null
-            }
-
-            let autoReason = ''
-            if (insideWork) {
-              autoReason = 'work-zone'
-            } else if (!workTargetValid && homeTargetValid) {
-              if (!insideHome) {
-                if (!awayStartRef.current) {
-                  awayStartRef.current = nowMs
-                }
-                const awayDurationMinutes = (nowMs - awayStartRef.current) / 60000
-                if (awayDurationMinutes >= awayMinutes) {
-                  autoReason = 'away-from-home'
-                }
-              }
-            }
-
-            if (!autoReason) return
-
-            const today = getTodayISO()
-            const existing = attendanceRef.current[today]
-            if (!existing?.worked) {
-              const locationName = String(workLocation.name || 'work location').trim() || 'work location'
-              const homeName = String(workLocation.homeName || 'home').trim() || 'home'
-              const reasonText = autoReason === 'work-zone'
-                ? `arrived at ${locationName}`
-                : `away from ${homeName} for ${Math.round(awayMinutes)}+ min`
-              const stamp = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-              const prefix = existing?.note ? `${existing.note} | ` : ''
-              const note = `${prefix}Auto logged: ${reasonText} (${stamp})`
-              markAttendanceRef.current(today, { worked: true, hours: autoHours, note })
-              setAttendanceDate(today)
-              setAttendanceForm({ worked: true, hours: autoHours, note })
-              if (autoReason === 'work-zone') {
-                setGeoStatus('Auto logged: marked Worked today after entering work zone.')
-              } else {
-                setGeoStatus('Auto logged: marked Worked today after prolonged time away from home.')
-              }
-            }
-
-            setWorkLocation(prev => {
-              if (prev.lastAutoLogDate === today && prev.lastAutoReason === autoReason) return prev
-              return {
-                ...prev,
-                lastAutoLogDate: today,
-                lastInsideAt: new Date().toISOString(),
-                lastAutoReason: autoReason,
-              }
-            })
-          },
-          onError: (err) => {
-            if (cancelled) return
-            setGeoLive(prev => ({ ...prev, tracking: false }))
-            const code = String(err?.code || '').toUpperCase()
-            const msg = String(err?.message || '')
-            if (
-              code === 'NOT_AUTHORIZED' ||
-              code === '1' ||
-              msg.toLowerCase().includes('permission')
-            ) {
-              setGeoStatus('Location permission denied. Enable location access to use auto work logging.')
-            } else if (code === '3' || msg.toLowerCase().includes('timeout')) {
-              setGeoStatus('Location request timed out. Tracker will retry automatically.')
-            } else {
-              setGeoStatus('Location unavailable right now. Tracker will retry automatically.')
-            }
-          },
-        })
-
-        if (cancelled) {
-          try {
-            await stopWatcher()
-          } catch {
-            // ignore cleanup errors
-          }
-          return
-        }
-        stopWatcherRef.current = stopWatcher
-      } catch {
-        if (cancelled) return
-        setGeoLive(prev => ({ ...prev, tracking: false }))
-        setGeoStatus('Could not start location tracker on this device.')
-      }
-    }
-
-    void startWatcher()
-
-    return () => {
-      cancelled = true
-      void stopExistingWatcher()
-    }
-  }, [
-    workLocation.enabled,
-    workLocation.lat,
-    workLocation.lng,
-    workLocation.radiusMeters,
-    workLocation.homeLat,
-    workLocation.homeLng,
-    workLocation.homeRadiusMeters,
-    workLocation.homeName,
-    workLocation.autoHours,
-    workLocation.awayMinutesForWork,
-    workLocation.name,
-    setWorkLocation,
-  ])
 
   return (
     <div className="content">
@@ -1015,7 +817,8 @@ export default function HealthTab() {
                 </button>
               </div>
 
-              {geoStatus && <p className="section-note">{geoStatus}</p>}
+              {geoMessage && <p className="section-note">{geoMessage}</p>}
+              {geoStatus && geoStatus !== geoMessage && <p className="section-note">{geoStatus}</p>}
               <p className="section-note">
                 Tracking mode: {nativeTrackingMode ? 'Native iOS (background-capable)' : 'Web (foreground-only)'}
               </p>

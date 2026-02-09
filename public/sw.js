@@ -1,4 +1,7 @@
-const CACHE_NAME = 'baby-prep-v8';
+// Cache version bump: change this whenever static assets (icons, CSS, JS) change
+// so installed PWAs pick up updates reliably.
+const CACHE_NAME = 'peggy-v9';
+const CACHE_PREFIXES = ['peggy-', 'baby-prep-'];
 
 function resolveBasePath() {
   const swPath = self.location?.pathname || '/sw.js';
@@ -35,7 +38,10 @@ self.addEventListener('install', (event) => {
 self.addEventListener('activate', (event) => {
   event.waitUntil(
     caches.keys()
-      .then(keys => Promise.all(keys.filter(k => k !== CACHE_NAME).map(k => caches.delete(k))))
+      .then(keys => Promise.all(keys
+        .filter((k) => CACHE_PREFIXES.some((p) => k.startsWith(p)) && k !== CACHE_NAME)
+        .map(k => caches.delete(k))
+      ))
       .then(() => self.clients.claim())
   );
 });

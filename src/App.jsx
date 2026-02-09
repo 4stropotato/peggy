@@ -9,6 +9,7 @@ import CloudSyncAgent from './components/CloudSyncAgent'
 import PushSyncAgent from './components/PushSyncAgent'
 import SmartReminderAgent from './components/SmartReminderAgent'
 import WidgetSyncAgent from './components/WidgetSyncAgent'
+import LocationAttendanceAgent from './components/LocationAttendanceAgent'
 import { THEME_ICONS, UiIcon, getNavIcons, resolveIconStyle } from './uiIcons'
 import './App.css'
 
@@ -222,6 +223,7 @@ export default function App() {
       <PushSyncAgent />
       <SmartReminderAgent />
       <WidgetSyncAgent />
+      <LocationAttendanceAgent />
       <AppInner />
     </AppProvider>
   )
