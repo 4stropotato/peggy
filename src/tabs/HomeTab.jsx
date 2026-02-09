@@ -78,6 +78,11 @@ export default function HomeTab() {
     moods,
     suppSchedule,
     attendance,
+    planner,
+    addPlan,
+    updatePlan,
+    removePlan,
+    togglePlanDone,
   } = useApp()
 
   const [showDueInput, setShowDueInput] = useState(!dueDate)
@@ -515,13 +520,15 @@ export default function HomeTab() {
             const att = attendance[dateISO]
             const hasCheckup = checkupDates[dateISO]
             const mood = moodByDate[dateISO]
-            if (!suppSt && !att && !hasCheckup && !mood) return null
+            const hasPlans = Array.isArray(planner?.[dateISO]) && planner[dateISO].length > 0
+            if (!suppSt && !att && !hasCheckup && !mood && !hasPlans) return null
             return (
               <div className="cal-dots">
                 {suppSt && <span className={`cal-micro supp-dot-${suppSt}`} />}
                 {att && <span className={`cal-micro ${att.worked ? 'work-dot-yes' : 'work-dot-no'}`} />}
                 {hasCheckup && <span className="cal-micro checkup-dot" />}
                 {mood && <span className="cal-micro mood-dot" />}
+                {hasPlans && <span className="cal-micro planner-dot" />}
               </div>
             )
           }}
@@ -531,11 +538,13 @@ export default function HomeTab() {
           <span className="cal-legend-item"><span className="cal-micro work-dot-yes" /> Worked</span>
           <span className="cal-legend-item"><span className="cal-micro checkup-dot" /> Checkup</span>
           <span className="cal-legend-item"><span className="cal-micro mood-dot" /> Mood</span>
+          <span className="cal-legend-item"><span className="cal-micro planner-dot" /> Plans</span>
         </div>
       </section>
 
       {selectedDay && (
         <DayDetail
+          key={selectedDay}
           dateISO={selectedDay}
           onClose={() => setSelectedDay(null)}
           dailySupp={dailySupp}
@@ -543,6 +552,11 @@ export default function HomeTab() {
           attendance={attendance}
           checkups={checkups}
           moods={moods}
+          planner={planner}
+          addPlan={addPlan}
+          updatePlan={updatePlan}
+          removePlan={removePlan}
+          togglePlanDone={togglePlanDone}
         />
       )}
 

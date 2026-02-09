@@ -181,6 +181,27 @@ async function clearObjectStore(storeName) {
   });
 }
 
+async function clearStateStoreAppKeys() {
+  // Keep reserved keys (like cloud session) intact in IndexedDB.
+  const db = await openDB();
+  return new Promise((resolve, reject) => {
+    const t = db.transaction(STATE_STORE, 'readwrite');
+    const store = t.objectStore(STATE_STORE);
+    const req = store.getAllKeys();
+    req.onsuccess = () => {
+      const keys = Array.isArray(req.result) ? req.result : [];
+      for (const key of keys) {
+        if (isAppStorageKey(String(key))) {
+          store.delete(key);
+        }
+      }
+    };
+    req.onerror = () => reject(req.error);
+    t.oncomplete = () => resolve();
+    t.onerror = () => reject(t.error);
+  });
+}
+
 export async function clearLocalAppData() {
   setSyncApplying(true);
   try {
@@ -188,7 +209,7 @@ export async function clearLocalAppData() {
       localStorage.removeItem(key);
     }
 
-    await clearObjectStore(STATE_STORE);
+    await clearStateStoreAppKeys();
     await clearObjectStore(PHOTO_STORE);
     notifyBackupRestored();
     notifyPhotoChanged();
@@ -244,7 +265,7 @@ export async function restoreBackupObject(backup) {
     for (const key of listAppStorageKeys()) {
       localStorage.removeItem(key);
     }
-    await clearObjectStore(STATE_STORE);
+    await clearStateStoreAppKeys();
 
     // Restore localStorage + IndexedDB state mirror
     for (const [key, value] of Object.entries(backup.appData)) {

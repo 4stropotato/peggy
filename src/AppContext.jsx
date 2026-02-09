@@ -74,6 +74,8 @@ export function AppProvider({ children }) {
   const [salary, setSalary] = useLS('baby-prep-salary', [])
   const [checkups, setCheckups] = useLS('baby-prep-checkups', {})
   const [moods, setMoods] = useLS('baby-prep-moods', [])
+  // Personal calendar planner entries by day (ISO): { '2026-02-10': [{ id, time, title, location, notes, done }] }
+  const [planner, setPlanner] = useLS('baby-prep-planner', {})
   const [doctor, setDoctor] = useLS('baby-prep-doctor', { name: '', hospital: '', phone: '', address: '', notes: '' })
   const [contacts, setContacts] = useLS('baby-prep-contacts', [
     { id: '1', name: 'Naomi', phone: '', relationship: 'Wife / Mommy' },
@@ -192,6 +194,86 @@ export function AppProvider({ children }) {
 
   const addMood = (entry) => setMoods(prev => [{ ...entry, id: Date.now().toString(36), date: new Date().toISOString() }, ...prev])
 
+  // Planner functions (simple personal organizer per date)
+  const addPlan = (dateISO, data) => {
+    const dateKey = String(dateISO || '').trim()
+    if (!dateKey) return
+    const title = String(data?.title || '').trim()
+    if (!title) return
+
+    const time = String(data?.time || '').trim()
+    const location = String(data?.location || '').trim()
+    const notes = String(data?.notes || '').trim()
+    const done = Boolean(data?.done)
+    const id = Date.now().toString(36) + Math.random().toString(36).slice(2, 6)
+
+    setPlanner(prev => {
+      const list = Array.isArray(prev?.[dateKey]) ? prev[dateKey] : []
+      return {
+        ...prev,
+        [dateKey]: [...list, { id, time, title, location, notes, done }]
+      }
+    })
+  }
+
+  const updatePlan = (dateISO, id, patch) => {
+    const dateKey = String(dateISO || '').trim()
+    const itemId = String(id || '').trim()
+    if (!dateKey || !itemId) return
+
+    setPlanner(prev => {
+      const list = Array.isArray(prev?.[dateKey]) ? prev[dateKey] : []
+      if (!list.length) return prev
+      const next = list.map(item => {
+        if (item?.id !== itemId) return item
+        const title = patch && Object.prototype.hasOwnProperty.call(patch, 'title')
+          ? String(patch.title || '').trim()
+          : String(item?.title || '').trim()
+        return {
+          ...item,
+          ...patch,
+          title,
+          time: patch && Object.prototype.hasOwnProperty.call(patch, 'time') ? String(patch.time || '').trim() : String(item?.time || '').trim(),
+          location: patch && Object.prototype.hasOwnProperty.call(patch, 'location') ? String(patch.location || '').trim() : String(item?.location || '').trim(),
+          notes: patch && Object.prototype.hasOwnProperty.call(patch, 'notes') ? String(patch.notes || '').trim() : String(item?.notes || '').trim(),
+          done: patch && Object.prototype.hasOwnProperty.call(patch, 'done') ? Boolean(patch.done) : Boolean(item?.done),
+        }
+      })
+      return { ...prev, [dateKey]: next }
+    })
+  }
+
+  const removePlan = (dateISO, id) => {
+    const dateKey = String(dateISO || '').trim()
+    const itemId = String(id || '').trim()
+    if (!dateKey || !itemId) return
+
+    setPlanner(prev => {
+      const list = Array.isArray(prev?.[dateKey]) ? prev[dateKey] : []
+      if (!list.length) return prev
+      const nextList = list.filter(item => item?.id !== itemId)
+      const next = { ...prev }
+      if (nextList.length) {
+        next[dateKey] = nextList
+      } else {
+        delete next[dateKey]
+      }
+      return next
+    })
+  }
+
+  const togglePlanDone = (dateISO, id) => {
+    const dateKey = String(dateISO || '').trim()
+    const itemId = String(id || '').trim()
+    if (!dateKey || !itemId) return
+    setPlanner(prev => {
+      const list = Array.isArray(prev?.[dateKey]) ? prev[dateKey] : []
+      if (!list.length) return prev
+      const next = list.map(item => item?.id === itemId ? { ...item, done: !item.done } : item)
+      return { ...prev, [dateKey]: next }
+    })
+  }
+
   const addContact = (contact) => setContacts(prev => [...prev, { ...contact, id: Date.now().toString(36) }])
   const removeContact = (id) => setContacts(prev => prev.filter(c => c.id !== id))
   const updateContact = (id, data) => setContacts(prev => prev.map(c => c.id === id ? { ...c, ...data } : c))
@@ -221,6 +303,7 @@ export function AppProvider({ children }) {
     salary, addSalary, removeSalary,
     checkups, updateCheckup,
     moods, addMood,
+    planner, addPlan, updatePlan, removePlan, togglePlanDone,
     doctor, setDoctor,
     contacts, addContact, removeContact, updateContact,
     taxInputs, setTaxInputs,

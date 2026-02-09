@@ -1,3 +1,5 @@
+import { loadState, saveState } from './db'
+
 const CLOUD_SESSION_KEY = 'baby-prep-cloud-session';
 const CLOUD_SESSION_EVENT = 'peggy-cloud-session-changed';
 const REFRESH_SKEW_SECONDS = 45;
@@ -32,6 +34,8 @@ function readSession() {
 
 function writeSession(session) {
   localStorage.setItem(CLOUD_SESSION_KEY, JSON.stringify(session));
+  // iOS PWAs sometimes clear localStorage; mirroring to IndexedDB helps keep users signed in across updates.
+  try { void saveState(CLOUD_SESSION_KEY, session); } catch {}
   notifySessionChanged(session);
   return session;
 }
@@ -162,7 +166,23 @@ export function getCloudSession() {
 
 export function clearCloudSession() {
   localStorage.removeItem(CLOUD_SESSION_KEY);
+  try { void saveState(CLOUD_SESSION_KEY, null); } catch {}
   notifySessionChanged(null);
+}
+
+export async function cloudTryRecoverSession() {
+  // Best-effort recovery if localStorage was cleared but IndexedDB survived.
+  const existing = readSession()
+  if (existing) return existing
+  try {
+    const idbValue = await loadState(CLOUD_SESSION_KEY)
+    if (idbValue?.accessToken && idbValue?.user?.id) {
+      return writeSession(idbValue)
+    }
+  } catch {
+    // ignore recovery failures
+  }
+  return null
 }
 
 export async function cloudSignUp(email, password, redirectTo = '') {

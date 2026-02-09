@@ -333,6 +333,32 @@ body {
 }
 .btn-glass-secondary:active { transform: scale(0.97); }
 
+.btn-glass-mini {
+  padding: 0.34rem 0.55rem;
+  border: 1px solid var(--glass-border);
+  border-radius: 10px;
+  background: var(--glass-highlight);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  color: var(--text2);
+  font-size: 0.72rem;
+  font-weight: 700;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  white-space: nowrap;
+}
+.btn-glass-mini:active { transform: scale(0.97); }
+.btn-glass-mini.primary {
+  border-color: rgba(108, 92, 231, 0.3);
+  background: linear-gradient(135deg, rgba(108, 92, 231, 0.32), rgba(233, 30, 139, 0.22));
+  color: #fff;
+}
+.btn-glass-mini.danger {
+  border-color: rgba(255,71,87,0.22);
+  background: rgba(255,71,87,0.12);
+  color: var(--red);
+}
+
 /* ===== Section Header ===== */
 .section-header {
   display: flex;
@@ -3239,6 +3265,12 @@ input[type="range"]:focus {
 }
 .checkup-dot { background: var(--purple); }
 .mood-dot { background: var(--pink); }
+.planner-dot {
+  border-radius: 2px;
+  width: 6px;
+  height: 6px;
+  background: linear-gradient(135deg, var(--pink), var(--purple));
+}
 
 /* Calendar legend */
 .cal-legend {
@@ -3345,6 +3377,102 @@ input[type="range"]:focus {
 .day-detail-dose.missed {
   background: rgba(255, 71, 87, 0.12);
   color: var(--red);
+}
+.day-detail-dose.future {
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--text2);
+}
+.app.light .day-detail-dose.future {
+  background: rgba(255, 255, 255, 0.46);
+  color: rgba(74, 31, 61, 0.7);
+}
+
+.day-detail-plans {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+.day-detail-plan {
+  display: grid;
+  grid-template-columns: 62px 1fr;
+  gap: 0.5rem 0.6rem;
+  padding: 0.55rem 0.55rem;
+  border-radius: 12px;
+}
+.day-detail-plan.done {
+  opacity: 0.7;
+}
+.day-detail-plan-time {
+  font-size: 0.7rem;
+  font-weight: 800;
+  color: var(--purple);
+  letter-spacing: 0.2px;
+}
+.day-detail-plan-main {
+  min-width: 0;
+}
+.day-detail-plan-title {
+  font-size: 0.78rem;
+  font-weight: 800;
+  color: var(--text);
+  line-height: 1.2;
+}
+.day-detail-plan-meta {
+  margin-top: 0.18rem;
+  font-size: 0.7rem;
+  color: var(--text2);
+  white-space: pre-line;
+  line-height: 1.35;
+}
+.day-detail-plan-actions {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+.day-detail-plan-form {
+  margin-top: 0.55rem;
+  padding: 0.6rem;
+  border-radius: 12px;
+}
+.day-detail-form-grid {
+  display: grid;
+  grid-template-columns: 112px 1fr;
+  gap: 0.55rem;
+}
+.day-detail-form-row {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  font-size: 0.7rem;
+  color: var(--text2);
+}
+.day-detail-form-row input,
+.day-detail-form-row textarea {
+  width: 100%;
+  padding: 0.5rem 0.6rem;
+  border-radius: 10px;
+  border: 1px solid var(--glass-border);
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--text);
+}
+.app.light .day-detail-form-row input,
+.app.light .day-detail-form-row textarea {
+  background: rgba(255, 255, 255, 0.56);
+  color: #4a1f3d;
+}
+.day-detail-form-check {
+  margin-top: 0.45rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.72rem;
+  color: var(--text2);
+}
+.day-detail-form-actions {
+  margin-top: 0.55rem;
+  display: flex;
+  gap: 0.45rem;
 }
 .day-detail-work {
   font-size: 0.8rem;

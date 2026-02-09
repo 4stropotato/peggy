@@ -3,6 +3,7 @@ import { buildBackupObject, clearLocalAppData, restoreBackupObject } from '../db
 import {
   isCloudConfigured,
   getCloudSession,
+  cloudTryRecoverSession,
   cloudValidateSession,
   cloudDownloadBackup,
   cloudUploadBackup
@@ -52,8 +53,16 @@ export default function CloudSyncAgent() {
 
     window.addEventListener(SESSION_EVENT, onSessionChanged)
     setSession(getCloudSession())
+    let cancelled = false
+    void cloudTryRecoverSession().then((recovered) => {
+      if (cancelled) return
+      if (recovered?.accessToken && recovered?.user?.id) {
+        setSession(recovered)
+      }
+    })
 
     return () => {
+      cancelled = true
       window.removeEventListener(SESSION_EVENT, onSessionChanged)
     }
   }, [])
@@ -66,6 +75,17 @@ export default function CloudSyncAgent() {
       readyRef.current = false
 
       if (!session?.accessToken || !session?.user?.id) {
+        // iOS PWAs sometimes wipe localStorage after updates while IndexedDB survives.
+        // Try to recover the auth session before deciding it's a true sign-out.
+        try {
+          const recovered = await cloudTryRecoverSession()
+          if (!cancelled && recovered?.accessToken && recovered?.user?.id) {
+            setSession(recovered)
+            readyRef.current = true
+            return
+          }
+        } catch {}
+
         const activeUser = localStorage.getItem(ACTIVE_USER_KEY)
         if (activeUser) {
           try { await clearLocalAppData() } catch {}

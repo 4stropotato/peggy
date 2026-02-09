@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { getCloudSession, isCloudConfigured } from '../cloudSync'
+import { cloudTryRecoverSession, getCloudSession, isCloudConfigured } from '../cloudSync'
 import {
   SMART_NOTIF_PREF_EVENT,
   readSmartNotifEnabled,
@@ -82,10 +82,21 @@ export default function PushSyncAgent() {
     window.addEventListener('peggy-backup-restored', syncFromPrefEvent)
     document.addEventListener('visibilitychange', syncWhenVisible)
 
+    let cancelled = false
+    void cloudTryRecoverSession().then((recovered) => {
+      if (cancelled) return
+      if (recovered?.accessToken && recovered?.user?.id) {
+        setSession(recovered)
+        sessionRef.current = recovered
+        void syncState()
+      }
+    })
+
     void syncState()
     const id = window.setInterval(() => { void syncState() }, 5 * 60 * 1000)
 
     return () => {
+      cancelled = true
       window.removeEventListener(SESSION_EVENT, syncFromSessionEvent)
       window.removeEventListener(SMART_NOTIF_PREF_EVENT, syncFromPrefEvent)
       window.removeEventListener('peggy-backup-restored', syncFromPrefEvent)
