@@ -3,6 +3,10 @@
 This setup continues the native iOS work and adds a home/lock-screen widget path.
 The web app keeps working without this, but WidgetKit needs Xcode on Mac.
 
+If you are on Windows + iPhone only right now, use:
+
+- `WINDOWS_IPHONE_PLAYBOOK.md`
+
 ## 1. Current JS Side (Already Added)
 
 - `src/native/widgetBridge.js`
@@ -76,4 +80,3 @@ Create a new Widget Extension target in Xcode, then adapt these files.
 - Widget UI tuning is done in SwiftUI (not in React).
 - Lock-screen accessory widgets can be added as a second pass after base widget is stable.
 - On Windows, templates/docs can be prepared, but actual WidgetKit build is Mac-only.
-
