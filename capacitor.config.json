@@ -1,0 +1,9 @@
+{
+  "appId": "com.peggy.app",
+  "appName": "Peggy",
+  "webDir": "dist",
+  "bundledWebRuntime": false,
+  "android": {
+    "useLegacyBridge": true
+  }
+}

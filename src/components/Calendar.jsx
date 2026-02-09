@@ -1,6 +1,6 @@
 import { useMemo } from 'react'
 
-const DAY_LABELS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
+const DAY_LABELS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
 
 function pad(n) { return String(n).padStart(2, '0') }
 
@@ -21,9 +21,8 @@ export default function Calendar({ year, month, onMonthChange, renderDay, select
   const { days, label } = useMemo(() => {
     const first = new Date(year, month - 1, 1)
     const last = new Date(year, month, 0)
-    // Monday = 0 ... Sunday = 6
-    let startDay = first.getDay() - 1
-    if (startDay < 0) startDay = 6
+    // Sunday = 0 ... Saturday = 6
+    const startDay = first.getDay()
 
     const cells = []
     // Previous month overflow

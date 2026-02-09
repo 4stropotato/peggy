@@ -1,10 +1,93 @@
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, useRef } from 'react'
 import { useApp } from '../AppContext'
 import { supplements, checkupSchedule, optimalSchedule } from '../data'
 import Calendar, { isoToDateString } from '../components/Calendar'
 import { APP_ICONS, TokenIcon, UiIcon } from '../uiIcons'
+import {
+  getCurrentAppLocation,
+  isNativeIos,
+  startAppLocationWatcher,
+} from '../native/locationBridge'
 
 const MOOD_EMOJIS = ['😊', '😐', '😢', '🤢', '😴', '😤', '🥰', '😰']
+
+const MIN_WORK_RADIUS_METERS = 50
+const DEFAULT_WORK_RADIUS_METERS = 180
+const DEFAULT_HOME_RADIUS_METERS = 220
+const DEFAULT_AUTO_HOURS = 8
+const DEFAULT_AWAY_MINUTES = 90
+const MAX_GEOFENCE_RADIUS_METERS = 3000
+const MAX_AWAY_MINUTES = 720
+const MAX_ALLOWED_ACCURACY_METERS = 60
+
+function getTodayISO() {
+  const now = new Date()
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`
+}
+
+function isValidLatLng(lat, lng) {
+  const latNum = Number(lat)
+  const lngNum = Number(lng)
+  return (
+    Number.isFinite(latNum) &&
+    Number.isFinite(lngNum) &&
+    latNum >= -90 &&
+    latNum <= 90 &&
+    lngNum >= -180 &&
+    lngNum <= 180
+  )
+}
+
+function toRad(value) {
+  return (Number(value) * Math.PI) / 180
+}
+
+function calcDistanceMeters(lat1, lng1, lat2, lng2) {
+  const earthRadius = 6371000
+  const dLat = toRad(lat2 - lat1)
+  const dLng = toRad(lng2 - lng1)
+  const a = Math.sin(dLat / 2) ** 2 +
+    Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLng / 2) ** 2
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
+  return earthRadius * c
+}
+
+function normalizeRadius(value, fallback = DEFAULT_WORK_RADIUS_METERS) {
+  return Math.min(
+    MAX_GEOFENCE_RADIUS_METERS,
+    Math.max(MIN_WORK_RADIUS_METERS, Number(value) || fallback)
+  )
+}
+
+function normalizeAutoHours(value) {
+  return Math.min(12, Math.max(0.5, Number(value) || DEFAULT_AUTO_HOURS))
+}
+
+function normalizeAwayMinutes(value) {
+  return Math.min(MAX_AWAY_MINUTES, Math.max(15, Number(value) || DEFAULT_AWAY_MINUTES))
+}
+
+function toCoordString(value) {
+  if (value === '' || value === null || typeof value === 'undefined') return ''
+  const parsed = Number(value)
+  if (!Number.isFinite(parsed)) return ''
+  return parsed.toFixed(6)
+}
+
+function toLocationDraft(location) {
+  return {
+    workName: String(location?.name || ''),
+    workLat: toCoordString(location?.lat),
+    workLng: toCoordString(location?.lng),
+    workRadiusMeters: String(normalizeRadius(location?.radiusMeters, DEFAULT_WORK_RADIUS_METERS)),
+    homeName: String(location?.homeName || ''),
+    homeLat: toCoordString(location?.homeLat),
+    homeLng: toCoordString(location?.homeLng),
+    homeRadiusMeters: String(normalizeRadius(location?.homeRadiusMeters, DEFAULT_HOME_RADIUS_METERS)),
+    autoHours: String(normalizeAutoHours(location?.autoHours)),
+    awayMinutesForWork: String(normalizeAwayMinutes(location?.awayMinutesForWork)),
+  }
+}
 
 function getCountdown(scheduledTime, lastTaken) {
   const now = new Date()
@@ -212,7 +295,7 @@ export default function HealthTab() {
   const {
     dailySupp, isSuppTaken, toggleSupp, undoSupp, checkups, updateCheckup, moods, addMood,
     suppSchedule, suppLastTaken, suppBottles, resetBottle,
-    attendance, markAttendance
+    attendance, markAttendance, workLocation, setWorkLocation
   } = useApp()
   const [subTab, setSubTab] = useState('supps')
   const [editVisit, setEditVisit] = useState(null)
@@ -235,6 +318,48 @@ export default function HealthTab() {
 
   const [attendanceDate, setAttendanceDate] = useState(now.toISOString().split('T')[0])
   const [attendanceForm, setAttendanceForm] = useState({ worked: true, hours: 8, note: '' })
+  const [geoStatus, setGeoStatus] = useState('')
+  const [geoLive, setGeoLive] = useState({
+    tracking: false,
+    inside: false,
+    insideWork: false,
+    insideHome: false,
+    distanceMeters: null,
+    distanceWorkMeters: null,
+    distanceHomeMeters: null,
+    accuracyMeters: null,
+    updatedAt: '',
+  })
+  const [locationDraft, setLocationDraft] = useState(() => toLocationDraft(workLocation))
+  const stopWatcherRef = useRef(null)
+  const attendanceRef = useRef(attendance)
+  const markAttendanceRef = useRef(markAttendance)
+  const draftDirtyRef = useRef(false)
+  const awayStartRef = useRef(null)
+
+  useEffect(() => {
+    attendanceRef.current = attendance
+  }, [attendance])
+
+  useEffect(() => {
+    markAttendanceRef.current = markAttendance
+  }, [markAttendance])
+
+  useEffect(() => {
+    if (draftDirtyRef.current) return
+    setLocationDraft(toLocationDraft(workLocation))
+  }, [
+    workLocation.name,
+    workLocation.lat,
+    workLocation.lng,
+    workLocation.radiusMeters,
+    workLocation.homeName,
+    workLocation.homeLat,
+    workLocation.homeLng,
+    workLocation.homeRadiusMeters,
+    workLocation.autoHours,
+    workLocation.awayMinutesForWork,
+  ])
 
   const suppTaken = supplements.filter(s => {
     const schedule = suppSchedule[s.id]
@@ -242,6 +367,10 @@ export default function HealthTab() {
     return times.every((_, i) => isSuppTaken(s.id, i))
   }).length
   const suppTotal = supplements.length
+  const savedWorkTargetValid = isValidLatLng(workLocation.lat, workLocation.lng)
+  const savedHomeTargetValid = isValidLatLng(workLocation.homeLat, workLocation.homeLng)
+  const hasSavedGeoTarget = savedWorkTargetValid || savedHomeTargetValid
+  const nativeTrackingMode = isNativeIos()
 
   const handleVisitSave = (visitId) => {
     updateCheckup(visitId, { ...visitForm, completed: true })
@@ -264,6 +393,96 @@ export default function HealthTab() {
   const handleAttendanceSave = () => {
     markAttendance(attendanceDate, attendanceForm)
     setAttendanceForm({ worked: true, hours: 8, note: '' })
+  }
+
+  const updateLocationDraft = (patch) => {
+    draftDirtyRef.current = true
+    setLocationDraft(prev => ({ ...prev, ...patch }))
+  }
+
+  const handleSaveLocationConfig = () => {
+    const hasWorkCoordsInput = String(locationDraft.workLat || '').trim() !== '' || String(locationDraft.workLng || '').trim() !== ''
+    const hasHomeCoordsInput = String(locationDraft.homeLat || '').trim() !== '' || String(locationDraft.homeLng || '').trim() !== ''
+
+    if (hasWorkCoordsInput && !isValidLatLng(locationDraft.workLat, locationDraft.workLng)) {
+      setGeoStatus('Work pin is invalid. Enter valid latitude and longitude.')
+      return
+    }
+
+    if (hasHomeCoordsInput && !isValidLatLng(locationDraft.homeLat, locationDraft.homeLng)) {
+      setGeoStatus('Home pin is invalid. Enter valid latitude and longitude.')
+      return
+    }
+
+    setWorkLocation(prev => ({
+      ...prev,
+      name: String(locationDraft.workName || '').trim(),
+      lat: toCoordString(locationDraft.workLat),
+      lng: toCoordString(locationDraft.workLng),
+      radiusMeters: normalizeRadius(locationDraft.workRadiusMeters, DEFAULT_WORK_RADIUS_METERS),
+      homeName: String(locationDraft.homeName || '').trim(),
+      homeLat: toCoordString(locationDraft.homeLat),
+      homeLng: toCoordString(locationDraft.homeLng),
+      homeRadiusMeters: normalizeRadius(locationDraft.homeRadiusMeters, DEFAULT_HOME_RADIUS_METERS),
+      autoHours: normalizeAutoHours(locationDraft.autoHours),
+      awayMinutesForWork: normalizeAwayMinutes(locationDraft.awayMinutesForWork),
+    }))
+
+    draftDirtyRef.current = false
+    setGeoStatus('Saved location settings. You can now enable tracker.')
+  }
+
+  const handleUseCurrentLocation = async (target = 'work') => {
+    try {
+      setGeoStatus('Getting current location...')
+      const loc = await getCurrentAppLocation()
+      if (!loc) {
+        setGeoStatus('Could not get current location. Try again.')
+        return
+      }
+
+      const lat = loc.latitude
+      const lng = loc.longitude
+      if (target === 'home') {
+        updateLocationDraft({
+          homeLat: lat.toFixed(6),
+          homeLng: lng.toFixed(6),
+          homeName: String(locationDraft.homeName || '').trim() || 'Home',
+        })
+        setGeoStatus('Current location captured for Home. Tap Save Locations.')
+        return
+      }
+
+      updateLocationDraft({
+        workLat: lat.toFixed(6),
+        workLng: lng.toFixed(6),
+        workName: String(locationDraft.workName || '').trim() || 'Work',
+      })
+      setGeoStatus('Current location captured for Work. Tap Save Locations.')
+    } catch (err) {
+      const msg = String(err?.message || '').toLowerCase()
+      if (msg.includes('permission')) {
+        setGeoStatus('Location permission denied. Enable location access first.')
+      } else {
+        setGeoStatus('Could not get current location. Try again.')
+      }
+    }
+  }
+
+  const handleEnableTracker = () => {
+    if (!hasSavedGeoTarget) {
+      setGeoStatus('Save at least one valid location (Work or Home) before enabling tracker.')
+      return
+    }
+    awayStartRef.current = null
+    setWorkLocation(prev => ({ ...prev, enabled: true }))
+    setGeoStatus('Location tracker enabled.')
+  }
+
+  const handleDisableTracker = () => {
+    awayStartRef.current = null
+    setWorkLocation(prev => ({ ...prev, enabled: false }))
+    setGeoStatus('Location tracker disabled.')
   }
 
   const toggleCalendar = (tab) => {
@@ -305,6 +524,200 @@ export default function HealthTab() {
     })
     return map
   }, [checkups])
+
+  useEffect(() => {
+    const stopExistingWatcher = async () => {
+      const stop = stopWatcherRef.current
+      stopWatcherRef.current = null
+      if (typeof stop !== 'function') return
+      try {
+        await stop()
+      } catch {
+        // ignore cleanup errors
+      }
+    }
+
+    if (!workLocation.enabled) {
+      void stopExistingWatcher()
+      awayStartRef.current = null
+      setGeoLive(prev => ({ ...prev, tracking: false }))
+      return undefined
+    }
+
+    const workTargetValid = isValidLatLng(workLocation.lat, workLocation.lng)
+    const homeTargetValid = isValidLatLng(workLocation.homeLat, workLocation.homeLng)
+    if (!workTargetValid && !homeTargetValid) {
+      void stopExistingWatcher()
+      awayStartRef.current = null
+      setGeoLive(prev => ({ ...prev, tracking: false }))
+      setGeoStatus('Tracker enabled, but no valid saved location found. Save Work or Home first.')
+      return undefined
+    }
+
+    const workLat = Number(workLocation.lat)
+    const workLng = Number(workLocation.lng)
+    const homeLat = Number(workLocation.homeLat)
+    const homeLng = Number(workLocation.homeLng)
+    const workRadius = normalizeRadius(workLocation.radiusMeters, DEFAULT_WORK_RADIUS_METERS)
+    const homeRadius = normalizeRadius(workLocation.homeRadiusMeters, DEFAULT_HOME_RADIUS_METERS)
+    const autoHours = normalizeAutoHours(workLocation.autoHours)
+    const awayMinutes = normalizeAwayMinutes(workLocation.awayMinutesForWork)
+
+    awayStartRef.current = null
+    void stopExistingWatcher()
+    if (workTargetValid) {
+      setGeoStatus(`Location tracker active (work radius ${Math.round(workRadius)}m).`)
+    } else {
+      setGeoStatus(`Location tracker active (home-away mode, ${Math.round(awayMinutes)} min).`)
+    }
+
+    let cancelled = false
+    const startWatcher = async () => {
+      try {
+        const stopWatcher = await startAppLocationWatcher({
+          distanceFilter: 15,
+          background: true,
+          onLocation: (loc) => {
+            if (cancelled || !loc) return
+
+            const lat = Number(loc.latitude)
+            const lng = Number(loc.longitude)
+            const accuracy = Number(loc.accuracy)
+            const hasAcceptableAccuracy = !Number.isFinite(accuracy) || accuracy <= MAX_ALLOWED_ACCURACY_METERS
+            const nowMs = Date.now()
+
+            const distanceWork = workTargetValid ? calcDistanceMeters(lat, lng, workLat, workLng) : null
+            const distanceHome = homeTargetValid ? calcDistanceMeters(lat, lng, homeLat, homeLng) : null
+            const roundedDistanceWork = distanceWork === null ? null : Math.round(distanceWork)
+            const roundedDistanceHome = distanceHome === null ? null : Math.round(distanceHome)
+            const insideWork = roundedDistanceWork !== null && roundedDistanceWork <= workRadius
+            const insideHome = roundedDistanceHome !== null && roundedDistanceHome <= homeRadius
+            const inside = insideWork || insideHome
+
+            setGeoLive({
+              tracking: true,
+              inside,
+              insideWork,
+              insideHome,
+              distanceMeters: insideWork ? roundedDistanceWork : roundedDistanceHome,
+              distanceWorkMeters: roundedDistanceWork,
+              distanceHomeMeters: roundedDistanceHome,
+              accuracyMeters: Number.isFinite(accuracy) ? Math.round(accuracy) : null,
+              updatedAt: new Date().toISOString(),
+            })
+
+            if (!hasAcceptableAccuracy) {
+              setGeoStatus('GPS accuracy is weak right now. Waiting for a stronger signal before auto logging.')
+              return
+            }
+
+            if (insideHome) {
+              awayStartRef.current = null
+            }
+
+            let autoReason = ''
+            if (insideWork) {
+              autoReason = 'work-zone'
+            } else if (!workTargetValid && homeTargetValid) {
+              if (!insideHome) {
+                if (!awayStartRef.current) {
+                  awayStartRef.current = nowMs
+                }
+                const awayDurationMinutes = (nowMs - awayStartRef.current) / 60000
+                if (awayDurationMinutes >= awayMinutes) {
+                  autoReason = 'away-from-home'
+                }
+              }
+            }
+
+            if (!autoReason) return
+
+            const today = getTodayISO()
+            const existing = attendanceRef.current[today]
+            if (!existing?.worked) {
+              const locationName = String(workLocation.name || 'work location').trim() || 'work location'
+              const homeName = String(workLocation.homeName || 'home').trim() || 'home'
+              const reasonText = autoReason === 'work-zone'
+                ? `arrived at ${locationName}`
+                : `away from ${homeName} for ${Math.round(awayMinutes)}+ min`
+              const stamp = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+              const prefix = existing?.note ? `${existing.note} | ` : ''
+              const note = `${prefix}Auto logged: ${reasonText} (${stamp})`
+              markAttendanceRef.current(today, { worked: true, hours: autoHours, note })
+              setAttendanceDate(today)
+              setAttendanceForm({ worked: true, hours: autoHours, note })
+              if (autoReason === 'work-zone') {
+                setGeoStatus('Auto logged: marked Worked today after entering work zone.')
+              } else {
+                setGeoStatus('Auto logged: marked Worked today after prolonged time away from home.')
+              }
+            }
+
+            setWorkLocation(prev => {
+              if (prev.lastAutoLogDate === today && prev.lastAutoReason === autoReason) return prev
+              return {
+                ...prev,
+                lastAutoLogDate: today,
+                lastInsideAt: new Date().toISOString(),
+                lastAutoReason: autoReason,
+              }
+            })
+          },
+          onError: (err) => {
+            if (cancelled) return
+            setGeoLive(prev => ({ ...prev, tracking: false }))
+            const code = String(err?.code || '').toUpperCase()
+            const msg = String(err?.message || '')
+            if (
+              code === 'NOT_AUTHORIZED' ||
+              code === '1' ||
+              msg.toLowerCase().includes('permission')
+            ) {
+              setGeoStatus('Location permission denied. Enable location access to use auto work logging.')
+            } else if (code === '3' || msg.toLowerCase().includes('timeout')) {
+              setGeoStatus('Location request timed out. Tracker will retry automatically.')
+            } else {
+              setGeoStatus('Location unavailable right now. Tracker will retry automatically.')
+            }
+          },
+        })
+
+        if (cancelled) {
+          try {
+            await stopWatcher()
+          } catch {
+            // ignore cleanup errors
+          }
+          return
+        }
+        stopWatcherRef.current = stopWatcher
+      } catch {
+        if (cancelled) return
+        setGeoLive(prev => ({ ...prev, tracking: false }))
+        setGeoStatus('Could not start location tracker on this device.')
+      }
+    }
+
+    void startWatcher()
+
+    return () => {
+      cancelled = true
+      void stopExistingWatcher()
+    }
+  }, [
+    workLocation.enabled,
+    workLocation.lat,
+    workLocation.lng,
+    workLocation.radiusMeters,
+    workLocation.homeLat,
+    workLocation.homeLng,
+    workLocation.homeRadiusMeters,
+    workLocation.homeName,
+    workLocation.autoHours,
+    workLocation.awayMinutesForWork,
+    workLocation.name,
+    setWorkLocation,
+  ])
 
   return (
     <div className="content">
@@ -436,25 +849,225 @@ export default function HealthTab() {
                 {showCalendar.work ? 'Hide calendar' : 'Show calendar'}
               </button>
             </div>
-            {showCalendar.work && (
-              <p className="section-note">Tap a day to select, then log attendance below.</p>
-            )}
+            <p className="section-note">Save a Work pin or Home pin first, then enable tracker for auto attendance logs.</p>
+
+            <div className="glass-card work-location-card">
+              <h3>Work/Home Location Auto-Log</h3>
+
+              <div className="attendance-toggle">
+                <button
+                  type="button"
+                  className={`att-btn ${workLocation.enabled ? 'active worked' : ''}`}
+                  onClick={handleEnableTracker}
+                >
+                  Tracker ON
+                </button>
+                <button
+                  type="button"
+                  className={`att-btn ${!workLocation.enabled ? 'active absent' : ''}`}
+                  onClick={handleDisableTracker}
+                >
+                  Tracker OFF
+                </button>
+              </div>
+
+              <div className="work-location-sections">
+                <div className="work-location-block glass-inner">
+                  <h4>Work Location</h4>
+                  <div className="form-row">
+                    <label>Name</label>
+                    <input
+                      type="text"
+                      value={locationDraft.workName}
+                      onChange={e => updateLocationDraft({ workName: e.target.value })}
+                      placeholder="e.g. Kawasaki Office"
+                    />
+                  </div>
+
+                  <div className="work-location-grid">
+                    <div className="form-row">
+                      <label>Latitude</label>
+                      <input
+                        type="number"
+                        step="0.000001"
+                        value={locationDraft.workLat}
+                        onChange={e => updateLocationDraft({ workLat: e.target.value })}
+                        placeholder="35.530000"
+                      />
+                    </div>
+                    <div className="form-row">
+                      <label>Longitude</label>
+                      <input
+                        type="number"
+                        step="0.000001"
+                        value={locationDraft.workLng}
+                        onChange={e => updateLocationDraft({ workLng: e.target.value })}
+                        placeholder="139.700000"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="form-row">
+                    <label>Radius (meters)</label>
+                    <input
+                      type="number"
+                      min={MIN_WORK_RADIUS_METERS}
+                      max={MAX_GEOFENCE_RADIUS_METERS}
+                      value={locationDraft.workRadiusMeters}
+                      onChange={e => updateLocationDraft({
+                        workRadiusMeters: String(normalizeRadius(e.target.value, DEFAULT_WORK_RADIUS_METERS)),
+                      })}
+                    />
+                  </div>
+
+                  <div className="work-location-actions">
+                    <button type="button" className="btn-glass-secondary" onClick={() => handleUseCurrentLocation('work')}>
+                      Use Current for Work
+                    </button>
+                  </div>
+                </div>
+
+                <div className="work-location-block glass-inner">
+                  <h4>Home Location</h4>
+                  <div className="form-row">
+                    <label>Name</label>
+                    <input
+                      type="text"
+                      value={locationDraft.homeName}
+                      onChange={e => updateLocationDraft({ homeName: e.target.value })}
+                      placeholder="e.g. Home"
+                    />
+                  </div>
+
+                  <div className="work-location-grid">
+                    <div className="form-row">
+                      <label>Latitude</label>
+                      <input
+                        type="number"
+                        step="0.000001"
+                        value={locationDraft.homeLat}
+                        onChange={e => updateLocationDraft({ homeLat: e.target.value })}
+                        placeholder="35.530000"
+                      />
+                    </div>
+                    <div className="form-row">
+                      <label>Longitude</label>
+                      <input
+                        type="number"
+                        step="0.000001"
+                        value={locationDraft.homeLng}
+                        onChange={e => updateLocationDraft({ homeLng: e.target.value })}
+                        placeholder="139.700000"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="form-row">
+                    <label>Radius (meters)</label>
+                    <input
+                      type="number"
+                      min={MIN_WORK_RADIUS_METERS}
+                      max={MAX_GEOFENCE_RADIUS_METERS}
+                      value={locationDraft.homeRadiusMeters}
+                      onChange={e => updateLocationDraft({
+                        homeRadiusMeters: String(normalizeRadius(e.target.value, DEFAULT_HOME_RADIUS_METERS)),
+                      })}
+                    />
+                  </div>
+
+                  <div className="work-location-actions">
+                    <button type="button" className="btn-glass-secondary" onClick={() => handleUseCurrentLocation('home')}>
+                      Use Current for Home
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              <div className="work-location-grid">
+                <div className="form-row">
+                  <label>Auto hours</label>
+                  <input
+                    type="number"
+                    min="0.5"
+                    max="12"
+                    step="0.5"
+                    value={locationDraft.autoHours}
+                    onChange={e => updateLocationDraft({ autoHours: String(normalizeAutoHours(e.target.value)) })}
+                  />
+                </div>
+                <div className="form-row">
+                  <label>Away minutes (home-only mode)</label>
+                  <input
+                    type="number"
+                    min="15"
+                    max={MAX_AWAY_MINUTES}
+                    value={locationDraft.awayMinutesForWork}
+                    onChange={e => updateLocationDraft({
+                      awayMinutesForWork: String(normalizeAwayMinutes(e.target.value)),
+                    })}
+                  />
+                </div>
+              </div>
+
+              <div className="work-location-save-row">
+                <button type="button" className="btn-glass-primary" onClick={handleSaveLocationConfig}>
+                  Save Locations
+                </button>
+              </div>
+
+              {geoStatus && <p className="section-note">{geoStatus}</p>}
+              <p className="section-note">
+                Tracking mode: {nativeTrackingMode ? 'Native iOS (background-capable)' : 'Web (foreground-only)'}
+              </p>
+              {workLocation.enabled && geoLive.tracking && (
+                <div className={`work-geo-live glass-inner ${geoLive.insideWork ? 'inside' : geoLive.insideHome ? 'home' : 'outside'}`}>
+                  <span>
+                    {geoLive.insideWork ? 'Inside work zone' : geoLive.insideHome ? 'Inside home zone' : 'Outside zones'}
+                  </span>
+                  <span>
+                    {geoLive.distanceWorkMeters !== null ? `Work ${geoLive.distanceWorkMeters}m` : 'Work n/a'}
+                    {' | '}
+                    {geoLive.distanceHomeMeters !== null ? `Home ${geoLive.distanceHomeMeters}m` : 'Home n/a'}
+                  </span>
+                </div>
+              )}
+              {workLocation.enabled && geoLive.accuracyMeters !== null && (
+                <p className="section-note">GPS accuracy: +/-{geoLive.accuracyMeters}m</p>
+              )}
+              {workLocation.lastAutoLogDate && (
+                <p className="section-note">
+                  Last auto log date: {workLocation.lastAutoLogDate}
+                  {workLocation.lastAutoReason ? ` (${workLocation.lastAutoReason === 'work-zone' ? 'work zone' : 'away from home'})` : ''}
+                </p>
+              )}
+              {!hasSavedGeoTarget && (
+                <p className="section-note">Save valid Work or Home coordinates to activate tracking.</p>
+              )}
+              <p className="section-note disclaimer">
+                {nativeTrackingMode
+                  ? 'Native mode can continue tracking in background after location permissions are granted.'
+                  : 'Web mode auto logging works while Peggy is open and location permission is granted.'}
+              </p>
+            </div>
 
             {showCalendar.work && (
-              <Calendar
-                year={workCal.y} month={workCal.m}
-                onMonthChange={(y, m) => setWorkCal({ y, m })}
-                selectedDate={attendanceDate}
-                onDayClick={(d) => {
-                  setAttendanceDate(d)
-                  setAttendanceForm(attendance[d] || { worked: true, hours: 8, note: '' })
-                }}
-                renderDay={(dateISO) => {
-                  const att = attendance[dateISO]
-                  if (!att) return null
-                  return <span className={`cal-dot ${att.worked ? 'work-dot-yes' : 'work-dot-no'}`} />
-                }}
-              />
+              <>
+                <p className="section-note">Tap a day to select, then log attendance below.</p>
+                <Calendar
+                  year={workCal.y} month={workCal.m}
+                  onMonthChange={(y, m) => setWorkCal({ y, m })}
+                  selectedDate={attendanceDate}
+                  onDayClick={(d) => {
+                    setAttendanceDate(d)
+                    setAttendanceForm(attendance[d] || { worked: true, hours: 8, note: '' })
+                  }}
+                  renderDay={(dateISO) => {
+                    const att = attendance[dateISO]
+                    if (!att) return null
+                    return <span className={`cal-dot ${att.worked ? 'work-dot-yes' : 'work-dot-no'}`} />
+                  }}
+                />
+              </>
             )}
 
             <div className="glass-card attendance-form">

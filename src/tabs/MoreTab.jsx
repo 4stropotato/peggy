@@ -450,14 +450,13 @@ export default function MoreTab() {
       .then(validated => setCloudSession(validated))
       .catch((err) => {
         const msg = String(err?.message || '').toLowerCase()
-        const authError = (
-          msg.includes('jwt') ||
-          msg.includes('token') ||
-          msg.includes('expired') ||
-          msg.includes('unauthorized') ||
-          msg.includes('http 401')
+        const mustSignInAgain = (
+          msg.includes('http 401') ||
+          msg.includes('refresh token') ||
+          msg.includes('invalid refresh') ||
+          msg.includes('session expired')
         )
-        if (authError) {
+        if (mustSignInAgain) {
           setCloudSession(null)
           return
         }

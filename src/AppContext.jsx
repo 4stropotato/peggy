@@ -88,6 +88,23 @@ export function AppProvider({ children }) {
   })
   // Work attendance for Naomi: { '2026-02-07': { worked: true, hours: 8, note: '' } }
   const [attendance, setAttendance] = useLS('baby-prep-attendance', {})
+  // Work geofence auto-logging config (synced per account via cloud backup).
+  const [workLocation, setWorkLocation] = useLS('baby-prep-work-location', {
+    enabled: false,
+    name: '',
+    lat: '',
+    lng: '',
+    radiusMeters: 180,
+    homeName: '',
+    homeLat: '',
+    homeLng: '',
+    homeRadiusMeters: 220,
+    autoHours: 8,
+    awayMinutesForWork: 90,
+    lastAutoLogDate: '',
+    lastInsideAt: '',
+    lastAutoReason: '',
+  })
   // Supplement schedule config: { suppId: { enabled, times: ['08:00', '20:00'], timesPerDay } }
   const [suppSchedule, setSuppSchedule] = useLS('baby-prep-supp-schedule', defaultSuppSchedule)
   // Supplement last taken timestamps: { 'suppId-doseIndex': 'ISO timestamp' }
@@ -207,7 +224,7 @@ export function AppProvider({ children }) {
     doctor, setDoctor,
     contacts, addContact, removeContact, updateContact,
     taxInputs, setTaxInputs,
-    attendance, markAttendance, getAttendance,
+    attendance, markAttendance, getAttendance, workLocation, setWorkLocation,
     suppSchedule,
     suppLastTaken, suppBottles, resetBottle,
     theme, toggleTheme,
