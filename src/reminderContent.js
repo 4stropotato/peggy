@@ -717,6 +717,27 @@ function resolveWorkLevel(ctx) {
   return 'gentle'
 }
 
+function resolveSuppIntervalMinutes(ctx, now, level) {
+  if (level === 'urgent') {
+    if (ctx.overdueDoses >= 3) return 6
+    if (ctx.overdueDoses >= 2) return 8
+    return 10
+  }
+  if (level === 'nudge') {
+    if (ctx.overdueDoses >= 1) return 12
+    if (ctx.remainingDoses >= 4) return 14
+    return 18
+  }
+  if (now.getHours() >= 18 && ctx.remainingDoses >= 1) return 20
+  return 28
+}
+
+function resolveWorkIntervalMinutes(ctx, level) {
+  if (level === 'urgent') return ctx.hour >= 20 ? 8 : 12
+  if (level === 'nudge') return ctx.hour >= 15 ? 18 : 24
+  return 40
+}
+
 function buildReminderSubtitle({
   taken,
   total,
@@ -741,7 +762,7 @@ function buildReminderSubtitle({
 
 export function buildSupplementReminder(ctx, now = new Date(), seedSalt = 'home') {
   const level = resolveSuppLevel(ctx, now)
-  const intervalMinutes = level === 'urgent' ? 12 : level === 'nudge' ? 25 : 45
+  const intervalMinutes = resolveSuppIntervalMinutes(ctx, now, level)
   const slot = Math.floor(minutesSinceMidnight(now) / intervalMinutes)
   const seedRoot = `${seedSalt}|supp|${ctx.dateKey}|${ctx.remainingDoses}|${ctx.overdueDoses}|${slot}|${level}`
   const style = weightedPick(LANGUAGE_STYLE_WEIGHTS, `${seedRoot}|style`) || 'taglish'
@@ -766,7 +787,7 @@ export function buildSupplementReminder(ctx, now = new Date(), seedSalt = 'home'
     level,
     intervalMinutes,
     slotKey: `${ctx.dateKey}|supp|${intervalMinutes}|${slot}`,
-    priorityScore: level === 'urgent' ? 4 : level === 'nudge' ? 3 : 2,
+    priorityScore: level === 'urgent' ? 5 : level === 'nudge' ? 3.6 : 2.4,
     title,
     subtitle,
     notificationTitle: 'Peggy reminder: Supplements',
@@ -776,7 +797,7 @@ export function buildSupplementReminder(ctx, now = new Date(), seedSalt = 'home'
 
 export function buildWorkReminder(ctx, now = new Date(), seedSalt = 'home') {
   const level = resolveWorkLevel(ctx)
-  const intervalMinutes = level === 'urgent' ? 20 : level === 'nudge' ? 40 : 80
+  const intervalMinutes = resolveWorkIntervalMinutes(ctx, level)
   const slot = Math.floor(minutesSinceMidnight(now) / intervalMinutes)
   const seedRoot = `${seedSalt}|work|${ctx.dateKey}|${ctx.hour}|${slot}|${level}`
   const style = weightedPick(LANGUAGE_STYLE_WEIGHTS, `${seedRoot}|style`) || 'taglish'
@@ -791,11 +812,31 @@ export function buildWorkReminder(ctx, now = new Date(), seedSalt = 'home') {
     level,
     intervalMinutes,
     slotKey: `${ctx.dateKey}|work|${intervalMinutes}|${slot}`,
-    priorityScore: level === 'urgent' ? 3 : level === 'nudge' ? 2 : 1,
+    priorityScore: level === 'urgent' ? 4.4 : level === 'nudge' ? 3.1 : 1.9,
     title,
     subtitle,
     notificationTitle: 'Peggy reminder: Attendance',
     notificationBody: 'Please log today attendance before day rollover.',
+  }
+}
+
+export function buildDailyTipReminder({ now = new Date(), dailyTip, seedSalt = 'notify' }) {
+  const intervalMinutes = 180
+  const slot = Math.floor(minutesSinceMidnight(now) / intervalMinutes)
+  const text = String(dailyTip?.text || '').trim()
+  const tone = dailyTip?.tone === 'serious' ? 'serious' : 'witty'
+  const category = String(dailyTip?.category || 'General')
+
+  return {
+    type: 'tip',
+    level: tone === 'serious' ? 'nudge' : 'gentle',
+    intervalMinutes,
+    slotKey: `${toIsoDate(now)}|tip|${intervalMinutes}|${slot}|${seedSalt}`,
+    priorityScore: tone === 'serious' ? 1.6 : 1.2,
+    title: tone === 'serious' ? 'Daily Tip: Deep info' : 'Daily Tip: Light break',
+    subtitle: text,
+    notificationTitle: `Peggy tip: ${category}`,
+    notificationBody: text || 'One small healthy action now beats perfect plans later.',
   }
 }
 
@@ -940,6 +981,70 @@ export const SMART_NOTIF_PREF_KEY = 'baby-prep-smart-notifs-enabled'
 export const LEGACY_SMART_NOTIF_PREF_KEY = 'peggy-smart-notifs-enabled'
 export const SMART_NOTIF_PREF_EVENT = 'peggy-smart-notif-pref-changed'
 export const SMART_NOTIF_LOG_KEY = 'peggy-smart-notifs-log-v1'
+export const SMART_NOTIF_QUIET_HOURS_KEY = 'baby-prep-smart-notif-quiet-hours'
+export const SMART_NOTIF_QUIET_HOURS_EVENT = 'peggy-smart-notif-quiet-hours-changed'
+
+const DEFAULT_SMART_QUIET_HOURS = Object.freeze({
+  enabled: true,
+  start: '22:00',
+  end: '07:00',
+})
+
+function normalizeClockValue(value, fallback = '00:00') {
+  const raw = String(value || '').trim()
+  const match = /^(\d{1,2}):(\d{1,2})$/.exec(raw)
+  if (!match) return fallback
+  const hh = Number(match[1])
+  const mm = Number(match[2])
+  if (!Number.isFinite(hh) || !Number.isFinite(mm)) return fallback
+  if (hh < 0 || hh > 23 || mm < 0 || mm > 59) return fallback
+  return `${String(hh).padStart(2, '0')}:${String(mm).padStart(2, '0')}`
+}
+
+function sanitizeQuietHours(value) {
+  const source = value && typeof value === 'object' ? value : {}
+  return {
+    enabled: source.enabled !== false,
+    start: normalizeClockValue(source.start, DEFAULT_SMART_QUIET_HOURS.start),
+    end: normalizeClockValue(source.end, DEFAULT_SMART_QUIET_HOURS.end),
+  }
+}
+
+export function readSmartNotifQuietHours() {
+  if (typeof window === 'undefined') return { ...DEFAULT_SMART_QUIET_HOURS }
+  try {
+    const raw = window.localStorage.getItem(SMART_NOTIF_QUIET_HOURS_KEY)
+    if (!raw) return { ...DEFAULT_SMART_QUIET_HOURS }
+    return sanitizeQuietHours(JSON.parse(raw))
+  } catch {
+    return { ...DEFAULT_SMART_QUIET_HOURS }
+  }
+}
+
+export function writeSmartNotifQuietHours(nextValue) {
+  if (typeof window === 'undefined') return
+  const safe = sanitizeQuietHours(nextValue)
+  window.localStorage.setItem(SMART_NOTIF_QUIET_HOURS_KEY, JSON.stringify(safe))
+  window.dispatchEvent(new CustomEvent(SMART_NOTIF_QUIET_HOURS_EVENT, { detail: safe }))
+  window.dispatchEvent(new CustomEvent('peggy-local-changed', { detail: { key: SMART_NOTIF_QUIET_HOURS_KEY } }))
+}
+
+export function isNowInSmartNotifQuietHours(now = new Date(), quietHours = null) {
+  const safe = sanitizeQuietHours(quietHours || readSmartNotifQuietHours())
+  if (!safe.enabled) return false
+
+  const start = parseClockMinutes(safe.start)
+  const end = parseClockMinutes(safe.end)
+  const current = minutesSinceMidnight(now)
+  if (start === end) return false
+  if (start < end) return current >= start && current < end
+  return current >= start || current < end
+}
+
+export function formatSmartNotifQuietHoursLabel(quietHours = null) {
+  const safe = sanitizeQuietHours(quietHours || readSmartNotifQuietHours())
+  return safe.enabled ? `${safe.start} - ${safe.end}` : 'Off'
+}
 
 export function readSmartNotifEnabled() {
   if (typeof window === 'undefined') return false

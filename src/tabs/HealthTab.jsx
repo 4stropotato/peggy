@@ -826,7 +826,7 @@ export default function HealthTab() {
               <p>Huwag sabayan ang Calcium at Prenatal (may iron)!</p>
               <p>Nag-aagawan sila sa absorption. Keep them 2+ hours apart.</p>
               <p><strong>Morning:</strong> Prenatal + DHA + Choline + Chlorella</p>
-              <p><strong>Lunch:</strong> Calcium (1st) + Vitamin D3</p>
+              <p><strong>Lunch:</strong> Calcium (1st) (+ Vitamin D3 only if advised)</p>
               <p><strong>Evening:</strong> Calcium (2nd)</p>
             </div>
           </section>

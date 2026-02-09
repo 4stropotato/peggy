@@ -2,14 +2,18 @@ import { useEffect } from 'react'
 import { useApp } from '../AppContext'
 import { babyNamesInfo } from '../infoData'
 import {
+  buildDailyTip,
+  buildDailyTipReminder,
   buildNameSpotlight,
   buildSupplementReminder,
   buildWorkReminder,
   getSupplementReminderContext,
   getWorkReminderContext,
   hasSentNotificationSlot,
+  isNowInSmartNotifQuietHours,
   markNotificationSlotSent,
   readSmartNotifEnabled,
+  readSmartNotifQuietHours,
 } from '../reminderContent'
 
 const APP_BASE = import.meta.env.BASE_URL || '/'
@@ -22,16 +26,81 @@ function canNotifyNow() {
   return true
 }
 
-function fireNotification(title, body, slotKey, urgent = false) {
+async function syncAppBadge(count) {
+  if (typeof navigator === 'undefined') return
+  const hasSet = typeof navigator.setAppBadge === 'function'
+  const hasClear = typeof navigator.clearAppBadge === 'function'
+  if (!hasSet && !hasClear) return
+
   try {
-    // Browser notification payload for PWA + desktop tab sessions.
-    new Notification(title, {
-      body,
+    const safeCount = Math.max(0, Number(count) || 0)
+    if (safeCount <= 0) {
+      if (hasClear) {
+        await navigator.clearAppBadge()
+      } else if (hasSet) {
+        await navigator.setAppBadge(0)
+      }
+      return
+    }
+    if (hasSet) await navigator.setAppBadge(Math.min(99, safeCount))
+  } catch {
+    // Badging is optional enhancement only.
+  }
+}
+
+function getNotifTone(type, level = 'gentle') {
+  if (type === 'supp') {
+    return {
+      titlePrefix: '💊',
+      bodyPrefix: 'Supplement check:',
+      vibrate: level === 'urgent' ? [140, 70, 140] : [100, 60, 100],
+    }
+  }
+  if (type === 'work') {
+    return {
+      titlePrefix: '🧾',
+      bodyPrefix: 'Work log:',
+      vibrate: level === 'urgent' ? [120, 50, 120, 50, 120] : [90, 50, 90],
+    }
+  }
+  if (type === 'tip') {
+    return {
+      titlePrefix: '💡',
+      bodyPrefix: 'Daily tip:',
+      vibrate: [70],
+    }
+  }
+  if (type === 'name') {
+    return {
+      titlePrefix: '🍼',
+      bodyPrefix: 'Name spotlight:',
+      vibrate: [50, 35, 50],
+    }
+  }
+  return {
+    titlePrefix: '',
+    bodyPrefix: '',
+    vibrate: [80],
+  }
+}
+
+function fireNotification({ title, body, slotKey, type = 'general', level = 'gentle', urgent = false }) {
+  const tone = getNotifTone(type, level)
+  const safeTitle = `${tone.titlePrefix} ${String(title || '').trim()}`.trim()
+  const baseBody = String(body || '').trim()
+  const safeBody = tone.bodyPrefix ? `${tone.bodyPrefix} ${baseBody}`.trim() : baseBody
+
+  try {
+    new Notification(safeTitle, {
+      body: safeBody,
       icon: NOTIF_ICON,
       badge: NOTIF_ICON,
-      tag: slotKey,
-      renotify: false,
-      requireInteraction: urgent,
+      tag: `${type}:${slotKey}`,
+      renotify: urgent,
+      requireInteraction: urgent || level === 'urgent',
+      vibrate: tone.vibrate,
+      timestamp: Date.now(),
+      data: { type, level },
     })
   } catch {
     // Ignore notification errors from unsupported environments.
@@ -45,52 +114,83 @@ export default function SmartReminderAgent() {
     if (typeof window === 'undefined' || typeof Notification === 'undefined') return undefined
 
     const tick = () => {
-      if (!readSmartNotifEnabled()) return
-      if (Notification.permission !== 'granted') return
-      if (!canNotifyNow()) return
+      if (!readSmartNotifEnabled()) {
+        void syncAppBadge(0)
+        return
+      }
 
       const now = new Date()
       const suppCtx = getSupplementReminderContext({ dailySupp, suppSchedule, now })
       const workCtx = getWorkReminderContext({ attendance, now })
-      const candidates = []
 
+      const badgeCount = Math.max(0, suppCtx.remainingDoses) + (workCtx.needsReminder ? 1 : 0)
+      void syncAppBadge(badgeCount)
+
+      if (isNowInSmartNotifQuietHours(now, readSmartNotifQuietHours())) return
+      if (Notification.permission !== 'granted') return
+      if (!canNotifyNow()) return
+
+      const actionableCandidates = []
       if (suppCtx.remainingDoses > 0) {
-        candidates.push(buildSupplementReminder(suppCtx, now, 'notify'))
+        actionableCandidates.push(buildSupplementReminder(suppCtx, now, 'notify'))
       }
       if (workCtx.needsReminder) {
-        candidates.push(buildWorkReminder(workCtx, now, 'notify'))
+        actionableCandidates.push(buildWorkReminder(workCtx, now, 'notify'))
       }
 
-      const unsentReminders = candidates
+      const actionable = actionableCandidates
         .filter(item => !hasSentNotificationSlot(item.slotKey, now))
-        .sort((a, b) => b.priorityScore - a.priorityScore)
+        .sort((a, b) => b.priorityScore - a.priorityScore)[0] || null
 
-      const topReminder = unsentReminders[0] || null
+      if (actionable) {
+        fireNotification({
+          title: actionable.notificationTitle,
+          body: actionable.notificationBody,
+          slotKey: actionable.slotKey,
+          type: actionable.type,
+          level: actionable.level,
+          urgent: actionable.level === 'urgent',
+        })
+        markNotificationSlotSent(actionable.slotKey, now)
+        return
+      }
+
+      const dailyTip = buildDailyTip({ now, suppCtx })
+      const tipReminder = buildDailyTipReminder({ now, dailyTip, seedSalt: 'notify' })
+      if (!hasSentNotificationSlot(tipReminder.slotKey, now)) {
+        fireNotification({
+          title: tipReminder.notificationTitle,
+          body: tipReminder.notificationBody,
+          slotKey: tipReminder.slotKey,
+          type: tipReminder.type,
+          level: tipReminder.level,
+          urgent: false,
+        })
+        markNotificationSlotSent(tipReminder.slotKey, now)
+        return
+      }
+
       const nameSpotlight = buildNameSpotlight({ now, babyNamesInfo, seedSalt: 'notify' })
       const nameSlotKey = `${nameSpotlight.slotKey}|name-notif`
       const nameUnsent = !hasSentNotificationSlot(nameSlotKey, now)
-
-      if (topReminder && topReminder.level === 'urgent') {
-        fireNotification(topReminder.notificationTitle, topReminder.notificationBody, topReminder.slotKey, true)
-        markNotificationSlotSent(topReminder.slotKey, now)
-        return
-      }
-
-      if (nameUnsent && (!topReminder || now.getMinutes() % 2 === 0)) {
-        fireNotification(nameSpotlight.notificationTitle, nameSpotlight.notificationBody, nameSlotKey, false)
+      if (nameUnsent && now.getMinutes() % 2 === 0) {
+        fireNotification({
+          title: nameSpotlight.notificationTitle,
+          body: nameSpotlight.notificationBody,
+          slotKey: nameSlotKey,
+          type: 'name',
+          level: 'gentle',
+          urgent: false,
+        })
         markNotificationSlotSent(nameSlotKey, now)
-        return
-      }
-
-      if (topReminder) {
-        fireNotification(topReminder.notificationTitle, topReminder.notificationBody, topReminder.slotKey, false)
-        markNotificationSlotSent(topReminder.slotKey, now)
       }
     }
 
     tick()
-    const id = window.setInterval(tick, 60 * 1000)
-    return () => window.clearInterval(id)
+    const id = window.setInterval(tick, 45 * 1000)
+    return () => {
+      window.clearInterval(id)
+    }
   }, [dailySupp, suppSchedule, attendance])
 
   return null

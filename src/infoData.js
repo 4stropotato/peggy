@@ -795,7 +795,7 @@ export const supplementsDetailInfo = {
       when: 'Daily with food, morning is best',
       options: [
         { product: 'Nature Made, Prenatal Multi + DHA, 90 Softgels', price: '~$15-18 (usually ¥2,200-2,800)', note: 'Budget pick - includes some DHA too', lasts: '3 months' },
-        { product: 'Thorne, Basic Prenatal, 90 Capsules', price: '~$28-35 (usually ¥4,200-5,200)', note: 'Best quality - methylated folate (better absorbed). No iron - need separate or from chlorella+food', lasts: '1 month' },
+        { product: 'Thorne, Basic Prenatal, 90 Capsules', price: '~$28-35 (usually ¥4,200-5,200)', note: 'Methylated folate option. Contains high iron, so avoid adding extra iron unless OB says needed.', lasts: '1 month' },
         { product: 'Garden of Life Vitamin Code RAW Prenatal', price: '~$25-30 (usually ¥3,700-4,500)', note: 'Whole food-based option', lasts: '1 month' },
       ]
     },
@@ -812,20 +812,20 @@ export const supplementsDetailInfo = {
       ]
     },
     {
-      name: 'Calcium + Mag + D + Zinc',
+      name: 'Calcium (No Added Zinc Preferred)',
       icon: '🦴',
-      why: 'Baby takes calcium directly from mom\'s bones if not enough! Reduces preeclampsia risk. Baby\'s bone and teeth development. Magnesium helps leg cramps.',
+      why: 'Use supplements only to fill calcium gap from food. Keep a safe margin below zinc and magnesium upper limits.',
       when: 'Split into 2 doses (morning/evening). Body absorbs max 500mg at a time. TAKE 2+ HOURS AWAY FROM IRON/PRENATAL!',
       options: [
-        { product: 'NOW Foods, Calcium & Magnesium with Vitamin D-3 and Zinc, 120 Softgels', price: '~$12-16 (usually ¥1,800-2,400)', note: 'Best value - Cal+Mag+D3+Zinc all in one softgel', lasts: '1-2 months' },
-        { product: '21st Century, Calcium Citrate + D3, 120 Tablets', price: '~$8-12 (usually ¥1,200-1,800)', note: 'Best absorption (citrate absorbs better than carbonate)', lasts: '1 month' },
-        { product: 'Nature Made, Calcium 600mg + D3, 220 Tablets', price: '~$10-14 (usually ¥1,500-2,100)', note: 'Cheapest option, lots of tablets', lasts: '3+ months' },
+        { product: '21st Century, Calcium Citrate + D3, 120 Tablets', price: '~$8-12 (usually ¥1,200-1,800)', note: 'No added zinc. Citrate form is generally easier to absorb.', lasts: '1 month' },
+        { product: 'Nature Made, Calcium 600mg + D3, 220 Tablets', price: '~$10-14 (usually ¥1,500-2,100)', note: 'No added zinc. Adjust tablet count based on food calcium intake.', lasts: '3+ months' },
+        { product: 'Kirkland Calcium Citrate + D3, 500 Tablets', price: '~$12-18 (usually ¥1,800-2,700)', note: 'Large bottle, no added zinc, budget long-term option', lasts: '4-6 months' },
       ]
     },
     {
       name: 'Chlorella',
       icon: '🌿',
-      why: 'THE RYZEN FORMULA! Used with Ryzen = brilliant at math. Contains: complete protein, B vitamins (B12), iron, chlorophyll (detoxifier), CGF (Chlorella Growth Factor), nucleic acids.',
+      why: 'Optional add-on only. Not a core prenatal requirement. If used, start low and monitor tolerance.',
       when: 'With meals. Start with lower dose, increase gradually over a week.',
       options: [
         { product: 'NOW Foods, Certified Organic Chlorella, 500 mg, 200 Tablets', price: '~$12-16 (usually ¥1,800-2,400)', note: 'Budget pick - organic, broken cell wall', lasts: '1-2 months' },
@@ -839,38 +839,38 @@ export const supplementsDetailInfo = {
       why: 'MOST PEOPLE MISS THIS. On par with DHA for brain development. Improves memory, attention, processing speed. Most prenatals have little to none. Target: 450mg/day during pregnancy.',
       when: 'With food, any time of day',
       options: [
-        { product: 'NOW Foods, Choline & Inositol, 500 mg, 100 Capsules', price: '~$8-12 (usually ¥1,200-1,800)', note: 'Best value - cheap and effective. Inositol bonus for mood/blood sugar', lasts: '3+ months' },
-        { product: 'Jarrow Formulas, Citicoline, CDP Choline, 250 mg, 60 Capsules', price: '~$18-25 (usually ¥2,700-3,700)', note: 'Premium form - crosses blood-brain barrier more efficiently', lasts: '2 months' },
+        { product: 'NOW Foods, Choline & Inositol, 500 mg, 100 Capsules', price: '~$8-12 (usually ¥1,200-1,800)', note: 'Plain and practical top-up after checking choline from food (eggs, fish, meat).', lasts: '3+ months' },
+        { product: 'NOW Foods, Sunflower Lecithin, 1200 mg, 100 Softgels', price: '~$10-14 (usually ¥1,500-2,100)', note: 'Alternative phosphatidylcholine source if better tolerated', lasts: '1-2 months' },
       ]
     },
     {
-      name: 'Vitamin D3',
+      name: 'Vitamin D3 (Optional / Lab-Guided)',
       icon: '☀️',
-      why: 'Very common deficiency in Japan. Without D3: calcium supplements are less effective, higher preeclampsia risk, compromised bone development, weakened immune system.',
-      when: 'With a meal containing fat',
+      why: 'Important nutrient, but extra high-dose D3 should be based on OB advice and 25-OH vitamin D labs.',
+      when: 'With a meal containing fat, only if advised',
       options: [
-        { product: 'NOW Foods, Vitamin D-3, 2,000 IU, 120 Softgels', price: '~$6-9 (usually ¥900-1,350)', note: 'Super cheap! Tiny softgel, easy to swallow. BEST VALUE on entire list.', lasts: '4 MONTHS' },
-        { product: 'Solgar, Vitamin D3, 2,200 IU, 100 Vegetable Capsules', price: '~$10-14 (usually ¥1,500-2,100)', note: 'Vegetarian capsule', lasts: '3+ months' },
+        { product: 'NOW Foods, Vitamin D-3, 1,000 IU, 180 Softgels', price: '~$7-10 (usually ¥1,050-1,500)', note: 'Lower-dose option for conservative top-up if OB suggests supplementation.', lasts: '6 months' },
+        { product: 'Solgar, Vitamin D3, 2,200 IU, 100 Vegetable Capsules', price: '~$10-14 (usually ¥1,500-2,100)', note: 'Use only when deficiency is confirmed or clinician recommends.', lasts: '3+ months' },
       ]
     }
   ],
   schedule: [
     { time: 'BREAKFAST', supplements: 'Prenatal Multi + DHA + Choline + Chlorella', note: 'With food (needs fat for DHA absorption)' },
-    { time: 'LUNCH/MERIENDA', supplements: 'Calcium (1st dose) + Vitamin D3', note: 'With food, AT LEAST 2 HOURS after breakfast supplements' },
+    { time: 'LUNCH/MERIENDA', supplements: 'Calcium (1st dose)', note: 'With food, AT LEAST 2 HOURS after breakfast supplements. Add Vitamin D3 only if advised.' },
     { time: 'DINNER/BEFORE BED', supplements: 'Calcium (2nd dose)', note: 'With food' },
   ],
-  importantRule: 'HUWAG sabayan ang calcium at prenatal (may iron). Nag-aagawan sila sa absorption. Kaya hiwalay: Prenatal sa morning, Calcium sa lunch at gabi.',
+  importantRule: 'HUWAG sabayan ang calcium at prenatal (may iron). Keep 2+ hours apart. Extra Vitamin D3 should be lab-guided, not automatic.',
   budgetCart: {
     title: 'Budget iHerb Cart',
-    total: '~$91 (usually ¥13,000-14,000)',
-    note: 'First order covers 1.5-3 months. Monthly reorder drops to ~$40-50/month (¥6,000-7,500)',
+    total: '~$78 (usually ¥11,500-12,500)',
+    note: 'Core stack only. Vitamin D3 can be added later if OB/labs recommend.',
     items: [
       'Nature Made, Prenatal Multi + DHA, 90 Softgels',
       'Nordic Naturals, Prenatal DHA, 500 mg, 90 Soft Gels',
-      'NOW Foods, Calcium & Magnesium with D-3 and Zinc, 120 Softgels',
+      '21st Century, Calcium Citrate + D3, 120 Tablets',
       'NOW Foods, Certified Organic Chlorella, 500 mg, 200 Tablets',
       'NOW Foods, Choline & Inositol, 500 mg, 100 Capsules',
-      'NOW Foods, Vitamin D-3, 2,000 IU, 120 Softgels',
+      'Vitamin D3 (optional add-on, only with OB/lab guidance)',
     ]
   },
   iherbTips: [

@@ -11,11 +11,15 @@ import {
   buildNameSpotlight,
   buildSupplementReminder,
   buildWorkReminder,
+  formatSmartNotifQuietHoursLabel,
   getSupplementReminderContext,
   getWorkReminderContext,
   SMART_NOTIF_PREF_EVENT,
+  SMART_NOTIF_QUIET_HOURS_EVENT,
   readSmartNotifEnabled,
+  readSmartNotifQuietHours,
   writeSmartNotifEnabled,
+  writeSmartNotifQuietHours,
 } from '../reminderContent'
 
 // Find earliest date any supplement was tracked
@@ -83,6 +87,7 @@ export default function HomeTab() {
   const [calState, setCalState] = useState({ y: now.getFullYear(), m: now.getMonth() + 1 })
   const [selectedDay, setSelectedDay] = useState(null)
   const [notifEnabled, setNotifEnabled] = useState(() => readSmartNotifEnabled())
+  const [quietHours, setQuietHours] = useState(() => readSmartNotifQuietHours())
   const [notifStatus, setNotifStatus] = useState('')
 
   useEffect(() => {
@@ -107,14 +112,24 @@ export default function HomeTab() {
     const syncNotifEnabled = () => {
       setNotifEnabled(readSmartNotifEnabled())
     }
+    const syncQuietHours = () => {
+      setQuietHours(readSmartNotifQuietHours())
+    }
+
+    const syncAllNotifSettings = () => {
+      syncNotifEnabled()
+      syncQuietHours()
+    }
 
     window.addEventListener(SMART_NOTIF_PREF_EVENT, syncNotifEnabled)
-    window.addEventListener('peggy-backup-restored', syncNotifEnabled)
-    window.addEventListener('storage', syncNotifEnabled)
+    window.addEventListener(SMART_NOTIF_QUIET_HOURS_EVENT, syncQuietHours)
+    window.addEventListener('peggy-backup-restored', syncAllNotifSettings)
+    window.addEventListener('storage', syncAllNotifSettings)
     return () => {
       window.removeEventListener(SMART_NOTIF_PREF_EVENT, syncNotifEnabled)
-      window.removeEventListener('peggy-backup-restored', syncNotifEnabled)
-      window.removeEventListener('storage', syncNotifEnabled)
+      window.removeEventListener(SMART_NOTIF_QUIET_HOURS_EVENT, syncQuietHours)
+      window.removeEventListener('peggy-backup-restored', syncAllNotifSettings)
+      window.removeEventListener('storage', syncAllNotifSettings)
     }
   }, [])
 
@@ -243,6 +258,22 @@ export default function HomeTab() {
     setNotifStatus('Permission not granted.')
   }
 
+  const handleQuietHoursToggle = () => {
+    const next = { ...quietHours, enabled: !quietHours.enabled }
+    setQuietHours(next)
+    writeSmartNotifQuietHours(next)
+    setNotifStatus(next.enabled ? `Quiet hours enabled (${formatSmartNotifQuietHoursLabel(next)}).` : 'Quiet hours disabled.')
+  }
+
+  const handleQuietHoursTimeChange = (field, value) => {
+    const next = { ...quietHours, [field]: value }
+    setQuietHours(next)
+    writeSmartNotifQuietHours(next)
+    if (next.enabled) {
+      setNotifStatus(`Quiet hours updated (${formatSmartNotifQuietHoursLabel(next)}).`)
+    }
+  }
+
   return (
     <div className="content">
       <header className="home-header">
@@ -311,6 +342,54 @@ export default function HomeTab() {
         </div>
       </div>
 
+      <section className="glass-section notif-settings-card">
+        <div className="section-header">
+          <span className="section-icon"><UiIcon icon={APP_ICONS.reminders} /></span>
+          <div>
+            <h2>Notification Settings</h2>
+            <span className="section-count">Per-account settings</span>
+          </div>
+          <button
+            type="button"
+            className={`notif-toggle-btn glass-inner ${notifEnabled ? 'on' : ''}`}
+            onClick={handleNotifToggle}
+          >
+            {notifEnabled ? 'Notifications ON' : 'Enable Notifications'}
+          </button>
+        </div>
+        <div className="notif-settings-grid">
+          <button
+            type="button"
+            className={`notif-pill-btn glass-inner ${quietHours.enabled ? 'on' : ''}`}
+            onClick={handleQuietHoursToggle}
+          >
+            {quietHours.enabled ? 'Quiet Hours ON' : 'Quiet Hours OFF'}
+          </button>
+          <label className="notif-time-field">
+            <span>Start</span>
+            <input
+              type="time"
+              value={quietHours.start}
+              disabled={!quietHours.enabled}
+              onChange={e => handleQuietHoursTimeChange('start', e.target.value)}
+            />
+          </label>
+          <label className="notif-time-field">
+            <span>End</span>
+            <input
+              type="time"
+              value={quietHours.end}
+              disabled={!quietHours.enabled}
+              onChange={e => handleQuietHoursTimeChange('end', e.target.value)}
+            />
+          </label>
+        </div>
+        <p className="section-note">
+          Quiet hours: {formatSmartNotifQuietHoursLabel(quietHours)}. During quiet hours, reminders stay silent pero badge updates continue.
+        </p>
+        {notifStatus && <p className="section-note">{notifStatus}</p>}
+      </section>
+
       {(suppReminder || workReminder) && (
         <section className="glass-section reminder-section">
           <div className="section-header">
@@ -324,7 +403,6 @@ export default function HomeTab() {
               {notifEnabled ? 'Notifications ON' : 'Enable Notifications'}
             </button>
           </div>
-          {notifStatus && <p className="section-note">{notifStatus}</p>}
           <div className="reminder-cards">
             {suppReminder && (
               <div className={`reminder-card glass-inner reminder-supps level-${suppReminder.level}`}>
@@ -363,7 +441,6 @@ export default function HomeTab() {
             {notifEnabled ? 'Notifications ON' : 'Enable Notifications'}
           </button>
         </div>
-        {notifStatus && !suppReminder && !workReminder && <p className="section-note">{notifStatus}</p>}
         <div className="name-spotlight-main glass-inner">
           <div className="name-spotlight-title">{nameSpotlight.spotlight.name} {nameSpotlight.spotlight.kanji}</div>
           <div className="name-spotlight-subtitle">{nameSpotlight.spotlight.meaning}</div>
