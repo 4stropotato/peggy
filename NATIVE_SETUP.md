@@ -60,9 +60,10 @@ Health tab now shows the active tracking mode so you can verify.
 
 ## 6. Widget Continuation
 
-For home-screen/lock-screen widget setup, follow:
+For home-screen/lock-screen widget setup, follow private docs:
 
-- `NATIVE_WIDGET_SETUP.md`
+- `../_private/docs/2026-02-09-native-widget-setup.md`
+- `../_private/docs/2026-02-09-windows-iphone-playbook.md`
 
 Template files are included in:
 
