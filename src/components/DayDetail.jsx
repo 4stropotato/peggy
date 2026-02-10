@@ -167,6 +167,19 @@ export default function DayDetail({
     }))
   }
 
+  const quickAddTemplate = (template) => {
+    const next = template?.form || null
+    if (!next) return
+    addPlan?.(dateISO, {
+      time: String(next.time || '').trim(),
+      title: String(next.title || '').trim(),
+      location: String(next.location || '').trim(),
+      notes: String(next.notes || '').trim(),
+      done: Boolean(next.done),
+      taskIds: Array.isArray(next.taskIds) ? next.taskIds : [],
+    })
+  }
+
   // Supplement status
   const suppStatus = useMemo(() => {
     return supplements.map(s => {
@@ -206,7 +219,7 @@ export default function DayDetail({
   }, [dateISO, moods])
 
   return (
-    <div className="day-detail-backdrop" onClick={onClose}>
+    <div className="day-detail-backdrop" onClick={() => { if (!isEditing) onClose?.() }}>
       <div className="day-detail-sheet glass-section" onClick={e => e.stopPropagation()}>
         <div className="day-detail-handle" />
         <h3 className="day-detail-title">{dayLabel}</h3>
@@ -220,6 +233,21 @@ export default function DayDetail({
               <button type="button" className="btn-glass-mini" onClick={startAdd}>Add</button>
             )}
           </div>
+
+          {!isEditing && (
+            <div className="day-detail-quick-row">
+              {QUICK_PLAN_TEMPLATES.map(t => (
+                <button
+                  key={t.id}
+                  type="button"
+                  className="quick-chip glass-inner"
+                  onClick={() => quickAddTemplate(t)}
+                >
+                  {t.label}
+                </button>
+              ))}
+            </div>
+          )}
 
           {sortedPlans.length > 0 ? (
             <div className="day-detail-plans">

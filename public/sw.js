@@ -1,6 +1,6 @@
 // Cache version bump: change this whenever static assets (icons, CSS, JS) change
 // so installed PWAs pick up updates reliably.
-const CACHE_NAME = 'peggy-v13';
+const CACHE_NAME = 'peggy-v14';
 const CACHE_PREFIXES = ['peggy-', 'baby-prep-'];
 
 function resolveBasePath() {
@@ -18,6 +18,21 @@ const PRECACHE = [
   `${BASE}icon-192.png`,
   `${BASE}icon-512.png`
 ];
+
+function isVersionFile(requestUrl) {
+  try {
+    const url = new URL(requestUrl);
+    return url.pathname === `${BASE}version.json`;
+  } catch {
+    return false;
+  }
+}
+
+function fetchNoStore(request) {
+  // Bypass HTTP cache headers (GH Pages uses max-age=600).
+  // This improves "Add to Home Screen" update reliability on iOS PWAs.
+  return fetch(new Request(request, { cache: 'no-store' }));
+}
 
 function toAbsoluteUrl(url) {
   try {
@@ -50,9 +65,14 @@ self.addEventListener('fetch', (event) => {
   if (event.request.method !== 'GET') return;
 
   const isDocument = event.request.mode === 'navigate' || event.request.destination === 'document';
+  if (isVersionFile(event.request.url)) {
+    event.respondWith(fetchNoStore(event.request));
+    return;
+  }
+
   if (isDocument) {
     event.respondWith(
-      fetch(event.request)
+      fetchNoStore(event.request)
         .then((response) => {
           if (response && response.status === 200) {
             const clone = response.clone();

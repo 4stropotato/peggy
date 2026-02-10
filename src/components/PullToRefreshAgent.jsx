@@ -75,6 +75,11 @@ export default function PullToRefreshAgent() {
       if (now - lastTriggerRef.current < TRIGGER_COOLDOWN_MS) return
       lastTriggerRef.current = now
 
+      // Ask main.jsx to run the "version.json" check + cache-busting reload.
+      try {
+        window.dispatchEvent(new CustomEvent('peggy-force-update'))
+      } catch {}
+
       const hasUpdate = await checkForUpdate()
       // If a new SW is installing/waiting, main.jsx will reload when it's ready.
       // Otherwise, do a simple reload to "force refresh" the app.
