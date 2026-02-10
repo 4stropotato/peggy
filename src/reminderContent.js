@@ -38,6 +38,15 @@ function parseClockMinutes(value) {
   return (h * 60) + m
 }
 
+function parseOptionalClockMinutes(value) {
+  const raw = String(value || '').trim()
+  if (!raw) return null
+  const [h, m] = raw.split(':').map(Number)
+  if (Number.isNaN(h) || Number.isNaN(m)) return null
+  if (h < 0 || h > 23 || m < 0 || m > 59) return null
+  return (h * 60) + m
+}
+
 function toIsoDate(now) {
   const y = now.getFullYear()
   const m = String(now.getMonth() + 1).padStart(2, '0')
@@ -702,6 +711,88 @@ export function getWorkReminderContext({ attendance, now = new Date() }) {
   }
 }
 
+function sortPlannerItems(items) {
+  const safe = Array.isArray(items) ? items.filter(Boolean) : []
+  return [...safe].sort((a, b) => {
+    const at = parseOptionalClockMinutes(a?.time)
+    const bt = parseOptionalClockMinutes(b?.time)
+    if (at !== null && bt !== null && at !== bt) return at - bt
+    if (at !== null && bt === null) return -1
+    if (at === null && bt !== null) return 1
+    const atitle = String(a?.title || '').toLowerCase()
+    const btitle = String(b?.title || '').toLowerCase()
+    return atitle.localeCompare(btitle)
+  })
+}
+
+function isoDayDiff(fromISO, toISO) {
+  try {
+    const from = new Date(`${fromISO}T00:00`)
+    const to = new Date(`${toISO}T00:00`)
+    return Math.round((to - from) / (1000 * 60 * 60 * 24))
+  } catch {
+    return 0
+  }
+}
+
+export function getPlannerReminderContext({ planner, now = new Date() }) {
+  const dateKey = toIsoDate(now)
+  const nowMinutes = minutesSinceMidnight(now)
+  const safePlanner = planner && typeof planner === 'object' ? planner : {}
+
+  const todayPlans = Array.isArray(safePlanner[dateKey]) ? safePlanner[dateKey] : []
+  const pendingToday = todayPlans.filter(p => p && !p.done)
+  const pendingTodaySorted = sortPlannerItems(pendingToday)
+
+  // Past dates: pick the most recent day with any pending plan.
+  const overdueBuckets = []
+  for (const [iso, plans] of Object.entries(safePlanner)) {
+    if (!iso || iso >= dateKey) continue
+    if (!Array.isArray(plans) || plans.length === 0) continue
+    const pending = plans.filter(p => p && !p.done)
+    if (pending.length === 0) continue
+    overdueBuckets.push({ dateISO: iso, plans: sortPlannerItems(pending) })
+  }
+  overdueBuckets.sort((a, b) => b.dateISO.localeCompare(a.dateISO))
+
+  const overdueCandidate = overdueBuckets.length > 0 ? overdueBuckets[0] : null
+  const candidateDateISO = overdueCandidate ? overdueCandidate.dateISO : dateKey
+  const candidatePlan = overdueCandidate
+    ? overdueCandidate.plans[0]
+    : (pendingTodaySorted[0] || null)
+
+  if (!candidatePlan) {
+    return {
+      dateKey,
+      nowMinutes,
+      pendingTodayCount: pendingToday.length,
+      pendingOverdueCount: overdueBuckets.reduce((acc, b) => acc + b.plans.length, 0),
+      candidate: null,
+    }
+  }
+
+  const timeMinutes = parseOptionalClockMinutes(candidatePlan.time)
+  const minutesUntil = timeMinutes === null ? null : (timeMinutes - nowMinutes)
+  const isOverdueDay = candidateDateISO < dateKey
+  const overdueDays = isOverdueDay ? isoDayDiff(candidateDateISO, dateKey) : 0
+
+  return {
+    dateKey,
+    nowMinutes,
+    pendingTodayCount: pendingToday.length,
+    pendingOverdueCount: overdueBuckets.reduce((acc, b) => acc + b.plans.length, 0),
+    candidate: {
+      dateISO: candidateDateISO,
+      planId: String(candidatePlan.id || '').trim(),
+      title: String(candidatePlan.title || '').trim(),
+      time: String(candidatePlan.time || '').trim(),
+      minutesUntil,
+      isOverdueDay,
+      overdueDays,
+    },
+  }
+}
+
 function resolveSuppLevel(ctx, now) {
   if (ctx.overdueDoses >= 2) return 'urgent'
   if (ctx.overdueDoses >= 1 && now.getHours() >= 16) return 'urgent'
@@ -715,6 +806,28 @@ function resolveWorkLevel(ctx) {
   if (ctx.hour >= 17) return 'urgent'
   if (ctx.hour >= 11) return 'nudge'
   return 'gentle'
+}
+
+function resolvePlannerLevel(ctx, now) {
+  const candidate = ctx?.candidate
+  if (!candidate) return 'gentle'
+  if (candidate.isOverdueDay) return 'urgent'
+
+  const minutesUntil = candidate.minutesUntil
+  if (minutesUntil !== null && minutesUntil <= 0) {
+    if (now.getHours() >= 18) return 'urgent'
+    return 'nudge'
+  }
+
+  if (ctx.pendingTodayCount >= 3 && now.getHours() >= 12) return 'nudge'
+  if (ctx.pendingTodayCount >= 1 && now.getHours() >= 17) return 'nudge'
+  return 'gentle'
+}
+
+function resolvePlannerIntervalMinutes(level) {
+  if (level === 'urgent') return 18
+  if (level === 'nudge') return 30
+  return 45
 }
 
 function resolveSuppIntervalMinutes(ctx, now, level) {
@@ -817,6 +930,73 @@ export function buildWorkReminder(ctx, now = new Date(), seedSalt = 'home') {
     subtitle,
     notificationTitle: 'Peggy reminder: Attendance',
     notificationBody: 'Please log today attendance before day rollover.',
+  }
+}
+
+export function buildPlannerReminder(ctx, now = new Date(), seedSalt = 'home') {
+  const candidate = ctx?.candidate
+  if (!candidate?.planId || !candidate?.title) return null
+
+  const level = resolvePlannerLevel(ctx, now)
+  const intervalMinutes = resolvePlannerIntervalMinutes(level)
+  const slot = Math.floor(minutesSinceMidnight(now) / intervalMinutes)
+  const seedRoot = `${seedSalt}|plan|${ctx.dateKey}|${candidate.dateISO}|${candidate.planId}|${slot}|${level}`
+
+  const safeTitle = String(candidate.title || '').trim() || 'Planner item'
+  const time = String(candidate.time || '').trim()
+  const minutesUntil = candidate.minutesUntil
+
+  const shortDate = (() => {
+    try {
+      return new Date(`${candidate.dateISO}T00:00`).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+    } catch {
+      return candidate.dateISO
+    }
+  })()
+
+  const statusLine = candidate.isOverdueDay
+    ? `Missed from ${shortDate}${candidate.overdueDays ? ` (${candidate.overdueDays}d ago)` : ''}.`
+    : (minutesUntil === null
+      ? 'All day.'
+      : (minutesUntil <= 0
+        ? `Due now${time ? ` (${time})` : ''}.`
+        : `Today${time ? ` at ${time}` : ''}${minutesUntil <= 180 ? ` (~${minutesUntil}m)` : ''}.`))
+
+  const extraLinePool = {
+    gentle: [
+      'Small plan, less stress later.',
+      'One tap to stay organized.',
+      'Keep it light and simple.',
+      'Plan check-in, then continue.',
+    ],
+    nudge: [
+      'Quick confirm so it does not slip.',
+      'Tiny admin now saves tomorrow.',
+      'Close the loop while it is easy.',
+      'One quick step, then back to rest.',
+    ],
+    urgent: [
+      'Overdue loop detected. Close it now.',
+      'Confirm status, then move on.',
+      'Do not let this pile up.',
+      'Fast check, clean timeline.',
+    ],
+  }
+  const extraLine = pickBySeed(extraLinePool[level] || extraLinePool.gentle, `${seedRoot}|line`)
+  const subtitle = `${statusLine} ${extraLine}`.trim()
+
+  return {
+    type: 'plan',
+    level,
+    intervalMinutes,
+    slotKey: `${ctx.dateKey}|plan|${intervalMinutes}|${slot}|${candidate.dateISO}|${candidate.planId}`,
+    priorityScore: level === 'urgent' ? 3.9 : level === 'nudge' ? 2.8 : 1.6,
+    title: safeTitle,
+    subtitle,
+    notificationTitle: 'Peggy reminder: Planner',
+    notificationBody: `${safeTitle} ${statusLine}`.trim(),
+    planDateISO: candidate.dateISO,
+    planId: candidate.planId,
   }
 }
 

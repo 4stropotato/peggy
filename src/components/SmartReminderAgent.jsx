@@ -5,8 +5,10 @@ import {
   buildDailyTip,
   buildDailyTipReminder,
   buildNameSpotlight,
+  buildPlannerReminder,
   buildSupplementReminder,
   buildWorkReminder,
+  getPlannerReminderContext,
   getSupplementReminderContext,
   getWorkReminderContext,
   hasSentNotificationSlot,
@@ -77,6 +79,13 @@ function getNotifTone(type, level = 'gentle') {
       vibrate: [50, 35, 50],
     }
   }
+  if (type === 'plan') {
+    return {
+      titlePrefix: '📅',
+      bodyPrefix: 'Plan:',
+      vibrate: level === 'urgent' ? [110, 60, 110] : [70, 40, 70],
+    }
+  }
   return {
     titlePrefix: '',
     bodyPrefix: '',
@@ -108,7 +117,7 @@ function fireNotification({ title, body, slotKey, type = 'general', level = 'gen
 }
 
 export default function SmartReminderAgent() {
-  const { dailySupp, suppSchedule, attendance } = useApp()
+  const { dailySupp, suppSchedule, attendance, planner } = useApp()
 
   useEffect(() => {
     if (typeof window === 'undefined' || typeof Notification === 'undefined') return undefined
@@ -122,8 +131,10 @@ export default function SmartReminderAgent() {
       const now = new Date()
       const suppCtx = getSupplementReminderContext({ dailySupp, suppSchedule, now })
       const workCtx = getWorkReminderContext({ attendance, now })
+      const planCtx = getPlannerReminderContext({ planner, now })
 
-      const badgeCount = Math.max(0, suppCtx.remainingDoses) + (workCtx.needsReminder ? 1 : 0)
+      const planBadgeCount = Math.max(0, Number(planCtx.pendingTodayCount) || 0) + Math.max(0, Number(planCtx.pendingOverdueCount) || 0)
+      const badgeCount = Math.max(0, suppCtx.remainingDoses) + (workCtx.needsReminder ? 1 : 0) + planBadgeCount
       void syncAppBadge(badgeCount)
 
       if (isNowInSmartNotifQuietHours(now, readSmartNotifQuietHours())) return
@@ -136,6 +147,10 @@ export default function SmartReminderAgent() {
       }
       if (workCtx.needsReminder) {
         actionableCandidates.push(buildWorkReminder(workCtx, now, 'notify'))
+      }
+      if (planCtx?.candidate?.planId) {
+        const planReminder = buildPlannerReminder(planCtx, now, 'notify')
+        if (planReminder) actionableCandidates.push(planReminder)
       }
 
       const actionable = actionableCandidates

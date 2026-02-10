@@ -284,19 +284,25 @@ export default function HealthTab() {
   const {
     dailySupp, isSuppTaken, toggleSupp, undoSupp, checkups, updateCheckup, moods, addMood,
     suppSchedule, suppLastTaken, suppBottles, resetBottle,
-    attendance, markAttendance, workLocation, setWorkLocation
+    attendance, markAttendance, workLocation, setWorkLocation,
+    healthCalendarVisibility, setHealthCalendarVisibility,
   } = useApp()
   const [subTab, setSubTab] = useState('supps')
   const [editVisit, setEditVisit] = useState(null)
   const [visitForm, setVisitForm] = useState({})
   const [moodForm, setMoodForm] = useState({ mood: '', energy: 3, cravings: '', notes: '' })
   const [expandedSupp, setExpandedSupp] = useState(null)
-  const [showCalendar, setShowCalendar] = useState({
-    supps: true,
-    work: true,
-    checkups: true,
-    mood: true,
-  })
+  const showCalendar = useMemo(() => {
+    const source = healthCalendarVisibility && typeof healthCalendarVisibility === 'object'
+      ? healthCalendarVisibility
+      : {}
+    return {
+      supps: source.supps !== false,
+      work: source.work !== false,
+      checkups: source.checkups !== false,
+      mood: source.mood !== false,
+    }
+  }, [healthCalendarVisibility])
 
   // Shared calendar state per sub-tab
   const now = new Date()
@@ -482,7 +488,18 @@ export default function HealthTab() {
   }
 
   const toggleCalendar = (tab) => {
-    setShowCalendar(prev => ({ ...prev, [tab]: !prev[tab] }))
+    const key = String(tab || '').trim()
+    if (!key) return
+    setHealthCalendarVisibility(prev => {
+      const safe = prev && typeof prev === 'object' ? prev : {}
+      const normalized = {
+        supps: safe.supps !== false,
+        work: safe.work !== false,
+        checkups: safe.checkups !== false,
+        mood: safe.mood !== false,
+      }
+      return { ...normalized, [key]: !normalized[key] }
+    })
   }
 
   // Monthly work stats

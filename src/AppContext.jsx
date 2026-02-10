@@ -63,6 +63,12 @@ function useLS(key, initial) {
 
 // Locked optimal schedule â€” no user editing
 const defaultSuppSchedule = OPTIMAL_SUPP_SCHEDULE
+const defaultHealthCalendarVisibility = Object.freeze({
+  supps: true,
+  work: true,
+  checkups: true,
+  mood: true,
+})
 
 export function AppProvider({ children }) {
   const [checked, setChecked] = useLS('baby-prep-checked', {})
@@ -74,7 +80,12 @@ export function AppProvider({ children }) {
   const [salary, setSalary] = useLS('baby-prep-salary', [])
   const [checkups, setCheckups] = useLS('baby-prep-checkups', {})
   const [moods, setMoods] = useLS('baby-prep-moods', [])
-  // Personal calendar planner entries by day (ISO): { '2026-02-10': [{ id, time, title, location, notes, done }] }
+  // Health tab calendar collapse/expand state per sub-tab.
+  const [healthCalendarVisibility, setHealthCalendarVisibility] = useLS(
+    'baby-prep-health-calendar-visibility',
+    { ...defaultHealthCalendarVisibility },
+  )
+  // Personal calendar planner entries by day (ISO): { '2026-02-10': [{ id, time, title, location, notes, done, taskIds?: [] }] }
   const [planner, setPlanner] = useLS('baby-prep-planner', {})
   const [doctor, setDoctor] = useLS('baby-prep-doctor', { name: '', hospital: '', phone: '', address: '', notes: '' })
   const [contacts, setContacts] = useLS('baby-prep-contacts', [
@@ -205,21 +216,43 @@ export function AppProvider({ children }) {
     const location = String(data?.location || '').trim()
     const notes = String(data?.notes || '').trim()
     const done = Boolean(data?.done)
+    const taskIds = Array.isArray(data?.taskIds)
+      ? data.taskIds.map(t => String(t || '').trim()).filter(Boolean)
+      : []
     const id = Date.now().toString(36) + Math.random().toString(36).slice(2, 6)
 
     setPlanner(prev => {
       const list = Array.isArray(prev?.[dateKey]) ? prev[dateKey] : []
       return {
         ...prev,
-        [dateKey]: [...list, { id, time, title, location, notes, done }]
+        [dateKey]: [...list, { id, time, title, location, notes, done, taskIds }]
       }
     })
+
+    if (done && taskIds.length) {
+      setChecked(prev => {
+        const next = { ...prev }
+        for (const taskId of taskIds) {
+          next[taskId] = true
+        }
+        return next
+      })
+    }
   }
 
   const updatePlan = (dateISO, id, patch) => {
     const dateKey = String(dateISO || '').trim()
     const itemId = String(id || '').trim()
     if (!dateKey || !itemId) return
+
+    const currentList = Array.isArray(planner?.[dateKey]) ? planner[dateKey] : []
+    const current = currentList.find(item => item?.id === itemId) || null
+    const nextDone = patch && Object.prototype.hasOwnProperty.call(patch, 'done')
+      ? Boolean(patch.done)
+      : Boolean(current?.done)
+    const nextTaskIds = patch && Object.prototype.hasOwnProperty.call(patch, 'taskIds')
+      ? (Array.isArray(patch.taskIds) ? patch.taskIds.map(t => String(t || '').trim()).filter(Boolean) : [])
+      : (Array.isArray(current?.taskIds) ? current.taskIds.map(t => String(t || '').trim()).filter(Boolean) : [])
 
     setPlanner(prev => {
       const list = Array.isArray(prev?.[dateKey]) ? prev[dateKey] : []
@@ -229,6 +262,9 @@ export function AppProvider({ children }) {
         const title = patch && Object.prototype.hasOwnProperty.call(patch, 'title')
           ? String(patch.title || '').trim()
           : String(item?.title || '').trim()
+        const taskIds = patch && Object.prototype.hasOwnProperty.call(patch, 'taskIds')
+          ? (Array.isArray(patch.taskIds) ? patch.taskIds.map(t => String(t || '').trim()).filter(Boolean) : [])
+          : (Array.isArray(item?.taskIds) ? item.taskIds.map(t => String(t || '').trim()).filter(Boolean) : [])
         return {
           ...item,
           ...patch,
@@ -237,10 +273,21 @@ export function AppProvider({ children }) {
           location: patch && Object.prototype.hasOwnProperty.call(patch, 'location') ? String(patch.location || '').trim() : String(item?.location || '').trim(),
           notes: patch && Object.prototype.hasOwnProperty.call(patch, 'notes') ? String(patch.notes || '').trim() : String(item?.notes || '').trim(),
           done: patch && Object.prototype.hasOwnProperty.call(patch, 'done') ? Boolean(patch.done) : Boolean(item?.done),
+          taskIds,
         }
       })
       return { ...prev, [dateKey]: next }
     })
+
+    if (nextDone && nextTaskIds.length) {
+      setChecked(prev => {
+        const next = { ...prev }
+        for (const taskId of nextTaskIds) {
+          next[taskId] = true
+        }
+        return next
+      })
+    }
   }
 
   const removePlan = (dateISO, id) => {
@@ -266,12 +313,30 @@ export function AppProvider({ children }) {
     const dateKey = String(dateISO || '').trim()
     const itemId = String(id || '').trim()
     if (!dateKey || !itemId) return
+
+    const currentList = Array.isArray(planner?.[dateKey]) ? planner[dateKey] : []
+    const current = currentList.find(item => item?.id === itemId) || null
+    const willBeDone = Boolean(current) ? !Boolean(current.done) : false
+    const taskIdsToMark = willBeDone && Array.isArray(current?.taskIds)
+      ? current.taskIds.map(t => String(t || '').trim()).filter(Boolean)
+      : []
+
     setPlanner(prev => {
       const list = Array.isArray(prev?.[dateKey]) ? prev[dateKey] : []
       if (!list.length) return prev
       const next = list.map(item => item?.id === itemId ? { ...item, done: !item.done } : item)
       return { ...prev, [dateKey]: next }
     })
+
+    if (taskIdsToMark.length) {
+      setChecked(prev => {
+        const next = { ...prev }
+        for (const taskId of taskIdsToMark) {
+          next[taskId] = true
+        }
+        return next
+      })
+    }
   }
 
   const addContact = (contact) => setContacts(prev => [...prev, { ...contact, id: Date.now().toString(36) }])
@@ -303,6 +368,7 @@ export function AppProvider({ children }) {
     salary, addSalary, removeSalary,
     checkups, updateCheckup,
     moods, addMood,
+    healthCalendarVisibility, setHealthCalendarVisibility,
     planner, addPlan, updatePlan, removePlan, togglePlanDone,
     doctor, setDoctor,
     contacts, addContact, removeContact, updateContact,

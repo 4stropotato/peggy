@@ -10,6 +10,7 @@ import PushSyncAgent from './components/PushSyncAgent'
 import SmartReminderAgent from './components/SmartReminderAgent'
 import WidgetSyncAgent from './components/WidgetSyncAgent'
 import LocationAttendanceAgent from './components/LocationAttendanceAgent'
+import PullToRefreshAgent from './components/PullToRefreshAgent'
 import { THEME_ICONS, UiIcon, getNavIcons, resolveIconStyle } from './uiIcons'
 import './App.css'
 
@@ -192,7 +193,7 @@ function AppInner() {
       >
         <UiIcon icon={ThemeIcon} />
       </button>
-      <main className="app-main">
+      <main id="peggy-scroll-root" className="app-main">
         {tab === 'home' && <HomeTab />}
         {tab === 'tasks' && <TasksTab />}
         {tab === 'money' && <MoneyTab />}
@@ -224,6 +225,7 @@ export default function App() {
       <SmartReminderAgent />
       <WidgetSyncAgent />
       <LocationAttendanceAgent />
+      <PullToRefreshAgent />
       <AppInner />
     </AppProvider>
   )

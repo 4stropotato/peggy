@@ -3,6 +3,59 @@ import { supplements, checkupSchedule } from '../data'
 import { isoToDateString } from './Calendar'
 import { APP_ICONS, TokenIcon, UiIcon } from '../uiIcons'
 
+const QUICK_PLAN_TEMPLATES = [
+  {
+    id: 'boshi-techo',
+    label: 'Kuyakusho - Boshi Techo',
+    form: {
+      title: 'Kuyakusho - Boshi Techo + vouchers',
+      location: 'Kawasaki Ward Office',
+      notes: 'Bring: pregnancy confirmation, residence card, insurance card, My Number. Ask about all programs.',
+      taskIds: ['p2', 'p3', 'p4'],
+    },
+  },
+  {
+    id: 'obgyn',
+    label: 'OB-GYN Visit',
+    form: {
+      title: 'OB-GYN visit',
+      location: '',
+      notes: '',
+      taskIds: ['p1'],
+    },
+  },
+  {
+    id: 'ryzen-pedia',
+    label: 'Ryzen Pediatrician',
+    form: {
+      title: 'Ryzen - Pediatrician visit',
+      location: '',
+      notes: 'Skin allergy follow-up.',
+      taskIds: [],
+    },
+  },
+  {
+    id: 'ryzen-school',
+    label: 'Ryzen School',
+    form: {
+      title: 'Ryzen - school',
+      location: '',
+      notes: '',
+      taskIds: [],
+    },
+  },
+  {
+    id: 'groceries',
+    label: 'Groceries',
+    form: {
+      title: 'Grocery run',
+      location: '',
+      notes: '',
+      taskIds: [],
+    },
+  },
+]
+
 function getTodayISO() {
   const now = new Date()
   return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`
@@ -54,12 +107,12 @@ export default function DayDetail({
   const plans = Array.isArray(planner?.[dateISO]) ? planner[dateISO] : []
   const sortedPlans = useMemo(() => sortPlans(plans), [plans])
   const [editingId, setEditingId] = useState(null)
-  const [planForm, setPlanForm] = useState({ time: '', title: '', location: '', notes: '', done: false })
+  const [planForm, setPlanForm] = useState({ time: '', title: '', location: '', notes: '', done: false, taskIds: [] })
   const isEditing = Boolean(editingId)
 
   const startAdd = () => {
     setEditingId('new')
-    setPlanForm({ time: '', title: '', location: '', notes: '', done: false })
+    setPlanForm({ time: '', title: '', location: '', notes: '', done: false, taskIds: [] })
   }
 
   const startEdit = (plan) => {
@@ -72,12 +125,13 @@ export default function DayDetail({
       location: String(plan?.location || '').trim(),
       notes: String(plan?.notes || '').trim(),
       done: Boolean(plan?.done),
+      taskIds: Array.isArray(plan?.taskIds) ? plan.taskIds : [],
     })
   }
 
   const cancelEdit = () => {
     setEditingId(null)
-    setPlanForm({ time: '', title: '', location: '', notes: '', done: false })
+    setPlanForm({ time: '', title: '', location: '', notes: '', done: false, taskIds: [] })
   }
 
   const handleSavePlan = () => {
@@ -90,6 +144,7 @@ export default function DayDetail({
       location: String(planForm.location || '').trim(),
       notes: String(planForm.notes || '').trim(),
       done: Boolean(planForm.done),
+      taskIds: Array.isArray(planForm.taskIds) ? planForm.taskIds : [],
     }
 
     if (editingId === 'new') {
@@ -98,6 +153,18 @@ export default function DayDetail({
       updatePlan?.(dateISO, editingId, payload)
     }
     cancelEdit()
+  }
+
+  const applyTemplate = (template) => {
+    const next = template?.form || null
+    if (!next) return
+    setPlanForm(prev => ({
+      ...prev,
+      title: String(next.title || '').trim(),
+      location: String(next.location || '').trim(),
+      notes: String(next.notes || '').trim(),
+      taskIds: Array.isArray(next.taskIds) ? next.taskIds : [],
+    }))
   }
 
   // Supplement status
@@ -199,25 +266,35 @@ export default function DayDetail({
 
           {isEditing && (
             <div className="day-detail-plan-form glass-inner">
-              <div className="day-detail-form-grid">
-                <label className="day-detail-form-row">
-                  <span>Time</span>
-                  <input
-                    type="time"
-                    value={planForm.time}
-                    onChange={e => setPlanForm(p => ({ ...p, time: e.target.value }))}
-                  />
-                </label>
-                <label className="day-detail-form-row">
-                  <span>Title</span>
-                  <input
-                    type="text"
-                    value={planForm.title}
-                    onChange={e => setPlanForm(p => ({ ...p, title: e.target.value }))}
-                    placeholder="e.g. City hall - Boshi Techo"
-                  />
-                </label>
+              <div className="day-detail-quick-row">
+                {QUICK_PLAN_TEMPLATES.map(t => (
+                  <button
+                    key={t.id}
+                    type="button"
+                    className="quick-chip glass-inner"
+                    onClick={() => applyTemplate(t)}
+                  >
+                    {t.label}
+                  </button>
+                ))}
               </div>
+              <label className="day-detail-form-row">
+                <span>Title (required)</span>
+                <input
+                  type="text"
+                  value={planForm.title}
+                  onChange={e => setPlanForm(p => ({ ...p, title: e.target.value }))}
+                  placeholder="e.g. Kuyakusho - Boshi Techo"
+                />
+              </label>
+              <label className="day-detail-form-row">
+                <span>Time (optional)</span>
+                <input
+                  type="time"
+                  value={planForm.time}
+                  onChange={e => setPlanForm(p => ({ ...p, time: e.target.value }))}
+                />
+              </label>
               <label className="day-detail-form-row">
                 <span>Location (optional)</span>
                 <input
@@ -245,7 +322,7 @@ export default function DayDetail({
                 <span>Mark as done</span>
               </label>
               <div className="day-detail-form-actions">
-                <button type="button" className="btn-glass-primary" onClick={handleSavePlan}>
+                <button type="button" className="btn-glass-primary" onClick={handleSavePlan} disabled={!String(planForm.title || '').trim()}>
                   Save
                 </button>
                 <button type="button" className="btn-glass-secondary" onClick={cancelEdit}>

@@ -834,6 +834,41 @@ ul { list-style: none; }
   background: var(--red);
   color: white;
 }
+.money-badge {
+  background: var(--gold);
+  color: #1a1a24;
+}
+.app.light .money-badge {
+  color: #ffffff;
+}
+.schedule-badge {
+  background: rgba(255, 255, 255, 0.14);
+  border: 1px solid var(--glass-border);
+  color: var(--text);
+}
+.schedule-badge.overdue {
+  background: rgba(255, 71, 87, 0.16);
+  border-color: rgba(255, 71, 87, 0.35);
+  color: var(--red);
+}
+
+.task-schedule-row {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+  flex-wrap: wrap;
+  margin-top: 0.35rem;
+}
+.task-schedule-row input {
+  flex: 1;
+  min-width: 130px;
+}
+.task-schedule-note {
+  margin-top: 0.35rem;
+  font-size: 0.72rem;
+  color: var(--text2);
+  line-height: 1.35;
+}
 
 /* ===== Money Tracker ===== */
 .money-card {
@@ -3039,6 +3074,13 @@ input[type="range"]:focus {
   background: rgba(108, 92, 231, 0.06);
   border-color: rgba(108, 92, 231, 0.15);
 }
+.reminder-card.reminder-plan {
+  background: rgba(0, 184, 148, 0.06);
+  border-color: rgba(0, 184, 148, 0.15);
+}
+.reminder-action {
+  flex-shrink: 0;
+}
 .reminder-card.level-gentle {
   animation: reminderEnter 420ms ease-out 1 both;
 }
@@ -3434,6 +3476,28 @@ input[type="range"]:focus {
   margin-top: 0.55rem;
   padding: 0.6rem;
   border-radius: 12px;
+}
+.day-detail-quick-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  margin-bottom: 0.55rem;
+}
+.quick-chip {
+  border: 1px solid var(--glass-border);
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--text);
+  border-radius: 999px;
+  padding: 0.35rem 0.55rem;
+  font-size: 0.68rem;
+  font-weight: 700;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.quick-chip:active { transform: translateY(1px); }
+.app.light .quick-chip {
+  background: rgba(255, 255, 255, 0.56);
+  color: #4a1f3d;
 }
 .day-detail-form-grid {
   display: grid;

@@ -1,6 +1,6 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { useApp } from '../AppContext'
-import { phases } from '../data'
+import { phases, moneyTracker } from '../data'
 import { buildTaskScripts } from '../scriptScenarios'
 import { APP_ICONS, ExpandIcon, TokenIcon, UiIcon } from '../uiIcons'
 
@@ -14,13 +14,101 @@ function getFlowCursor(flow, saved) {
 }
 
 export default function TasksTab() {
-  const { checked, toggle } = useApp()
+  const { checked, toggle, planner, addPlan } = useApp()
   const [expandedItem, setExpandedItem] = useState(null)
   const [expandedScript, setExpandedScript] = useState(null)
   const [flowState, setFlowState] = useState({})
+  const [scheduleDraft, setScheduleDraft] = useState({})
+
+  const moneyById = useMemo(() => {
+    const out = {}
+    moneyTracker.forEach(m => { out[m.id] = m })
+    return out
+  }, [])
+
+  const todayISO = (() => {
+    const now = new Date()
+    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`
+  })()
+
+  const taskScheduleMap = useMemo(() => {
+    const map = {}
+    const safePlanner = planner && typeof planner === 'object' ? planner : {}
+
+    for (const [dateISO, plans] of Object.entries(safePlanner)) {
+      if (!Array.isArray(plans) || plans.length === 0) continue
+      for (const plan of plans) {
+        if (!plan || plan.done) continue
+        const taskIds = Array.isArray(plan.taskIds) ? plan.taskIds : []
+        if (taskIds.length === 0) continue
+
+        const time = String(plan.time || '').trim()
+        for (const taskIdRaw of taskIds) {
+          const taskId = String(taskIdRaw || '').trim()
+          if (!taskId) continue
+          const candidate = { dateISO, time, planId: plan.id }
+          const existing = map[taskId]
+
+          if (!existing) {
+            map[taskId] = candidate
+            continue
+          }
+          if (candidate.dateISO < existing.dateISO) {
+            map[taskId] = candidate
+            continue
+          }
+          if (candidate.dateISO === existing.dateISO) {
+            if (candidate.time && !existing.time) map[taskId] = candidate
+            else if (candidate.time && existing.time && candidate.time < existing.time) map[taskId] = candidate
+          }
+        }
+      }
+    }
+
+    return map
+  }, [planner])
 
   const totalItems = phases.reduce((acc, p) => acc + p.items.length, 0)
   const doneItems = phases.reduce((acc, p) => acc + p.items.filter(i => checked[i.id]).length, 0)
+
+  const formatShortDate = (iso) => {
+    try {
+      return new Date(`${iso}T00:00`).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+    } catch {
+      return iso
+    }
+  }
+
+  const toCompactTitle = (text) => {
+    const raw = String(text || '').trim()
+    if (raw.length <= 96) return raw
+    return `${raw.slice(0, 93)}...`
+  }
+
+  const upsertScheduleDraft = (taskId, patch) => {
+    setScheduleDraft(prev => ({
+      ...prev,
+      [taskId]: {
+        date: String(prev?.[taskId]?.date || ''),
+        time: String(prev?.[taskId]?.time || ''),
+        ...patch,
+      },
+    }))
+  }
+
+  const scheduleTaskToCalendar = (itemId, itemText, existingSchedule = null) => {
+    const draft = scheduleDraft?.[itemId] || {}
+    const dateISO = String(draft.date || existingSchedule?.dateISO || '').trim() || todayISO
+    const time = String(draft.time || existingSchedule?.time || '').trim()
+    addPlan?.(dateISO, {
+      time,
+      title: toCompactTitle(itemText),
+      location: '',
+      notes: '',
+      done: false,
+      taskIds: [itemId],
+    })
+  }
 
   const toggleExpand = (id, e) => {
     e.stopPropagation()
@@ -101,6 +189,11 @@ export default function TasksTab() {
                   || (Array.isArray(item.phones) && item.phones.length > 0)
                   || scriptScenarios.length > 0,
                 )
+                const moneyIds = Array.isArray(item.moneyIds) ? item.moneyIds : []
+                const moneyTotal = moneyIds.reduce((acc, id) => acc + (moneyById[id]?.amount || 0), 0)
+                const schedule = taskScheduleMap[item.id]
+                const scheduleLabel = schedule ? formatShortDate(schedule.dateISO) : ''
+                const scheduleIsOverdue = Boolean(schedule && schedule.dateISO < todayISO)
                 return (
                   <li key={item.id} className={`task-item-wrap ${checked[item.id] ? 'done' : ''}`}>
                     <div
@@ -112,6 +205,16 @@ export default function TasksTab() {
                       {item.priority === 'urgent' && !checked[item.id] && (
                         <span className="badge urgent-badge">URGENT</span>
                       )}
+                      {moneyIds.length > 0 && !checked[item.id] && (
+                        <span className="badge money-badge">
+                          {moneyTotal > 0 ? `+¥${moneyTotal.toLocaleString()}` : 'BENEFIT'}
+                        </span>
+                      )}
+                      {schedule && !checked[item.id] && (
+                        <span className={`badge schedule-badge ${scheduleIsOverdue ? 'overdue' : ''}`}>
+                          {scheduleLabel}{schedule.time ? ` ${schedule.time}` : ''}
+                        </span>
+                      )}
                       {hasDetails && (
                         <button className="info-btn glass-inner" onClick={(e) => toggleExpand(item.id, e)}>
                           {isExpanded ? '▲' : 'i'}
@@ -121,6 +224,38 @@ export default function TasksTab() {
 
                     {isExpanded && hasDetails && (
                       <div className="task-detail">
+                        <div className="task-detail-section">
+                          <div className="task-detail-label">Schedule (adds to Home → Calendar):</div>
+                          <div className="task-schedule-row">
+                            <input
+                              type="date"
+                              value={scheduleDraft?.[item.id]?.date || schedule?.dateISO || todayISO}
+                              onChange={(e) => upsertScheduleDraft(item.id, { date: e.target.value })}
+                            />
+                            <input
+                              type="time"
+                              value={scheduleDraft?.[item.id]?.time || schedule?.time || ''}
+                              onChange={(e) => upsertScheduleDraft(item.id, { time: e.target.value })}
+                            />
+                            <button
+                              type="button"
+                              className="btn-glass-mini primary"
+                              onClick={() => scheduleTaskToCalendar(item.id, item.text, schedule)}
+                            >
+                              Add
+                            </button>
+                          </div>
+                          {schedule ? (
+                            <div className="task-schedule-note">
+                              Scheduled: {scheduleLabel}{schedule.time ? ` ${schedule.time}` : ''}. Marking the plan as done will auto-check this task.
+                            </div>
+                          ) : (
+                            <div className="task-schedule-note">
+                              Tip: pick a date and tap Add. When you mark that plan as done, this task will auto-check.
+                            </div>
+                          )}
+                        </div>
+
                         {item.howTo && item.howTo.length > 0 && (
                           <div className="task-detail-section">
                             <div className="task-detail-label">How to do this:</div>

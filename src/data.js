@@ -40,6 +40,7 @@ export const phases = [
       },
       {
         id: 'p2', text: 'Go to Kawasaki Ward Office - get Boshi Techo (母子健康手帳 / boshi kenkou techou) + 14 checkup vouchers', priority: 'urgent',
+        moneyIds: ['m2'],
         howTo: [
           'Go to Kawasaki Ward Office (川崎区役所), Child & Family section (こども家庭課)',
           'Address: 川崎市川崎区東田町8, near Kawasaki Station',
@@ -67,6 +68,7 @@ export const phases = [
       },
       {
         id: 'p3', text: 'Complete consultation for Shussan Kosodate Ouen Kyuufukin (出産・子育て応援給付金 / shussan kosodate ouen kyuufukin) → receive ¥50,000', priority: 'urgent',
+        moneyIds: ['m1'],
         howTo: [
           'This is part of the boshi techo pickup process - do it at the SAME VISIT',
           'You need a consultation (面談 / mendan) with a support worker',
@@ -92,6 +94,7 @@ export const phases = [
       },
       {
         id: 'p4', text: 'Ask Kawasaki Ward Office about municipal baby gift programs', priority: 'high',
+        moneyIds: ['m10'],
         howTo: [
           'While at the ward office for boshi techo, ask about ALL available programs',
           'Some programs are not advertised publicly',
@@ -136,6 +139,7 @@ export const phases = [
       },
       {
         id: 'p6', text: 'Apply for Sanzen Sango pension exemption (産前産後 / sanzen sango) ~¥66,000 saved', priority: 'high',
+        moneyIds: ['m3'],
         howTo: [
           'Exemption from National Pension (国民年金) for 4 months around due date',
           'Saves ~¥16,500/month × 4 = ~¥66,000',
@@ -382,6 +386,7 @@ export const phases = [
     items: [
       {
         id: 'd1', text: 'Confirm hospital uses Chokusetsu Shiharai Seido (直接支払制度 / chokusetsu shiharai seido) for ¥500,000', priority: 'urgent',
+        moneyIds: ['m4'],
         howTo: [
           'Ask at your delivery hospital during a prenatal visit',
           'The ¥500,000 childbirth allowance goes directly from insurance to hospital',
@@ -524,6 +529,7 @@ export const phases = [
       },
       {
         id: 'b2', text: 'Complete 2nd consultation for Ouen Kyuufukin (応援給付金 / ouen kyuufukin) → receive ¥50,000', priority: 'urgent',
+        moneyIds: ['m5'],
         howTo: [
           'This is the 2nd half of the ¥100,000 total grant',
           'Do at the SAME VISIT as birth registration',
@@ -537,6 +543,7 @@ export const phases = [
       },
       {
         id: 'b3', text: 'Apply for Jidou Teate (児童手当 / jidou teate) - WITHIN 15 DAYS (¥15,000/month!)', priority: 'urgent',
+        moneyIds: ['m8'],
         howTo: [
           'DEADLINE: Within 15 days of birth! Late = lost months!',
           'Apply at ward office こども家庭課',
@@ -604,6 +611,7 @@ export const phases = [
       },
       {
         id: 'b6', text: 'If delivery < ¥500,000 → apply for refund of difference', priority: 'high',
+        moneyIds: ['m6'],
         howTo: [
           'Check your hospital invoice after delivery',
           'If total cost was LESS than ¥500,000, get the difference refunded',
@@ -627,6 +635,7 @@ export const phases = [
       },
       {
         id: 'b7', text: 'Check Fuka Kyuufu (付加給付 / fuka kyuufu) with employer insurance', priority: 'high',
+        moneyIds: ['m7'],
         howTo: [
           'Some health insurance associations pay EXTRA on top of ¥500,000',
           'Amount varies: ¥10,000-90,000',
@@ -712,6 +721,7 @@ export const phases = [
       },
       {
         id: 'o4', text: 'File Kakutei Shinkoku (確定申告 / kakutei shinkoku) in Feb-March with Iryouhi Koujo (医療費控除 / iryouhi koujo)', priority: 'high',
+        moneyIds: ['m9'],
         howTo: [
           'Filing period: February 16 - March 15 each year',
           'File at Kawasaki-Minami Tax Office or online via e-Tax',

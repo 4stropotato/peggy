@@ -9,8 +9,10 @@ import {
   buildCompanionSubtitleRotation,
   buildDailyTip,
   buildNameSpotlight,
+  buildPlannerReminder,
   buildSupplementReminder,
   buildWorkReminder,
+  getPlannerReminderContext,
   getSupplementReminderContext,
   getWorkReminderContext,
 } from '../reminderContent'
@@ -158,6 +160,10 @@ export default function HomeTab() {
     () => getWorkReminderContext({ attendance, now }),
     [attendance, nowTick],
   )
+  const planReminderCtx = useMemo(
+    () => getPlannerReminderContext({ planner, now }),
+    [planner, nowTick],
+  )
 
   const suppReminder = useMemo(
     () => (suppReminderCtx.remainingDoses > 0 ? buildSupplementReminder(suppReminderCtx, now, 'home') : null),
@@ -166,6 +172,10 @@ export default function HomeTab() {
   const workReminder = useMemo(
     () => (workReminderCtx.needsReminder ? buildWorkReminder(workReminderCtx, now, 'home') : null),
     [workReminderCtx, nowTick],
+  )
+  const planReminder = useMemo(
+    () => (planReminderCtx?.candidate?.planId ? buildPlannerReminder(planReminderCtx, now, 'home') : null),
+    [planReminderCtx, nowTick],
   )
 
   const nameSpotlight = useMemo(
@@ -269,8 +279,30 @@ export default function HomeTab() {
           <span className="section-icon"><UiIcon icon={APP_ICONS.reminders} /></span>
           <div><h2>Reminders for Today</h2></div>
         </div>
-        {(suppReminder || workReminder) ? (
+        {(planReminder || suppReminder || workReminder) ? (
           <div className="reminder-cards">
+            {planReminder && (
+              <div
+                className={`reminder-card glass-inner reminder-plan level-${planReminder.level}`}
+                onClick={() => setSelectedDay(planReminder.planDateISO)}
+              >
+                <span className="reminder-icon"><UiIcon icon={APP_ICONS.activity} /></span>
+                <div className="reminder-content">
+                  <div className="reminder-title">{planReminder.title}</div>
+                  <div className="reminder-subtitle">{planReminder.subtitle}</div>
+                </div>
+                <button
+                  type="button"
+                  className="btn-glass-mini primary reminder-action"
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    togglePlanDone?.(planReminder.planDateISO, planReminder.planId)
+                  }}
+                >
+                  Done
+                </button>
+              </div>
+            )}
             {suppReminder && (
               <div className={`reminder-card glass-inner reminder-supps level-${suppReminder.level}`}>
                 <span className="reminder-icon"><UiIcon icon={APP_ICONS.supplements} /></span>
