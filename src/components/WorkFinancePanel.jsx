@@ -466,6 +466,24 @@ export default function WorkFinancePanel({
     setAttendanceForm(createDefaultAttendanceForm({ isHusband }))
   }
 
+  const handleCalendarQuickLog = (dateISO) => {
+    const source = activeAttendance[dateISO]
+    const base = toAttendanceForm(source, { isHusband })
+    const computedRange = base.useTimeRange
+      ? computeWorkedHoursFromRange(base.startTime, base.endTime, base.breakMinutes)
+      : null
+    const defaultHours = createDefaultAttendanceForm({ isHusband }).hours
+    const payload = {
+      ...base,
+      worked: true,
+      hours: Math.max(0, Number(base.useTimeRange ? (computedRange ?? base.hours) : base.hours) || defaultHours),
+      breakMinutes: normalizeBreakMinutes(base.breakMinutes),
+    }
+    activeMarkAttendance(dateISO, payload)
+    setAttendanceDate(dateISO)
+    setAttendanceForm(toAttendanceForm(payload, { isHusband }))
+  }
+
   const toggleWorkCalendar = () => {
     setShowWorkCalendar(prev => !prev)
   }
@@ -500,6 +518,7 @@ export default function WorkFinancePanel({
 
         {showWorkCalendar && (
           <>
+            <p className="section-note">Double tap a date to quick-log Worked.</p>
             <Calendar
               year={workCal.y}
               month={workCal.m}
@@ -509,6 +528,7 @@ export default function WorkFinancePanel({
                 setAttendanceDate(d)
                 setAttendanceForm(toAttendanceForm(activeAttendance[d], { isHusband }))
               }}
+              onDayDoubleTap={(d) => handleCalendarQuickLog(d)}
               renderDay={(dateISO) => {
                 const att = activeAttendance[dateISO]
                 if (!att) return null

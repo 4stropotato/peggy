@@ -1,4 +1,4 @@
-import { useMemo } from 'react'
+import { useMemo, useRef } from 'react'
 
 const DAY_LABELS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
 
@@ -14,7 +14,16 @@ export function isoToDateString(iso) {
   return new Date(y, m - 1, d).toDateString()
 }
 
-export default function Calendar({ year, month, onMonthChange, renderDay, selectedDate, onDayClick }) {
+export default function Calendar({
+  year,
+  month,
+  onMonthChange,
+  renderDay,
+  selectedDate,
+  onDayClick,
+  onDayDoubleTap,
+}) {
+  const lastTapRef = useRef({ date: '', time: 0 })
   const today = new Date()
   const todayISO = toISO(today.getFullYear(), today.getMonth() + 1, today.getDate())
 
@@ -64,6 +73,20 @@ export default function Calendar({ year, month, onMonthChange, renderDay, select
     onMonthChange(y, m)
   }
 
+  const handleDayTap = (cell) => {
+    if (cell.overflow) return
+    const now = Date.now()
+    const last = lastTapRef.current || { date: '', time: 0 }
+    const isDoubleTap = last.date === cell.date && (now - last.time) <= 360
+    if (isDoubleTap) {
+      lastTapRef.current = { date: '', time: 0 }
+      onDayDoubleTap?.(cell.date)
+      return
+    }
+    lastTapRef.current = { date: cell.date, time: now }
+    onDayClick?.(cell.date)
+  }
+
   return (
     <div className="cal">
       <div className="cal-header">
@@ -80,7 +103,7 @@ export default function Calendar({ year, month, onMonthChange, renderDay, select
             <div
               key={i}
               className={`cal-day ${cell.overflow ? 'overflow' : ''} ${isToday ? 'today' : ''} ${isSelected ? 'selected' : ''}`}
-              onClick={() => !cell.overflow && onDayClick?.(cell.date)}
+              onClick={() => handleDayTap(cell)}
             >
               <span className="cal-day-num">{cell.day}</span>
               {!cell.overflow && renderDay?.(cell.date)}
