@@ -254,6 +254,14 @@ export default function MoneyTab() {
     removeExpense,
   } = useApp()
   const includeHusband = familyConfig?.includeHusband !== false
+  const safePayRates = useMemo(
+    () => (Array.isArray(payRates) ? payRates.filter(item => item && typeof item === 'object') : []),
+    [payRates]
+  )
+  const safeExpenses = useMemo(
+    () => (Array.isArray(expenses) ? expenses.filter(item => item && typeof item === 'object') : []),
+    [expenses]
+  )
 
   const [subTab, setSubTab] = useState('benefits')
   const [workView, setWorkView] = useState('wife')
@@ -298,12 +306,12 @@ export default function MoneyTab() {
   )
 
   const naomiWorkMonthlyIncomeMap = useMemo(
-    () => buildMonthlyIncomeMap(attendance, payRates, 'naomi'),
-    [attendance, payRates]
+    () => buildMonthlyIncomeMap(attendance, safePayRates, 'naomi'),
+    [attendance, safePayRates]
   )
   const husbandWorkMonthlyIncomeMap = useMemo(
-    () => buildMonthlyIncomeMap(husbandAttendance, payRates, 'husband'),
-    [husbandAttendance, payRates]
+    () => buildMonthlyIncomeMap(husbandAttendance, safePayRates, 'husband'),
+    [husbandAttendance, safePayRates]
   )
   const naomiMonthlyIncomeMap = useMemo(
     () => applyPayrollProfileToMonthlyMap(naomiWorkMonthlyIncomeMap, naomiPayrollProfile, recentYearMonthKeys),
@@ -333,14 +341,14 @@ export default function MoneyTab() {
     [husbandAttendance, selectedPeriodMonthKeys]
   )
   const selectedExpensesTotal = useMemo(
-    () => sumExpensesForMonths(expenses, selectedPeriodMonthKeys),
-    [expenses, selectedPeriodMonthKeys]
+    () => sumExpensesForMonths(safeExpenses, selectedPeriodMonthKeys),
+    [safeExpenses, selectedPeriodMonthKeys]
   )
   const selectedFamilyNet = selectedFamilyIncome - selectedExpensesTotal
   const expenseItemsSorted = useMemo(
-    () => [...(Array.isArray(expenses) ? expenses : [])]
+    () => [...safeExpenses]
       .sort((a, b) => String(b?.date || '').localeCompare(String(a?.date || ''))),
-    [expenses]
+    [safeExpenses]
   )
 
   const effectiveAnnualIncome = includeHusband
@@ -357,9 +365,9 @@ export default function MoneyTab() {
   })
 
   const sortedRates = useMemo(
-    () => [...(Array.isArray(payRates) ? payRates : [])]
+    () => [...safePayRates]
       .sort((a, b) => toDateStamp(b?.effectiveFrom) - toDateStamp(a?.effectiveFrom)),
-    [payRates]
+    [safePayRates]
   )
 
   const updateTax = (field, val) => setTaxInputs(prev => ({ ...prev, [field]: val }))
