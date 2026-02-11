@@ -14,6 +14,10 @@ const TAX_STEPS = [
 
 const MEDICAL_PRESETS = [0, 50000, 100000, 200000, 300000]
 const SOCIAL_PRESETS = [0, 300000, 500000, 700000]
+const PERSON_LABELS = {
+  naomi: 'Naomi',
+  husband: 'Shinji',
+}
 const EXPENSE_CATEGORIES = [
   { id: 'bills', label: 'Bills' },
   { id: 'loan', label: 'Loan' },
@@ -232,8 +236,8 @@ function formatAssumption(item) {
 
 function formatPerson(personKey) {
   const normalized = normalizePerson(personKey)
-  if (normalized === 'naomi') return 'Wife'
-  if (normalized === 'husband') return 'Husband'
+  if (normalized === 'naomi') return PERSON_LABELS.naomi
+  if (normalized === 'husband') return PERSON_LABELS.husband
   return String(personKey || 'Other')
 }
 
@@ -253,7 +257,6 @@ export default function MoneyTab() {
     attendance,
     husbandAttendance,
     familyConfig,
-    setFamilyConfig,
     financeConfig,
     setFinanceConfig,
     expenses,
@@ -334,7 +337,6 @@ export default function MoneyTab() {
   )
   const estimatedNaomiAnnual = naomiAnnualFromWork > 0 ? naomiAnnualFromWork : naomiAnnualFallback
   const estimatedHusbandAnnual = husbandAnnualFromWork > 0 ? husbandAnnualFromWork : husbandAnnualFallback
-  const estimatedFamilyAnnual = estimatedNaomiAnnual + (includeHusband ? estimatedHusbandAnnual : 0)
   const selectedMonth = String(summaryMonthKey || '').trim() || toMonthKey(new Date())
   const selectedPeriodMonthKeys = summaryPeriod === 'monthly' ? [selectedMonth] : recentYearMonthKeys
   const selectedNaomiIncome = summaryPeriod === 'monthly'
@@ -520,7 +522,7 @@ export default function MoneyTab() {
                 <li key={item.id} className={`glass-card money-card ${moneyClaimed[item.id] ? 'done' : ''}`}>
                   <div className="money-card-top">
                     <span className="checkbox glass-inner" onClick={() => toggleMoney(item.id)}>
-                      {moneyClaimed[item.id] ? '?' : ''}
+                      {moneyClaimed[item.id] ? '\u2713' : ''}
                     </span>
                     <span className={`item-text ${moneyClaimed[item.id] ? 'claimed' : ''}`}>{item.label}</span>
                     <span className="money-amount">{formatYen(item.amount)}</span>
@@ -594,44 +596,22 @@ export default function MoneyTab() {
 
       {subTab === 'work' && (
         <>
-          <section className="glass-section">
-            <div className="section-header">
-              <span className="section-icon"><UiIcon icon={APP_ICONS.work} /></span>
-              <div>
-                <h2>Work Attendance</h2>
-                <span className="section-count">Keep attendance separate from salary setup</span>
-              </div>
-            </div>
-            <div className="household-toggle-row glass-inner">
-              <div>
-                <div className="household-toggle-title">Husband side</div>
-                <div className="household-toggle-note">Disable for single-mother setup</div>
-              </div>
+          <div className="glass-tabs salary-mini-tabs">
+            {['wife', includeHusband ? 'husband' : null].filter(Boolean).map(view => (
               <button
-                type="button"
-                className={`notif-pill-btn glass-inner ${includeHusband ? 'on' : ''}`}
-                onClick={() => setFamilyConfig(prev => ({ ...(prev || {}), includeHusband: !includeHusband }))}
+                key={view}
+                className={`glass-tab ${workView === view ? 'active' : ''} ${view === 'husband' ? 'husband-tab' : ''}`}
+                onClick={() => setWorkView(view)}
               >
-                {includeHusband ? 'Enabled' : 'Disabled'}
+                <span>{view === 'wife' ? `${PERSON_LABELS.naomi} Work` : `${PERSON_LABELS.husband} Work`}</span>
               </button>
-            </div>
-            <div className="glass-tabs salary-mini-tabs">
-              {['wife', includeHusband ? 'husband' : null].filter(Boolean).map(view => (
-                <button
-                  key={view}
-                  className={`glass-tab ${workView === view ? 'active' : ''} ${view === 'husband' ? 'husband-tab' : ''}`}
-                  onClick={() => setWorkView(view)}
-                >
-                  <span>{view === 'wife' ? 'Wife Work' : 'Husband Work'}</span>
-                </button>
-              ))}
-            </div>
-          </section>
+            ))}
+          </div>
 
           {workView === 'wife' && (
             <WorkFinancePanel
               personKey="naomi"
-              title="Wife Work Attendance"
+              title={`${PERSON_LABELS.naomi} Work`}
               accent="wife"
               allowGeoTracker={true}
             />
@@ -640,7 +620,7 @@ export default function MoneyTab() {
           {workView === 'husband' && includeHusband && (
             <WorkFinancePanel
               personKey="husband"
-              title="Husband Work Attendance"
+              title={`${PERSON_LABELS.husband} Work`}
               accent="husband"
               allowGeoTracker={false}
             />
@@ -658,20 +638,6 @@ export default function MoneyTab() {
                 <span className="section-count">Rates + family totals, separate from work logging</span>
               </div>
             </div>
-            <div className="household-toggle-row glass-inner">
-              <div>
-                <div className="household-toggle-title">Husband side</div>
-                <div className="household-toggle-note">Disable for single-mother setup</div>
-              </div>
-              <button
-                type="button"
-                className={`notif-pill-btn glass-inner ${includeHusband ? 'on' : ''}`}
-                onClick={() => setFamilyConfig(prev => ({ ...(prev || {}), includeHusband: !includeHusband }))}
-              >
-                {includeHusband ? 'Enabled' : 'Disabled'}
-              </button>
-            </div>
-
             <div className="glass-inner summary-period-row">
               <div className="household-toggle-title">Summary Period</div>
               <div className="summary-period-controls">
@@ -714,7 +680,7 @@ export default function MoneyTab() {
 
             <div className="salary-summary-grid">
               <div className="glass-card payroll-card">
-                <h3>Wife Payroll</h3>
+                <h3>{PERSON_LABELS.naomi} Payroll</h3>
                 <div className="salary-rate-grid">
                   <div className="form-row">
                     <label>Payday Type</label>
@@ -762,7 +728,7 @@ export default function MoneyTab() {
 
               {includeHusband && (
                 <div className="glass-card payroll-card husband-summary">
-                  <h3>Husband Payroll</h3>
+                  <h3>{PERSON_LABELS.husband} Payroll</h3>
                   <div className="salary-rate-grid">
                     <div className="form-row">
                       <label>Payday Type</label>
@@ -825,8 +791,8 @@ export default function MoneyTab() {
                 <div className="form-row">
                   <label>Side</label>
                   <select value={rateForm.person} onChange={e => updateRateForm('person', e.target.value)}>
-                    <option value="naomi">Wife</option>
-                    <option value="husband">Husband</option>
+                    <option value="naomi">{PERSON_LABELS.naomi}</option>
+                    <option value="husband">{PERSON_LABELS.husband}</option>
                   </select>
                 </div>
                 <div className="form-row">
@@ -907,7 +873,7 @@ export default function MoneyTab() {
             </div>
             <div className="salary-summary-grid">
               <div className="glass-inner salary-summary-card">
-                <div className="salary-person">Wife</div>
+                <div className="salary-person">{PERSON_LABELS.naomi}</div>
                 <div className="salary-annual">
                   {formatYen(selectedNaomiIncome)} / {summaryPeriod === 'monthly' ? 'month' : 'year'}
                 </div>
@@ -922,7 +888,7 @@ export default function MoneyTab() {
               </div>
               {includeHusband && (
                 <div className="glass-inner salary-summary-card husband-summary">
-                  <div className="salary-person">Husband</div>
+                  <div className="salary-person">{PERSON_LABELS.husband}</div>
                   <div className="salary-annual">
                     {formatYen(selectedHusbandIncome)} / {summaryPeriod === 'monthly' ? 'month' : 'year'}
                   </div>
@@ -1036,8 +1002,8 @@ export default function MoneyTab() {
                 return (
                   <div key={monthKey} className="glass-inner salary-month-row">
                     <span>{monthKey}</span>
-                    <span>Wife: {formatYen(wife)}</span>
-                    {includeHusband && <span>Husband: {formatYen(husband)}</span>}
+                    <span>{PERSON_LABELS.naomi}: {formatYen(wife)}</span>
+                    {includeHusband && <span>{PERSON_LABELS.husband}: {formatYen(husband)}</span>}
                     <span>Total: {formatYen(total)}</span>
                   </div>
                 )
@@ -1113,7 +1079,7 @@ export default function MoneyTab() {
                 <h3>Income Inputs</h3>
                 <div className="tax-form">
                   <div className="tax-field">
-                    <label>{includeHusband ? `Husband annual income (${YEN})` : `Primary annual income (${YEN})`}</label>
+                    <label>{includeHusband ? `${PERSON_LABELS.husband} annual income (${YEN})` : `Primary annual income (${YEN})`}</label>
                     <input
                       type="number"
                       value={taxInputs.annualIncome}
@@ -1123,7 +1089,7 @@ export default function MoneyTab() {
                   </div>
                   {includeHusband && (
                     <div className="tax-field">
-                      <label>Wife annual income ({YEN})</label>
+                      <label>{PERSON_LABELS.naomi} annual income ({YEN})</label>
                       <input
                         type="number"
                         value={taxInputs.spouseIncome}
@@ -1217,8 +1183,8 @@ export default function MoneyTab() {
               <div className="tax-step-body">
                 <h3>Estimated Result</h3>
                 <div className="tax-summary-strip">
-                  <span>Primary: {formatYen(effectiveAnnualIncome)}</span>
-                  {includeHusband && <span>Partner: {formatYen(effectiveSpouseIncome)}</span>}
+                  <span>{includeHusband ? PERSON_LABELS.husband : 'Primary'}: {formatYen(effectiveAnnualIncome)}</span>
+                  {includeHusband && <span>{PERSON_LABELS.naomi}: {formatYen(effectiveSpouseIncome)}</span>}
                   <span>Family: {formatYen(effectiveAnnualIncome + effectiveSpouseIncome)}</span>
                 </div>
                 <div className="tax-results">

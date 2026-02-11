@@ -416,8 +416,10 @@ function InfoPanel({ section }) {
 export default function MoreTab() {
   const {
     doctor, setDoctor, contacts, addContact, removeContact, updateContact,
+    familyConfig, setFamilyConfig,
     iconStyle, setIconStyle,
   } = useApp()
+  const includeHusband = familyConfig?.includeHusband !== false
   const [subTab, setSubTab] = useState('info')
   const [infoSection, setInfoSection] = useState('gov')
   const [photoCategory, setPhotoCategory] = useState('Ultrasound')
@@ -1064,6 +1066,24 @@ export default function MoreTab() {
                 Quiet hours: {formatSmartNotifQuietHoursLabel(quietHours)}. During quiet hours, reminders stay silent pero badge updates continue.
               </p>
               {notifStatus && <p className="section-note">{notifStatus}</p>}
+            </div>
+
+            <div className="glass-card backup-card">
+              <h3>Family Setup</h3>
+              <p className="section-note">Control whether Shinji side appears in Work and Salary tabs.</p>
+              <div className="household-toggle-row glass-inner">
+                <div>
+                  <div className="household-toggle-title">Show Shinji side</div>
+                  <div className="household-toggle-note">Turn off for single-mother mode</div>
+                </div>
+                <button
+                  type="button"
+                  className={`notif-pill-btn glass-inner ${includeHusband ? 'on' : ''}`}
+                  onClick={() => setFamilyConfig(prev => ({ ...(prev || {}), includeHusband: !includeHusband }))}
+                >
+                  {includeHusband ? 'Enabled' : 'Disabled'}
+                </button>
+              </div>
             </div>
 
             <div className="glass-card backup-card design-card">

@@ -153,20 +153,20 @@ function toLocationDraft(location) {
   }
 }
 
-function createDefaultAttendanceForm() {
+function createDefaultAttendanceForm({ isHusband = false } = {}) {
   return {
     worked: true,
-    hours: 7.5,
+    hours: isHusband ? 8 : 7.5,
     note: '',
-    useTimeRange: false,
-    startTime: '',
-    endTime: '',
-    breakMinutes: 0,
+    useTimeRange: isHusband,
+    startTime: isHusband ? '08:00' : '',
+    endTime: isHusband ? '17:00' : '',
+    breakMinutes: isHusband ? 60 : 0,
   }
 }
 
-function toAttendanceForm(record) {
-  const base = createDefaultAttendanceForm()
+function toAttendanceForm(record, { isHusband = false } = {}) {
+  const base = createDefaultAttendanceForm({ isHusband })
   const source = record && typeof record === 'object' ? record : {}
   return {
     ...base,
@@ -217,7 +217,7 @@ export default function WorkFinancePanel({
   const now = new Date()
   const [workCal, setWorkCal] = useState({ y: now.getFullYear(), m: now.getMonth() + 1 })
   const [attendanceDate, setAttendanceDate] = useState(now.toISOString().split('T')[0])
-  const [attendanceForm, setAttendanceForm] = useState(() => createDefaultAttendanceForm())
+  const [attendanceForm, setAttendanceForm] = useState(() => createDefaultAttendanceForm({ isHusband }))
   const [showWorkCalendar, setShowWorkCalendar] = useState(() => readCalendarPreference(calendarStorageKey, true))
   const [showGeoPanel, setShowGeoPanel] = useState(() => readCalendarPreference(geoPanelStorageKey, false))
   const [showGeoAdvanced, setShowGeoAdvanced] = useState(() => readCalendarPreference(geoAdvancedStorageKey, false))
@@ -463,7 +463,7 @@ export default function WorkFinancePanel({
       breakMinutes: normalizeBreakMinutes(attendanceForm.breakMinutes),
     }
     activeMarkAttendance(attendanceDate, payload)
-    setAttendanceForm(createDefaultAttendanceForm())
+    setAttendanceForm(createDefaultAttendanceForm({ isHusband }))
   }
 
   const toggleWorkCalendar = () => {
@@ -497,15 +497,9 @@ export default function WorkFinancePanel({
             {showWorkCalendar ? 'Hide calendar' : 'Show calendar'}
           </button>
         </div>
-        <p className="section-note">
-          {allowGeoTracker
-            ? 'Log attendance here. Auto-log settings are available at the bottom of this page.'
-            : 'Manual mode: log attendance below for salary computation.'}
-        </p>
 
         {showWorkCalendar && (
           <>
-            <p className="section-note">Tap a day to select, then log attendance below.</p>
             <Calendar
               year={workCal.y}
               month={workCal.m}
@@ -513,7 +507,7 @@ export default function WorkFinancePanel({
               selectedDate={attendanceDate}
               onDayClick={(d) => {
                 setAttendanceDate(d)
-                setAttendanceForm(toAttendanceForm(activeAttendance[d]))
+                setAttendanceForm(toAttendanceForm(activeAttendance[d], { isHusband }))
               }}
               renderDay={(dateISO) => {
                 const att = activeAttendance[dateISO]
@@ -666,7 +660,7 @@ export default function WorkFinancePanel({
                 className={`att-log-item glass-inner ${a.worked ? 'worked' : 'absent'}`}
                 onClick={() => {
                   setAttendanceDate(a.date)
-                  setAttendanceForm(toAttendanceForm(a))
+                  setAttendanceForm(toAttendanceForm(a, { isHusband }))
                 }}
               >
                 <span className="att-log-date">{a.date}</span>
