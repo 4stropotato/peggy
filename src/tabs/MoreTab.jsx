@@ -14,6 +14,7 @@ import {
 } from '../cloudSync'
 import {
   formatSmartNotifQuietHoursLabel,
+  isNowInSmartNotifQuietHours,
   isSmartNotifChannelEnabled,
   readSmartNotifChannels,
   readSmartNotifEnabled,
@@ -445,6 +446,10 @@ export default function MoreTab() {
   const [notifChannels, setNotifChannels] = useState(() => readSmartNotifChannels())
   const [quietHours, setQuietHours] = useState(() => readSmartNotifQuietHours())
   const [notifStatus, setNotifStatus] = useState('')
+  const [notifPermission, setNotifPermission] = useState(() => (
+    typeof Notification === 'undefined' ? 'unsupported' : Notification.permission
+  ))
+  const quietHoursActiveNow = isNowInSmartNotifQuietHours(new Date(), quietHours)
 
   useEffect(() => {
     if (subTab === 'photos') loadPhotos()
@@ -456,6 +461,14 @@ export default function MoreTab() {
     return () => clearTimeout(id)
   }, [notifStatus])
 
+  const refreshNotifPermission = () => {
+    if (typeof Notification === 'undefined') {
+      setNotifPermission('unsupported')
+      return
+    }
+    setNotifPermission(Notification.permission)
+  }
+
   useEffect(() => {
     if (typeof window === 'undefined') return undefined
 
@@ -466,6 +479,7 @@ export default function MoreTab() {
       syncNotifEnabled()
       syncNotifChannels()
       syncQuietHours()
+      refreshNotifPermission()
     }
 
     window.addEventListener(SMART_NOTIF_PREF_EVENT, syncNotifEnabled)
@@ -473,12 +487,17 @@ export default function MoreTab() {
     window.addEventListener(SMART_NOTIF_QUIET_HOURS_EVENT, syncQuietHours)
     window.addEventListener('peggy-backup-restored', syncAll)
     window.addEventListener('storage', syncAll)
+    window.addEventListener('focus', refreshNotifPermission)
+    document.addEventListener('visibilitychange', refreshNotifPermission)
+    refreshNotifPermission()
     return () => {
       window.removeEventListener(SMART_NOTIF_PREF_EVENT, syncNotifEnabled)
       window.removeEventListener(SMART_NOTIF_CHANNEL_EVENT, syncNotifChannels)
       window.removeEventListener(SMART_NOTIF_QUIET_HOURS_EVENT, syncQuietHours)
       window.removeEventListener('peggy-backup-restored', syncAll)
       window.removeEventListener('storage', syncAll)
+      window.removeEventListener('focus', refreshNotifPermission)
+      document.removeEventListener('visibilitychange', refreshNotifPermission)
     }
   }, [])
 
@@ -796,6 +815,44 @@ export default function MoreTab() {
     }
   }
 
+  const handleLocalNotifTest = async () => {
+    if (typeof Notification === 'undefined') {
+      setNotifStatus('Notifications are not supported on this browser/device.')
+      return
+    }
+    if (Notification.permission !== 'granted') {
+      setNotifStatus('Enable notifications first, then run local test.')
+      return
+    }
+
+    const title = 'Peggy local test'
+    const body = 'Notification pipeline is active on this device.'
+    const options = {
+      body,
+      icon: `${import.meta.env.BASE_URL || '/'}icon-192.png`,
+      badge: `${import.meta.env.BASE_URL || '/'}icon-192.png`,
+      tag: `peggy-local-test-${Date.now()}`,
+      renotify: false,
+      requireInteraction: false,
+      timestamp: Date.now(),
+    }
+
+    try {
+      if ('serviceWorker' in navigator) {
+        const registration = await navigator.serviceWorker.ready
+        if (registration?.showNotification) {
+          await registration.showNotification(title, options)
+          setNotifStatus('Local test sent via Service Worker.')
+          return
+        }
+      }
+      new Notification(title, options)
+      setNotifStatus('Local test sent.')
+    } catch (err) {
+      setNotifStatus(`Local test failed: ${err.message}`)
+    }
+  }
+
   return (
     <div className="content">
       <div className="sub-tabs glass-tabs">
@@ -1065,6 +1122,20 @@ export default function MoreTab() {
               <p className="section-note">
                 Quiet hours: {formatSmartNotifQuietHoursLabel(quietHours)}. During quiet hours, reminders stay silent pero badge updates continue.
               </p>
+              <p className="section-note">
+                Permission: {notifPermission === 'unsupported' ? 'unsupported' : notifPermission}.
+                {' '}Quiet hours active now: {quietHoursActiveNow ? 'yes' : 'no'}.
+              </p>
+              <div className="backup-cloud-actions">
+                <button
+                  type="button"
+                  className="btn-glass-secondary"
+                  onClick={handleLocalNotifTest}
+                  disabled={!notifEnabled}
+                >
+                  Send Local Test
+                </button>
+              </div>
               {notifStatus && <p className="section-note">{notifStatus}</p>}
             </div>
 

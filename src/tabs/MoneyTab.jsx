@@ -82,6 +82,15 @@ const BENEFIT_BATCH_HINT_BY_ID = {
   m16: 'Ask at insurance counter while handling other kokuho procedures.',
 }
 
+const BENEFIT_ASK_REQUIRED_BY_ID = {
+  m10: true,
+  m11: true,
+  m12: true,
+  m13: true,
+  m15: true,
+  m16: true,
+}
+
 function formatYen(value) {
   return `${YEN}${Number(value || 0).toLocaleString()}`
 }
@@ -405,6 +414,10 @@ export default function MoneyTab() {
     })
     return map
   }, [])
+  const unmappedBenefitIds = useMemo(
+    () => moneyTracker.filter(item => !Array.isArray(benefitTasksById[item.id]) || benefitTasksById[item.id].length === 0).map(item => item.id),
+    [benefitTasksById]
+  )
   const filteredMoneyTracker = useMemo(() => {
     if (benefitSourceFilter === 'all') return moneyTracker
     return moneyTracker.filter((item) => (BENEFIT_SOURCE_BY_ID[item.id] || 'kawasaki') === benefitSourceFilter)
@@ -671,6 +684,11 @@ export default function MoneyTab() {
             <p className="section-note">
               Tap checkbox to mark as claimed. Tap info for claim flow, related tasks, and what to batch together.
             </p>
+            <p className="section-note">
+              {unmappedBenefitIds.length === 0
+                ? 'Coverage check: all Benefits items are linked to checklist tasks.'
+                : `Coverage warning: ${unmappedBenefitIds.join(', ')} not linked to checklist yet.`}
+            </p>
             <div className="glass-tabs salary-mini-tabs">
               {[
                 { id: 'all', label: 'All' },
@@ -697,6 +715,9 @@ export default function MoneyTab() {
                     </span>
                     <span className={`item-text ${moneyClaimed[item.id] ? 'claimed' : ''}`}>{item.label}</span>
                     <span className="money-amount">{formatYen(item.amount)}</span>
+                    {BENEFIT_ASK_REQUIRED_BY_ID[item.id] && !moneyClaimed[item.id] && (
+                      <span className="badge ask-badge">ASK</span>
+                    )}
                     <button className="info-btn glass-inner" onClick={(event) => toggleExpand(item.id, event)}>
                       {expandedItem === item.id ? 'Hide' : 'i'}
                     </button>
@@ -736,6 +757,12 @@ export default function MoneyTab() {
                         <div className="detail-section">
                           <div className="detail-label">Batch this with:</div>
                           <div className="detail-text">{BENEFIT_BATCH_HINT_BY_ID[item.id]}</div>
+                        </div>
+                      )}
+                      {BENEFIT_ASK_REQUIRED_BY_ID[item.id] && (
+                        <div className="detail-section">
+                          <div className="detail-label">Important:</div>
+                          <div className="detail-text">Not always auto-granted. Ask directly at counter/HR so this benefit is not missed.</div>
                         </div>
                       )}
                       {Array.isArray(benefitTasksById[item.id]) && benefitTasksById[item.id].length > 0 && (

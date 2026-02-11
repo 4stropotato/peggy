@@ -933,20 +933,24 @@ export const moneyTracker = [
     tip: 'DO NOT SKIP THE CONSULTATION. No consultation = no money. Kawasaki gives this as cash or vouchers - ask which one. Get this at the same visit as your boshi techo pickup to save a trip.',
     verifiedAt: '2026-02-11',
     sourceLinks: [
-      { label: 'Kawasaki: 妊婦のための支援給付', url: 'https://www.city.kawasaki.jp/450/page/0000181172.html' }
+      { label: 'Kawasaki: 妊婦のための支援給付', url: 'https://www.city.kawasaki.jp/450/page/0000146038.html' }
     ],
     phones: [{ label: 'Kawasaki Ward こども家庭課', number: '044-201-3214' }]
   },
   {
     id: 'm2',
     label: 'Prenatal Checkup Vouchers (妊婦健診受診票 / ninpu kenshin jushinpyou)',
-    amount: 100000,
+    amount: 135000,
     phase: 'pregnancy',
     howTo: 'You receive 14 checkup vouchers when you get the Boshi Techo (母子健康手帳). Each voucher covers ¥5,000-10,000+ per OB-GYN visit. Just present the voucher at each prenatal checkup and it reduces the bill.',
     where: 'Kawasaki Ward Office - received together with boshi techo\n川崎区役所 こども家庭課: 044-201-3214',
     bring: 'Same visit as boshi techo pickup',
     deadline: 'Get early in pregnancy to use all 14 vouchers. The earlier you register, the more vouchers you use.',
-    tip: 'KEEP ALL RECEIPTS for amounts NOT covered by vouchers - these count toward 医療費控除 (iryouhi koujo) tax deduction at year end! Kawasaki may offer extra ultrasound vouchers too - ASK!',
+    tip: 'KEEP ALL RECEIPTS for amounts NOT covered by vouchers - these count toward 医療費控除 (iryouhi koujo) tax deduction at year end! Kawasaki increased support to around ¥135,000 total subsidy for eligible checkup tickets, and some visits still have co-pay depending on clinic. Ask at ward office for current ticket set details.',
+    verifiedAt: '2026-02-11',
+    sourceLinks: [
+      { label: 'Kawasaki: 妊婦健康診査費助成 (up to ¥135,000)', url: 'https://www.city.kawasaki.jp/450/page/0000145999.html' }
+    ],
     phones: [{ label: 'Kawasaki Ward こども家庭課', number: '044-201-3214' }]
   },
   {
@@ -988,7 +992,7 @@ export const moneyTracker = [
     tip: 'Do this at the SAME TIME as registering the birth to save a trip. Same rules as pregnancy grant - requires consultation.',
     verifiedAt: '2026-02-11',
     sourceLinks: [
-      { label: 'Kawasaki: 妊婦のための支援給付', url: 'https://www.city.kawasaki.jp/450/page/0000181172.html' }
+      { label: 'Kawasaki: 妊婦のための支援給付', url: 'https://www.city.kawasaki.jp/450/page/0000146038.html' }
     ],
     phones: [{ label: 'Kawasaki Ward こども家庭課', number: '044-201-3214' }]
   },
@@ -1028,7 +1032,8 @@ export const moneyTracker = [
     tip: 'This is the BIGGEST ongoing benefit. ¥15,000/month for 3 years + ¥10,000/month until 18. For 2 kids that\'s ¥4,680,000 total over 18 years. If you have a 3rd child: ¥30,000/month = ¥6,480,000! Amount shown is Year 1 only (¥15,000 x 12).',
     verifiedAt: '2026-02-11',
     sourceLinks: [
-      { label: 'Children and Families Agency: Child Allowance Reform', url: 'https://www.cfa.go.jp/policies/kokoseido/jidouteate/r6kaisei' },
+      { label: 'Children and Families Agency: Child Allowance Guide', url: 'https://www.cfa.go.jp/seisaku/teate-seido/annai' },
+      { label: 'Children and Families Agency: Child Allowance Reform Summary', url: 'https://www.cfa.go.jp/seisaku/teate-seido/mottoouen' },
       { label: 'Kawasaki: 児童手当制度改正', url: 'https://www.city.kawasaki.jp/450/page/0000169414.html' }
     ],
     phones: [{ label: 'Kawasaki Ward こども家庭課', number: '044-201-3214' }]
@@ -1134,7 +1139,7 @@ export const moneyTracker = [
     tip: 'Treat this as campaign-style support: check each fiscal year if a new one-time child payment is available.',
     verifiedAt: '2026-02-11',
     sourceLinks: [
-      { label: 'Kawasaki: 物価高騰対応支援給付金', url: 'https://www.city.kawasaki.jp/450/page/0000177538.html' }
+      { label: 'Kawasaki: 物価高対応子育て応援手当 (¥20,000 per eligible child)', url: 'https://www.city.kawasaki.jp/450/page/0000182550.html' }
     ],
     phones: []
   },
@@ -1150,7 +1155,7 @@ export const moneyTracker = [
     tip: 'This is often missed because families assume it is automatic. Ask specifically about maternal premium reduction and under-school-age child premium reduction.',
     verifiedAt: '2026-02-11',
     sourceLinks: [
-      { label: 'Kawasaki: 国保の産前産後保険料軽減', url: 'https://www.city.kawasaki.jp/250/page/0000156338.html' }
+      { label: 'Kawasaki: 国保の産前産後保険料軽減', url: 'https://www.city.kawasaki.jp/350/page/0000178815.html' }
     ],
     phones: [{ label: 'Kawasaki Ward insurance and pension section', number: '044-201-3151' }]
   },

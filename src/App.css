@@ -927,6 +927,16 @@ ul { list-style: none; }
   background: var(--red);
   color: white;
 }
+.ask-badge {
+  background: rgba(47, 128, 237, 0.22);
+  border: 1px solid rgba(47, 128, 237, 0.5);
+  color: #dce9ff;
+}
+.app.light .ask-badge {
+  background: rgba(47, 128, 237, 0.14);
+  border-color: rgba(47, 128, 237, 0.35);
+  color: #174f9d;
+}
 .money-badge {
   background: var(--gold);
   color: #1a1a24;

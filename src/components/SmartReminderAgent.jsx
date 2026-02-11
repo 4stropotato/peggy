@@ -118,6 +118,38 @@ function fireNotification({ title, body, slotKey, type = 'general', level = 'gen
   }
 }
 
+async function fireNotificationReliable(payload) {
+  const tone = getNotifTone(payload?.type, payload?.level)
+  const safeTitle = `${tone.titlePrefix} ${String(payload?.title || '').trim()}`.trim()
+  const baseBody = String(payload?.body || '').trim()
+  const safeBody = tone.bodyPrefix ? `${tone.bodyPrefix} ${baseBody}`.trim() : baseBody
+  const options = {
+    body: safeBody,
+    icon: NOTIF_ICON,
+    badge: NOTIF_ICON,
+    tag: `${String(payload?.type || 'general')}:${String(payload?.slotKey || '')}`,
+    renotify: Boolean(payload?.urgent),
+    requireInteraction: Boolean(payload?.urgent || payload?.level === 'urgent'),
+    vibrate: tone.vibrate,
+    timestamp: Date.now(),
+    data: { type: payload?.type || 'general', level: payload?.level || 'gentle' },
+  }
+
+  try {
+    if (typeof navigator !== 'undefined' && 'serviceWorker' in navigator) {
+      const registration = await navigator.serviceWorker.ready
+      if (registration?.showNotification) {
+        await registration.showNotification(safeTitle, options)
+        return
+      }
+    }
+  } catch {
+    // Fall back to Notification API below.
+  }
+
+  fireNotification(payload)
+}
+
 export default function SmartReminderAgent() {
   const { dailySupp, suppSchedule, attendance, planner } = useApp()
 
@@ -167,7 +199,7 @@ export default function SmartReminderAgent() {
         .sort((a, b) => b.priorityScore - a.priorityScore)[0] || null
 
       if (actionable) {
-        fireNotification({
+        void fireNotificationReliable({
           title: actionable.notificationTitle,
           body: actionable.notificationBody,
           slotKey: actionable.slotKey,
@@ -183,7 +215,7 @@ export default function SmartReminderAgent() {
         const dailyTip = buildDailyTip({ now, suppCtx })
         const tipReminder = buildDailyTipReminder({ now, dailyTip, seedSalt: 'notify' })
         if (!hasSentNotificationSlot(tipReminder.slotKey, now)) {
-          fireNotification({
+          void fireNotificationReliable({
             title: tipReminder.notificationTitle,
             body: tipReminder.notificationBody,
             slotKey: tipReminder.slotKey,
@@ -201,7 +233,7 @@ export default function SmartReminderAgent() {
         const nameSlotKey = `${nameSpotlight.slotKey}|name-notif`
         const nameUnsent = !hasSentNotificationSlot(nameSlotKey, now)
         if (nameUnsent && now.getMinutes() % 2 === 0) {
-          fireNotification({
+          void fireNotificationReliable({
             title: nameSpotlight.notificationTitle,
             body: nameSpotlight.notificationBody,
             slotKey: nameSlotKey,

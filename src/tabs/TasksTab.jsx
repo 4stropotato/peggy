@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useApp } from '../AppContext'
 import { phases, moneyTracker } from '../data'
 import { buildTaskScripts } from '../scriptScenarios'
@@ -46,6 +46,26 @@ const TASK_BUNDLES_BY_ID = (() => {
   return out
 })()
 
+const ASK_REQUIRED_TASK_IDS = new Set([
+  'p4',  // ask municipal gift programs
+  'p5',  // ask insurance premium reduction
+  'p6',  // ask free dental checkup
+  'p7',  // ask postpartum care
+  'p8',  // ask housing support
+  'p10', // ask employer support scope
+  'p13', // ask international support line
+  'p14', // ask limit certificate
+  'd6',  // ask employer fuka kyuufu
+  'o7',  // ask annual new programs
+  'b2',  // ask support second consultation payout
+])
+
+function isAskRequiredTask(item) {
+  if (!item || typeof item !== 'object') return false
+  if (ASK_REQUIRED_TASK_IDS.has(String(item.id || ''))) return true
+  return /^ask\b/i.test(String(item.text || '').trim())
+}
+
 function getFlowCursor(flow, saved) {
   const startNodeId = flow?.startNodeId || 'start'
   if (!saved || typeof saved !== 'object') return { nodeId: startNodeId, history: [] }
@@ -56,12 +76,26 @@ function getFlowCursor(flow, saved) {
 }
 
 export default function TasksTab() {
-  const { checked, toggle, planner, addPlan } = useApp()
+  const {
+    checked,
+    toggle,
+    planner,
+    addPlan,
+    taskBundleFilter,
+    setTaskBundleFilter,
+  } = useApp()
   const [expandedItem, setExpandedItem] = useState(null)
   const [expandedScript, setExpandedScript] = useState(null)
   const [flowState, setFlowState] = useState({})
   const [scheduleDraft, setScheduleDraft] = useState({})
-  const [bundleFilter, setBundleFilter] = useState('all')
+
+  const bundleFilter = String(taskBundleFilter || 'all')
+
+  useEffect(() => {
+    if (bundleFilter === 'all') return
+    const valid = TASK_BUNDLES.some(bundle => bundle.id === bundleFilter)
+    if (!valid) setTaskBundleFilter('all')
+  }, [bundleFilter, setTaskBundleFilter])
 
   const moneyById = useMemo(() => {
     const out = {}
@@ -249,7 +283,7 @@ export default function TasksTab() {
           <button
             type="button"
             className={`bundle-filter-btn glass-inner ${bundleFilter === 'all' ? 'active' : ''}`}
-            onClick={() => setBundleFilter('all')}
+            onClick={() => setTaskBundleFilter('all')}
           >
             All tasks
           </button>
@@ -258,7 +292,7 @@ export default function TasksTab() {
               key={`filter-${bundle.id}`}
               type="button"
               className={`bundle-filter-btn glass-inner bundle-${bundle.tone} ${bundleFilter === bundle.id ? 'active' : ''}`}
-              onClick={() => setBundleFilter(bundle.id)}
+              onClick={() => setTaskBundleFilter(bundle.id)}
             >
               {bundle.shortLabel}
             </button>
@@ -309,6 +343,9 @@ export default function TasksTab() {
                       <span className="item-text">{item.text}</span>
                       {item.priority === 'urgent' && !checked[item.id] && (
                         <span className="badge urgent-badge">URGENT</span>
+                      )}
+                      {isAskRequiredTask(item) && !checked[item.id] && (
+                        <span className="badge ask-badge">ASK</span>
                       )}
                       {moneyIds.length > 0 && !checked[item.id] && (
                         <span className="badge money-badge">

@@ -115,6 +115,7 @@ export function AppProvider({ children }) {
   const [payRates, setPayRates] = useLS('baby-prep-pay-rates', [])
   const [checkups, setCheckups] = useLS('baby-prep-checkups', {})
   const [moods, setMoods] = useLS('baby-prep-moods', [])
+  const [taskBundleFilter, setTaskBundleFilter] = useLS('baby-prep-task-bundle-filter', 'all')
   // Health tab calendar collapse/expand state per sub-tab.
   const [healthCalendarVisibility, setHealthCalendarVisibility] = useLS(
     'baby-prep-health-calendar-visibility',
@@ -468,6 +469,7 @@ export function AppProvider({ children }) {
     payRates, addPayRate, removePayRate, updatePayRate,
     checkups, updateCheckup,
     moods, addMood,
+    taskBundleFilter, setTaskBundleFilter,
     healthCalendarVisibility, setHealthCalendarVisibility,
     planner, addPlan, updatePlan, removePlan, togglePlanDone,
     doctor, setDoctor,
