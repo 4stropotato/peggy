@@ -12,7 +12,7 @@ const DEFAULT_AUTO_HOURS = 8
 const DEFAULT_AWAY_MINUTES = 90
 const MAX_GEOFENCE_RADIUS_METERS = 3000
 const MAX_AWAY_MINUTES = 720
-const SHAKE_DELTA_THRESHOLD = 17
+const SHAKE_DELTA_THRESHOLD = 22
 const SHAKE_COOLDOWN_MS = 1200
 const QUICK_ACTION_MESSAGE_MS = 4200
 
@@ -235,12 +235,14 @@ export default function WorkFinancePanel({
   } = useApp()
 
   const isHusband = String(personKey || '').toLowerCase() === 'husband'
+  const geoChannel = isHusband ? 'husband' : 'naomi'
   const activeAttendance = isHusband ? husbandAttendance : attendance
   const activeMarkAttendance = isHusband ? markHusbandAttendance : markAttendance
   const activeRemoveAttendance = isHusband ? removeHusbandAttendance : removeAttendance
   const activeWorkLocation = isHusband ? husbandWorkLocation : workLocation
   const activeSetWorkLocation = isHusband ? setHusbandWorkLocation : setWorkLocation
   const calendarStorageKey = `baby-prep-finance-work-calendar-${isHusband ? 'husband' : 'wife'}`
+  const summaryStorageKey = `baby-prep-finance-work-summary-${isHusband ? 'husband' : 'wife'}`
   const geoPanelStorageKey = `baby-prep-finance-work-geo-panel-${isHusband ? 'husband' : 'wife'}`
   const geoAdvancedStorageKey = `baby-prep-finance-work-geo-advanced-${isHusband ? 'husband' : 'wife'}`
 
@@ -249,14 +251,15 @@ export default function WorkFinancePanel({
   const [attendanceDate, setAttendanceDate] = useState(now.toISOString().split('T')[0])
   const [attendanceForm, setAttendanceForm] = useState(() => createDefaultAttendanceForm({ isHusband }))
   const [showWorkCalendar, setShowWorkCalendar] = useState(() => readCalendarPreference(calendarStorageKey, true))
+  const [showMonthlySummary, setShowMonthlySummary] = useState(() => readCalendarPreference(summaryStorageKey, true))
   const [showGeoPanel, setShowGeoPanel] = useState(() => readCalendarPreference(geoPanelStorageKey, false))
   const [showGeoAdvanced, setShowGeoAdvanced] = useState(() => readCalendarPreference(geoAdvancedStorageKey, false))
   const [geoMessage, setGeoMessage] = useState('')
   const [quickActionMessage, setQuickActionMessage] = useState('')
-  const [geoStatus, setGeoStatus] = useState(() => String(getGeoTelemetry()?.status || ''))
+  const [geoStatus, setGeoStatus] = useState(() => String(getGeoTelemetry(geoChannel)?.status || ''))
   const [geoLive, setGeoLive] = useState(() => ({
     ...DEFAULT_GEO_LIVE,
-    ...(getGeoTelemetry()?.live || {}),
+    ...(getGeoTelemetry(geoChannel)?.live || {}),
   }))
   const [locationDraft, setLocationDraft] = useState(() => toLocationDraft(activeWorkLocation))
   const [mapPinInput, setMapPinInput] = useState({ work: '', home: '' })
@@ -303,6 +306,11 @@ export default function WorkFinancePanel({
 
   useEffect(() => {
     if (typeof window === 'undefined') return
+    window.localStorage.setItem(summaryStorageKey, showMonthlySummary ? '1' : '0')
+  }, [summaryStorageKey, showMonthlySummary])
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return
     window.localStorage.setItem(geoPanelStorageKey, showGeoPanel ? '1' : '0')
   }, [geoPanelStorageKey, showGeoPanel])
 
@@ -315,16 +323,18 @@ export default function WorkFinancePanel({
     if (typeof window === 'undefined') return undefined
 
     const applyTelemetry = (next) => {
-      const payload = next && typeof next === 'object' ? next : getGeoTelemetry()
+      const payload = next && typeof next === 'object' ? next : getGeoTelemetry(geoChannel)
+      const payloadChannel = String(payload?.channel || geoChannel).trim().toLowerCase()
+      if (payloadChannel !== geoChannel) return
       setGeoStatus(String(payload?.status || ''))
       setGeoLive({ ...DEFAULT_GEO_LIVE, ...(payload?.live || {}) })
     }
 
-    applyTelemetry(getGeoTelemetry())
+    applyTelemetry(getGeoTelemetry(geoChannel))
     const onTelemetry = (event) => applyTelemetry(event?.detail)
     window.addEventListener(GEO_TELEMETRY_EVENT, onTelemetry)
     return () => window.removeEventListener(GEO_TELEMETRY_EVENT, onTelemetry)
-  }, [])
+  }, [geoChannel])
 
   useEffect(() => {
     if (!geoMessage) return undefined
@@ -817,50 +827,6 @@ export default function WorkFinancePanel({
         </div>
       </section>
 
-      <section className={`glass-section finance-work-section ${accent}`}>
-        <div className="section-header">
-          <span className="section-icon"><UiIcon icon={APP_ICONS.overview} /></span>
-          <div><h2>Monthly Summary - {viewMonth}</h2></div>
-        </div>
-        <div className="attendance-stats">
-          <div className="att-stat glass-inner">
-            <div className="att-stat-num">{daysWorked}</div>
-            <div className="att-stat-label">Days Worked</div>
-          </div>
-          <div className="att-stat glass-inner">
-            <div className="att-stat-num">{formatHoursAndMinutes(totalHours)}</div>
-            <div className="att-stat-label">Total Hours</div>
-          </div>
-          <div className="att-stat glass-inner">
-            <div className="att-stat-num">{monthAttendance.filter(a => !a.worked).length}</div>
-            <div className="att-stat-label">Days Off</div>
-          </div>
-        </div>
-        {monthAttendance.length > 0 && (
-          <ul className="attendance-log">
-            {monthAttendance.map(a => (
-              <li
-                key={a.date}
-                className={`att-log-item glass-inner ${a.worked ? 'worked' : 'absent'}`}
-                onClick={() => {
-                  setAttendanceDate(a.date)
-                  setAttendanceForm(toAttendanceForm(a, { isHusband }))
-                }}
-              >
-                <span className="att-log-date">{a.date}</span>
-                <span className="att-log-status">{a.worked ? `Worked ${formatHoursAndMinutes(a.hours)}` : 'Absent'}</span>
-                {a.worked && a.useTimeRange && a.startTime && a.endTime && (
-                  <span className="att-log-note">
-                    {a.startTime} - {a.endTime} (break {formatHoursAndMinutes((Number(a.breakMinutes) || 0) / 60)})
-                  </span>
-                )}
-                {a.note && <span className="att-log-note">{a.note}</span>}
-              </li>
-            ))}
-          </ul>
-        )}
-      </section>
-
       {allowGeoTracker && (
         <section className={`glass-section finance-work-section ${accent}`}>
           <div className="section-header">
@@ -1151,6 +1117,62 @@ export default function WorkFinancePanel({
           )}
         </section>
       )}
+
+      <section className={`glass-section finance-work-section ${accent}`}>
+        <div className="section-header">
+          <span className="section-icon"><UiIcon icon={APP_ICONS.overview} /></span>
+          <div><h2>Monthly Summary - {viewMonth}</h2></div>
+          <button
+            type="button"
+            className="cal-collapse-btn"
+            onClick={() => setShowMonthlySummary(prev => !prev)}
+            aria-expanded={showMonthlySummary}
+          >
+            {showMonthlySummary ? 'Hide summary' : 'Show summary'}
+          </button>
+        </div>
+        {showMonthlySummary && (
+          <>
+            <div className="attendance-stats">
+              <div className="att-stat glass-inner">
+                <div className="att-stat-num">{daysWorked}</div>
+                <div className="att-stat-label">Days Worked</div>
+              </div>
+              <div className="att-stat glass-inner">
+                <div className="att-stat-num">{formatHoursAndMinutes(totalHours)}</div>
+                <div className="att-stat-label">Total Hours</div>
+              </div>
+              <div className="att-stat glass-inner">
+                <div className="att-stat-num">{monthAttendance.filter(a => !a.worked).length}</div>
+                <div className="att-stat-label">Days Off</div>
+              </div>
+            </div>
+            {monthAttendance.length > 0 && (
+              <ul className="attendance-log">
+                {monthAttendance.map(a => (
+                  <li
+                    key={a.date}
+                    className={`att-log-item glass-inner ${a.worked ? 'worked' : 'absent'}`}
+                    onClick={() => {
+                      setAttendanceDate(a.date)
+                      setAttendanceForm(toAttendanceForm(a, { isHusband }))
+                    }}
+                  >
+                    <span className="att-log-date">{a.date}</span>
+                    <span className="att-log-status">{a.worked ? `Worked ${formatHoursAndMinutes(a.hours)}` : 'Absent'}</span>
+                    {a.worked && a.useTimeRange && a.startTime && a.endTime && (
+                      <span className="att-log-note">
+                        {a.startTime} - {a.endTime} (break {formatHoursAndMinutes((Number(a.breakMinutes) || 0) / 60)})
+                      </span>
+                    )}
+                    {a.note && <span className="att-log-note">{a.note}</span>}
+                  </li>
+                ))}
+              </ul>
+            )}
+          </>
+        )}
+      </section>
     </div>
   )
 }

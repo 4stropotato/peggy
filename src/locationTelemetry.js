@@ -12,25 +12,45 @@ const DEFAULT_LIVE = {
   updatedAt: '',
 }
 
-let geoTelemetry = {
-  status: '',
-  live: { ...DEFAULT_LIVE },
-}
+const DEFAULT_CHANNEL = 'naomi'
+const CHANNELS = ['naomi', 'husband']
 
-export function getGeoTelemetry() {
-  return geoTelemetry
-}
-
-export function setGeoTelemetry(patch = {}) {
-  const next = {
-    ...geoTelemetry,
-    ...patch,
-    live: patch.live ? { ...geoTelemetry.live, ...patch.live } : geoTelemetry.live,
+function createChannelState() {
+  return {
+    status: '',
+    live: { ...DEFAULT_LIVE },
   }
-  geoTelemetry = next
+}
+
+function normalizeChannel(channel) {
+  const raw = String(channel || '').trim().toLowerCase()
+  return CHANNELS.includes(raw) ? raw : DEFAULT_CHANNEL
+}
+
+let geoTelemetry = {
+  naomi: createChannelState(),
+  husband: createChannelState(),
+}
+
+export function getGeoTelemetry(channel = DEFAULT_CHANNEL) {
+  const key = normalizeChannel(channel)
+  return geoTelemetry[key] || createChannelState()
+}
+
+export function setGeoTelemetry(patch = {}, channel = DEFAULT_CHANNEL) {
+  const key = normalizeChannel(channel)
+  const prev = geoTelemetry[key] || createChannelState()
+  const next = {
+    ...prev,
+    ...patch,
+    live: patch.live ? { ...prev.live, ...patch.live } : prev.live,
+  }
+  geoTelemetry = {
+    ...geoTelemetry,
+    [key]: next,
+  }
 
   if (typeof window !== 'undefined') {
-    window.dispatchEvent(new CustomEvent(GEO_TELEMETRY_EVENT, { detail: next }))
+    window.dispatchEvent(new CustomEvent(GEO_TELEMETRY_EVENT, { detail: { channel: key, ...next } }))
   }
 }
-

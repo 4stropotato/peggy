@@ -1,6 +1,7 @@
 import { useMemo, useRef } from 'react'
 
 const DAY_LABELS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
+const LONG_PRESS_MS = 900
 
 function pad(n) { return String(n).padStart(2, '0') }
 
@@ -106,7 +107,7 @@ export default function Calendar({
       lastTapRef.current = { date: '', time: 0 }
       suppressClickRef.current = { date: cell.date, until: Date.now() + 450 }
       onDayLongPress?.(cell.date)
-    }, 680)
+    }, LONG_PRESS_MS)
   }
 
   const handleLongPressEnd = () => {

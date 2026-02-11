@@ -93,14 +93,10 @@ function createDefaultFinanceConfig() {
   return {
     payrollProfiles: {
       naomi: {
-        payMode: 'fixed_day',
-        payDay: 15,
         delayMonths: 1,
         monthlyAdjustment: 0,
       },
       husband: {
-        payMode: 'month_end',
-        payDay: 30,
         delayMonths: 1,
         monthlyAdjustment: 0,
       },

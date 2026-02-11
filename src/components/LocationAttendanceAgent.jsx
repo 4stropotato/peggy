@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useMemo, useRef } from 'react'
 import { useApp } from '../AppContext'
 import { startAppLocationWatcher } from '../native/locationBridge'
 import { setGeoTelemetry } from '../locationTelemetry'
@@ -59,30 +59,72 @@ function normalizeAwayMinutes(value) {
   return Math.min(MAX_AWAY_MINUTES, Math.max(15, Number(value) || DEFAULT_AWAY_MINUTES))
 }
 
-export default function LocationAttendanceAgent() {
-  const { attendance, markAttendance, workLocation, setWorkLocation } = useApp()
+export default function LocationAttendanceAgent({ personKey = 'naomi' }) {
+  const {
+    attendance,
+    markAttendance,
+    workLocation,
+    setWorkLocation,
+    husbandAttendance,
+    markHusbandAttendance,
+    husbandWorkLocation,
+    setHusbandWorkLocation,
+  } = useApp()
+
+  const isHusband = String(personKey || '').trim().toLowerCase() === 'husband'
+  const channelKey = isHusband ? 'husband' : 'naomi'
+  const activeAttendance = isHusband ? husbandAttendance : attendance
+  const activeMarkAttendance = isHusband ? markHusbandAttendance : markAttendance
+  const activeWorkLocation = isHusband ? husbandWorkLocation : workLocation
+  const activeSetWorkLocation = isHusband ? setHusbandWorkLocation : setWorkLocation
 
   const stopWatcherRef = useRef(null)
   const awayStartRef = useRef(null)
-  const attendanceRef = useRef(attendance)
-  const markAttendanceRef = useRef(markAttendance)
+  const attendanceRef = useRef(activeAttendance)
+  const markAttendanceRef = useRef(activeMarkAttendance)
   const statusRef = useRef('')
-  const wasEnabledRef = useRef(Boolean(workLocation.enabled))
+  const wasEnabledRef = useRef(Boolean(activeWorkLocation.enabled))
 
   useEffect(() => {
-    attendanceRef.current = attendance
-  }, [attendance])
+    attendanceRef.current = activeAttendance
+  }, [activeAttendance])
 
   useEffect(() => {
-    markAttendanceRef.current = markAttendance
-  }, [markAttendance])
+    markAttendanceRef.current = activeMarkAttendance
+  }, [activeMarkAttendance])
 
   const setStatus = (nextStatus) => {
     const text = String(nextStatus || '')
     if (text === statusRef.current) return
     statusRef.current = text
-    setGeoTelemetry({ status: text })
+    setGeoTelemetry({ status: text }, channelKey)
   }
+
+  const activeLocationMemo = useMemo(() => ({
+    enabled: Boolean(activeWorkLocation.enabled),
+    lat: activeWorkLocation.lat,
+    lng: activeWorkLocation.lng,
+    radiusMeters: activeWorkLocation.radiusMeters,
+    homeLat: activeWorkLocation.homeLat,
+    homeLng: activeWorkLocation.homeLng,
+    homeRadiusMeters: activeWorkLocation.homeRadiusMeters,
+    homeName: activeWorkLocation.homeName,
+    autoHours: activeWorkLocation.autoHours,
+    awayMinutesForWork: activeWorkLocation.awayMinutesForWork,
+    name: activeWorkLocation.name,
+  }), [
+    activeWorkLocation.enabled,
+    activeWorkLocation.lat,
+    activeWorkLocation.lng,
+    activeWorkLocation.radiusMeters,
+    activeWorkLocation.homeLat,
+    activeWorkLocation.homeLng,
+    activeWorkLocation.homeRadiusMeters,
+    activeWorkLocation.homeName,
+    activeWorkLocation.autoHours,
+    activeWorkLocation.awayMinutesForWork,
+    activeWorkLocation.name,
+  ])
 
   useEffect(() => {
     const stopExistingWatcher = async () => {
@@ -109,10 +151,10 @@ export default function LocationAttendanceAgent() {
           accuracyMeters: null,
           updatedAt: new Date().toISOString(),
         },
-      })
+      }, channelKey)
     }
 
-    if (!workLocation.enabled) {
+    if (!activeLocationMemo.enabled) {
       void stopExistingWatcher()
       awayStartRef.current = null
       disableLive()
@@ -126,8 +168,8 @@ export default function LocationAttendanceAgent() {
     }
     wasEnabledRef.current = true
 
-    const workTargetValid = isValidLatLng(workLocation.lat, workLocation.lng)
-    const homeTargetValid = isValidLatLng(workLocation.homeLat, workLocation.homeLng)
+    const workTargetValid = isValidLatLng(activeLocationMemo.lat, activeLocationMemo.lng)
+    const homeTargetValid = isValidLatLng(activeLocationMemo.homeLat, activeLocationMemo.homeLng)
     if (!workTargetValid && !homeTargetValid) {
       void stopExistingWatcher()
       awayStartRef.current = null
@@ -136,14 +178,14 @@ export default function LocationAttendanceAgent() {
       return undefined
     }
 
-    const workLat = Number(workLocation.lat)
-    const workLng = Number(workLocation.lng)
-    const homeLat = Number(workLocation.homeLat)
-    const homeLng = Number(workLocation.homeLng)
-    const workRadius = normalizeRadius(workLocation.radiusMeters, DEFAULT_WORK_RADIUS_METERS)
-    const homeRadius = normalizeRadius(workLocation.homeRadiusMeters, DEFAULT_HOME_RADIUS_METERS)
-    const autoHours = normalizeAutoHours(workLocation.autoHours)
-    const awayMinutes = normalizeAwayMinutes(workLocation.awayMinutesForWork)
+    const workLat = Number(activeLocationMemo.lat)
+    const workLng = Number(activeLocationMemo.lng)
+    const homeLat = Number(activeLocationMemo.homeLat)
+    const homeLng = Number(activeLocationMemo.homeLng)
+    const workRadius = normalizeRadius(activeLocationMemo.radiusMeters, DEFAULT_WORK_RADIUS_METERS)
+    const homeRadius = normalizeRadius(activeLocationMemo.homeRadiusMeters, DEFAULT_HOME_RADIUS_METERS)
+    const autoHours = normalizeAutoHours(activeLocationMemo.autoHours)
+    const awayMinutes = normalizeAwayMinutes(activeLocationMemo.awayMinutesForWork)
 
     awayStartRef.current = null
     void stopExistingWatcher()
@@ -189,7 +231,7 @@ export default function LocationAttendanceAgent() {
                 accuracyMeters: Number.isFinite(accuracy) ? Math.round(accuracy) : null,
                 updatedAt: new Date().toISOString(),
               },
-            })
+            }, channelKey)
 
             if (!hasAcceptableAccuracy) {
               setStatus('GPS accuracy is weak right now. Waiting for a stronger signal before auto logging.')
@@ -220,8 +262,8 @@ export default function LocationAttendanceAgent() {
             const today = getTodayISO()
             const existing = attendanceRef.current[today]
             if (!existing?.worked) {
-              const locationName = String(workLocation.name || 'work location').trim() || 'work location'
-              const homeName = String(workLocation.homeName || 'home').trim() || 'home'
+              const locationName = String(activeLocationMemo.name || 'work location').trim() || 'work location'
+              const homeName = String(activeLocationMemo.homeName || 'home').trim() || 'home'
               const reasonText = autoReason === 'work-zone'
                 ? `arrived at ${locationName}`
                 : `away from ${homeName} for ${Math.round(awayMinutes)}+ min`
@@ -238,7 +280,7 @@ export default function LocationAttendanceAgent() {
               }
             }
 
-            setWorkLocation(prev => {
+            activeSetWorkLocation(prev => {
               if (prev.lastAutoLogDate === today && prev.lastAutoReason === autoReason) return prev
               return {
                 ...prev,
@@ -262,7 +304,7 @@ export default function LocationAttendanceAgent() {
                 accuracyMeters: null,
                 updatedAt: new Date().toISOString(),
               },
-            })
+            }, channelKey)
             const code = String(err?.code || '').toUpperCase()
             const msg = String(err?.message || '')
             if (
@@ -302,7 +344,7 @@ export default function LocationAttendanceAgent() {
             accuracyMeters: null,
             updatedAt: new Date().toISOString(),
           },
-        })
+        }, channelKey)
         setStatus('Could not start location tracker on this device.')
       }
     }
@@ -313,20 +355,7 @@ export default function LocationAttendanceAgent() {
       cancelled = true
       void stopExistingWatcher()
     }
-  }, [
-    workLocation.enabled,
-    workLocation.lat,
-    workLocation.lng,
-    workLocation.radiusMeters,
-    workLocation.homeLat,
-    workLocation.homeLng,
-    workLocation.homeRadiusMeters,
-    workLocation.homeName,
-    workLocation.autoHours,
-    workLocation.awayMinutesForWork,
-    workLocation.name,
-    setWorkLocation,
-  ])
+  }, [activeLocationMemo, activeSetWorkLocation, channelKey])
 
   return null
 }

@@ -398,10 +398,10 @@ export default function HealthTab() {
   const [attendanceDate, setAttendanceDate] = useState(now.toISOString().split('T')[0])
   const [attendanceForm, setAttendanceForm] = useState(() => createDefaultAttendanceForm())
   const [geoMessage, setGeoMessage] = useState('')
-  const [geoStatus, setGeoStatus] = useState(() => String(getGeoTelemetry()?.status || ''))
+  const [geoStatus, setGeoStatus] = useState(() => String(getGeoTelemetry('naomi')?.status || ''))
   const [geoLive, setGeoLive] = useState(() => ({
     ...DEFAULT_GEO_LIVE,
-    ...(getGeoTelemetry()?.live || {})
+    ...(getGeoTelemetry('naomi')?.live || {})
   }))
   const [locationDraft, setLocationDraft] = useState(() => toLocationDraft(workLocation))
   const draftDirtyRef = useRef(false)
@@ -470,12 +470,14 @@ export default function HealthTab() {
     if (typeof window === 'undefined') return undefined
 
     const applyTelemetry = (next) => {
-      const payload = next && typeof next === 'object' ? next : getGeoTelemetry()
+      const payload = next && typeof next === 'object' ? next : getGeoTelemetry('naomi')
+      const payloadChannel = String(payload?.channel || 'naomi').trim().toLowerCase()
+      if (payloadChannel !== 'naomi') return
       setGeoStatus(String(payload?.status || ''))
       setGeoLive({ ...DEFAULT_GEO_LIVE, ...(payload?.live || {}) })
     }
 
-    applyTelemetry(getGeoTelemetry())
+    applyTelemetry(getGeoTelemetry('naomi'))
     const onTelemetry = (event) => applyTelemetry(event?.detail)
     window.addEventListener(GEO_TELEMETRY_EVENT, onTelemetry)
     return () => window.removeEventListener(GEO_TELEMETRY_EVENT, onTelemetry)

@@ -235,7 +235,8 @@ export default function App() {
       <PushSyncAgent />
       <SmartReminderAgent />
       <WidgetSyncAgent />
-      <LocationAttendanceAgent />
+      <LocationAttendanceAgent personKey="naomi" />
+      <LocationAttendanceAgent personKey="husband" />
       <PullToRefreshAgent />
       <AppInner />
     </AppProvider>
