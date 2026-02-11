@@ -12,6 +12,7 @@ import WidgetSyncAgent from './components/WidgetSyncAgent'
 import LocationAttendanceAgent from './components/LocationAttendanceAgent'
 import PullToRefreshAgent from './components/PullToRefreshAgent'
 import { THEME_ICONS, UiIcon, getNavIcons, resolveIconStyle } from './uiIcons'
+import { resolveQuickMoodEmoji } from './reminderContent'
 import './App.css'
 
 const FLOATING_TOGGLE_MARGIN = 8
@@ -24,7 +25,7 @@ function clamp(value, min, max) {
 function AppInner() {
   const [tab, setTab] = useState('home')
   const [themeTogglePos, setThemeTogglePos] = useState(null)
-  const { theme, toggleTheme, iconStyle } = useApp()
+  const { theme, toggleTheme, iconStyle, addMood, moods } = useApp()
   const themeToggleRef = useRef(null)
   const themeTogglePosRef = useRef(null)
   const suppressThemeClickRef = useRef(false)
@@ -188,6 +189,66 @@ function AppInner() {
     themeTogglePosRef.current = themeTogglePos
     applyThemeTogglePosition(themeTogglePos)
   }, [themeTogglePos])
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return undefined
+
+    const openHealthMood = () => {
+      setTab('health')
+      window.setTimeout(() => {
+        window.dispatchEvent(new CustomEvent('peggy-open-health-subtab', { detail: { subTab: 'mood' } }))
+      }, 30)
+    }
+
+    window.addEventListener('peggy-open-health-mood', openHealthMood)
+    return () => window.removeEventListener('peggy-open-health-mood', openHealthMood)
+  }, [])
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+
+    let parsed
+    try {
+      parsed = new URL(window.location.href)
+    } catch {
+      return
+    }
+
+    const openMood = parsed.searchParams.get('openMood') === '1'
+    const quickMoodCode = String(parsed.searchParams.get('quickMood') || '').trim().toLowerCase()
+    const quickMoodEmoji = resolveQuickMoodEmoji(quickMoodCode)
+
+    if (!openMood && !quickMoodEmoji) return
+
+    if (openMood) {
+      window.dispatchEvent(new CustomEvent('peggy-open-health-mood'))
+    }
+
+    if (quickMoodEmoji) {
+      const todayKey = new Date().toDateString()
+      const hasMoodToday = Array.isArray(moods) && moods.some(entry => {
+        const ts = entry?.date
+        if (!ts) return false
+        const dt = new Date(ts)
+        if (Number.isNaN(dt.getTime())) return false
+        return dt.toDateString() === todayKey
+      })
+      if (!hasMoodToday) {
+        addMood({
+          mood: quickMoodEmoji,
+          energy: 3,
+          cravings: '',
+          notes: 'Quick mood log from notification',
+        })
+      }
+    }
+
+    parsed.searchParams.delete('openMood')
+    parsed.searchParams.delete('quickMood')
+    const nextQuery = parsed.searchParams.toString()
+    const nextUrl = `${parsed.pathname}${nextQuery ? `?${nextQuery}` : ''}${parsed.hash || ''}`
+    window.history.replaceState({}, '', nextUrl)
+  }, [addMood, moods])
 
   return (
     <div className={`app ${theme} icon-${normalizedIconStyle}`}>

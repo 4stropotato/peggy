@@ -1126,6 +1126,9 @@ export default function MoreTab() {
                 Permission: {notifPermission === 'unsupported' ? 'unsupported' : notifPermission}.
                 {' '}Quiet hours active now: {quietHoursActiveNow ? 'yes' : 'no'}.
               </p>
+              <p className="section-note">
+                Mood reminder slots: 12:00, 17:00, 20:00 (only if today has no mood log yet).
+              </p>
               <div className="backup-cloud-actions">
                 <button
                   type="button"

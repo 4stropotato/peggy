@@ -4,10 +4,12 @@ import { babyNamesInfo } from '../infoData'
 import {
   buildDailyTip,
   buildDailyTipReminder,
+  buildMoodReminder,
   buildNameSpotlight,
   buildPlannerReminder,
   buildSupplementReminder,
   buildWorkReminder,
+  getMoodReminderContext,
   getPlannerReminderContext,
   getSupplementReminderContext,
   getWorkReminderContext,
@@ -95,14 +97,24 @@ function getNotifTone(type, level = 'gentle') {
   }
 }
 
-function fireNotification({ title, body, slotKey, type = 'general', level = 'gentle', urgent = false }) {
+function fireNotification({
+  title,
+  body,
+  slotKey,
+  type = 'general',
+  level = 'gentle',
+  urgent = false,
+  url = APP_BASE,
+  actions = null,
+  actionUrls = null,
+}) {
   const tone = getNotifTone(type, level)
   const safeTitle = `${tone.titlePrefix} ${String(title || '').trim()}`.trim()
   const baseBody = String(body || '').trim()
   const safeBody = tone.bodyPrefix ? `${tone.bodyPrefix} ${baseBody}`.trim() : baseBody
 
   try {
-    new Notification(safeTitle, {
+    const options = {
       body: safeBody,
       icon: NOTIF_ICON,
       badge: NOTIF_ICON,
@@ -111,8 +123,17 @@ function fireNotification({ title, body, slotKey, type = 'general', level = 'gen
       requireInteraction: urgent || level === 'urgent',
       vibrate: tone.vibrate,
       timestamp: Date.now(),
-      data: { type, level },
-    })
+      data: {
+        type,
+        level,
+        url,
+        actionUrls: actionUrls && typeof actionUrls === 'object' ? actionUrls : {},
+      },
+    }
+    if (Array.isArray(actions) && actions.length > 0) {
+      options.actions = actions.slice(0, 8)
+    }
+    new Notification(safeTitle, options)
   } catch {
     // Ignore notification errors from unsupported environments.
   }
@@ -132,7 +153,15 @@ async function fireNotificationReliable(payload) {
     requireInteraction: Boolean(payload?.urgent || payload?.level === 'urgent'),
     vibrate: tone.vibrate,
     timestamp: Date.now(),
-    data: { type: payload?.type || 'general', level: payload?.level || 'gentle' },
+    data: {
+      type: payload?.type || 'general',
+      level: payload?.level || 'gentle',
+      url: payload?.url || APP_BASE,
+      actionUrls: payload?.actionUrls && typeof payload.actionUrls === 'object' ? payload.actionUrls : {},
+    },
+  }
+  if (Array.isArray(payload?.actions) && payload.actions.length > 0) {
+    options.actions = payload.actions.slice(0, 8)
   }
 
   try {
@@ -151,7 +180,7 @@ async function fireNotificationReliable(payload) {
 }
 
 export default function SmartReminderAgent() {
-  const { dailySupp, suppSchedule, attendance, planner } = useApp()
+  const { dailySupp, suppSchedule, attendance, planner, moods } = useApp()
 
   useEffect(() => {
     if (typeof window === 'undefined' || typeof Notification === 'undefined') return undefined
@@ -165,6 +194,7 @@ export default function SmartReminderAgent() {
       const now = new Date()
       const suppCtx = getSupplementReminderContext({ dailySupp, suppSchedule, now })
       const workCtx = getWorkReminderContext({ attendance, now })
+      const moodCtx = getMoodReminderContext({ moods, now })
       const planCtx = getPlannerReminderContext({ planner, now })
       const channelPrefs = readSmartNotifChannels()
       const remindersChannelOn = isSmartNotifChannelEnabled('reminders', channelPrefs)
@@ -173,7 +203,9 @@ export default function SmartReminderAgent() {
       const namesChannelOn = isSmartNotifChannelEnabled('names', channelPrefs)
 
       const planBadgeCount = Math.max(0, Number(planCtx.pendingTodayCount) || 0) + Math.max(0, Number(planCtx.pendingOverdueCount) || 0)
-      const reminderBadgeCount = remindersChannelOn ? (Math.max(0, suppCtx.remainingDoses) + (workCtx.needsReminder ? 1 : 0)) : 0
+      const reminderBadgeCount = remindersChannelOn
+        ? (Math.max(0, suppCtx.remainingDoses) + (workCtx.needsReminder ? 1 : 0) + (moodCtx.needsReminder ? 1 : 0))
+        : 0
       const calendarBadgeCount = calendarChannelOn ? planBadgeCount : 0
       const badgeCount = reminderBadgeCount + calendarBadgeCount
       void syncAppBadge(badgeCount)
@@ -189,6 +221,10 @@ export default function SmartReminderAgent() {
       if (remindersChannelOn && workCtx.needsReminder) {
         actionableCandidates.push(buildWorkReminder(workCtx, now, 'notify'))
       }
+      if (remindersChannelOn && moodCtx.needsReminder) {
+        const moodReminder = buildMoodReminder(moodCtx, now, 'notify')
+        if (moodReminder) actionableCandidates.push(moodReminder)
+      }
       if (calendarChannelOn && planCtx?.candidate?.planId) {
         const planReminder = buildPlannerReminder(planCtx, now, 'notify')
         if (planReminder) actionableCandidates.push(planReminder)
@@ -199,6 +235,23 @@ export default function SmartReminderAgent() {
         .sort((a, b) => b.priorityScore - a.priorityScore)[0] || null
 
       if (actionable) {
+        const isMoodReminder = actionable.type === 'mood'
+        const moodActions = Array.isArray(actionable.moodQuickActions)
+          ? actionable.moodQuickActions
+          : []
+        const actions = moodActions.map(item => ({
+          action: `quick_mood_${String(item.code || '').trim()}`,
+          title: String(item.label || item.emoji || '').trim(),
+        })).filter(item => item.action && item.title)
+        const actionUrls = Object.fromEntries(
+          moodActions
+            .map(item => {
+              const code = String(item?.code || '').trim()
+              if (!code) return ['', '']
+              return [`quick_mood_${code}`, `${APP_BASE}?openMood=1&quickMood=${encodeURIComponent(code)}`]
+            })
+            .filter(([k, v]) => k && v)
+        )
         void fireNotificationReliable({
           title: actionable.notificationTitle,
           body: actionable.notificationBody,
@@ -206,6 +259,9 @@ export default function SmartReminderAgent() {
           type: actionable.type,
           level: actionable.level,
           urgent: actionable.level === 'urgent',
+          url: isMoodReminder ? `${APP_BASE}?openMood=1` : APP_BASE,
+          actions: isMoodReminder ? actions : [],
+          actionUrls: isMoodReminder ? actionUrls : {},
         })
         markNotificationSlotSent(actionable.slotKey, now)
         return
@@ -251,7 +307,7 @@ export default function SmartReminderAgent() {
     return () => {
       window.clearInterval(id)
     }
-  }, [dailySupp, suppSchedule, attendance, planner])
+  }, [dailySupp, suppSchedule, attendance, planner, moods])
 
   return null
 }

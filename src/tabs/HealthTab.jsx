@@ -403,6 +403,18 @@ export default function HealthTab() {
   const geoMessageTimerRef = useRef(null)
 
   useEffect(() => {
+    if (typeof window === 'undefined') return undefined
+    const handleOpenSubTab = (event) => {
+      const requested = String(event?.detail?.subTab || '').trim().toLowerCase()
+      if (!requested) return
+      if (!['supps', 'work', 'checkups', 'mood'].includes(requested)) return
+      setSubTab(requested)
+    }
+    window.addEventListener('peggy-open-health-subtab', handleOpenSubTab)
+    return () => window.removeEventListener('peggy-open-health-subtab', handleOpenSubTab)
+  }, [])
+
+  useEffect(() => {
     if (draftDirtyRef.current) return
     setLocationDraft(toLocationDraft(workLocation))
   }, [

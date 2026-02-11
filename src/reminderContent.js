@@ -711,6 +711,93 @@ export function getWorkReminderContext({ attendance, now = new Date() }) {
   }
 }
 
+export const QUICK_MOOD_ACTIONS = Object.freeze([
+  { code: 'happy', emoji: '😊', label: '😊 Great' },
+  { code: 'okay', emoji: '😐', label: '😐 Okay' },
+  { code: 'sad', emoji: '😢', label: '😢 Low' },
+  { code: 'nauseous', emoji: '🤢', label: '🤢 Nauseous' },
+  { code: 'sleepy', emoji: '😴', label: '😴 Sleepy' },
+  { code: 'stressed', emoji: '😤', label: '😤 Stressed' },
+  { code: 'loved', emoji: '🥰', label: '🥰 Loved' },
+  { code: 'anxious', emoji: '😰', label: '😰 Anxious' },
+])
+
+const MOOD_REMINDER_WINDOWS = Object.freeze([
+  { id: 'noon', minuteOfDay: 12 * 60, label: '12:00' },
+  { id: 'late_afternoon', minuteOfDay: 17 * 60, label: '17:00' },
+  { id: 'night', minuteOfDay: 20 * 60, label: '20:00' },
+])
+
+const MOOD_TITLES = {
+  gentle: [
+    'Mood check-in time.',
+    'How are you feeling today?',
+    'Quick mood log before lunch reset.',
+  ],
+  nudge: [
+    'Still no mood log today.',
+    'Late-afternoon mood check.',
+    'Quick check-in before evening.',
+  ],
+  urgent: [
+    'Final mood check for today.',
+    'Before bedtime: log your mood.',
+    'End-of-day mood check-in.',
+  ],
+}
+
+const MOOD_SUBTITLES = {
+  gentle: [
+    'One tap is enough. Keep today emotionally tracked.',
+    'No long notes needed. Just choose one mood.',
+    'Quick snapshot now helps spot stress trends later.',
+  ],
+  nudge: [
+    'If busy kanina, one quick mood tap now is enough.',
+    'Simple check-in now, cleaner records tonight.',
+    'Track now while your day still feels fresh.',
+  ],
+  urgent: [
+    'No mood logged yet today. Last check-in window is open.',
+    'Close the day with one mood tap.',
+    'A quick mood log now keeps the daily streak complete.',
+  ],
+}
+
+export function resolveQuickMoodEmoji(code) {
+  const key = String(code || '').trim().toLowerCase()
+  const found = QUICK_MOOD_ACTIONS.find(item => item.code === key)
+  return found?.emoji || ''
+}
+
+function hasMoodLoggedForDate(moods, dateKey) {
+  const list = Array.isArray(moods) ? moods : []
+  return list.some(entry => {
+    const ts = entry?.date
+    if (!ts) return false
+    const parsed = new Date(ts)
+    if (!Number.isFinite(parsed.getTime())) return false
+    return toIsoDate(parsed) === dateKey
+  })
+}
+
+export function getMoodReminderContext({ moods, now = new Date() }) {
+  const dateKey = toIsoDate(now)
+  const nowMinutes = minutesSinceMidnight(now)
+  const hasMoodToday = hasMoodLoggedForDate(moods, dateKey)
+  const activeWindow = [...MOOD_REMINDER_WINDOWS]
+    .reverse()
+    .find(windowDef => nowMinutes >= windowDef.minuteOfDay) || null
+
+  return {
+    dateKey,
+    nowMinutes,
+    hasMoodToday,
+    needsReminder: !hasMoodToday && Boolean(activeWindow),
+    activeWindow,
+  }
+}
+
 function sortPlannerItems(items) {
   const safe = Array.isArray(items) ? items.filter(Boolean) : []
   return [...safe].sort((a, b) => {
@@ -930,6 +1017,35 @@ export function buildWorkReminder(ctx, now = new Date(), seedSalt = 'home') {
     subtitle,
     notificationTitle: 'Peggy reminder: Attendance',
     notificationBody: 'Please log today attendance before day rollover.',
+  }
+}
+
+function resolveMoodLevel(ctx) {
+  const slotId = ctx?.activeWindow?.id
+  if (slotId === 'night') return 'urgent'
+  if (slotId === 'late_afternoon') return 'nudge'
+  return 'gentle'
+}
+
+export function buildMoodReminder(ctx, now = new Date(), seedSalt = 'home') {
+  if (!ctx?.needsReminder || !ctx?.activeWindow?.id) return null
+  const level = resolveMoodLevel(ctx)
+  const slotId = ctx.activeWindow.id
+  const seedRoot = `${seedSalt}|mood|${ctx.dateKey}|${slotId}|${level}`
+  const title = pickBySeed(MOOD_TITLES[level] || MOOD_TITLES.gentle, `${seedRoot}|title`)
+  const subtitle = pickBySeed(MOOD_SUBTITLES[level] || MOOD_SUBTITLES.gentle, `${seedRoot}|subtitle`)
+
+  return {
+    type: 'mood',
+    level,
+    intervalMinutes: 1,
+    slotKey: `${ctx.dateKey}|mood|${slotId}`,
+    priorityScore: level === 'urgent' ? 4.6 : level === 'nudge' ? 3.7 : 2.7,
+    title,
+    subtitle,
+    notificationTitle: 'Peggy check-in: Mood',
+    notificationBody: `No mood log yet for today. Quick check-in window: ${ctx.activeWindow.label}.`,
+    moodQuickActions: QUICK_MOOD_ACTIONS,
   }
 }
 

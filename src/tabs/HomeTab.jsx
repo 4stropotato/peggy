@@ -8,10 +8,12 @@ import { APP_ICONS, TokenIcon, UiIcon } from '../uiIcons'
 import {
   buildCompanionSubtitleRotation,
   buildDailyTip,
+  buildMoodReminder,
   buildNameSpotlight,
   buildPlannerReminder,
   buildSupplementReminder,
   buildWorkReminder,
+  getMoodReminderContext,
   getPlannerReminderContext,
   getSupplementReminderContext,
   getWorkReminderContext,
@@ -261,6 +263,10 @@ export default function HomeTab() {
     () => getWorkReminderContext({ attendance, now }),
     [attendance, nowTick],
   )
+  const moodReminderCtx = useMemo(
+    () => getMoodReminderContext({ moods, now }),
+    [moods, nowTick],
+  )
   const planReminderCtx = useMemo(
     () => getPlannerReminderContext({ planner, now }),
     [planner, nowTick],
@@ -273,6 +279,10 @@ export default function HomeTab() {
   const workReminder = useMemo(
     () => (workReminderCtx.needsReminder ? buildWorkReminder(workReminderCtx, now, 'home') : null),
     [workReminderCtx, nowTick],
+  )
+  const moodReminder = useMemo(
+    () => (moodReminderCtx.needsReminder ? buildMoodReminder(moodReminderCtx, now, 'home') : null),
+    [moodReminderCtx, nowTick],
   )
   const planReminder = useMemo(
     () => (planReminderCtx?.candidate?.planId ? buildPlannerReminder(planReminderCtx, now, 'home') : null),
@@ -398,7 +408,7 @@ export default function HomeTab() {
             {isChannelOn('reminders') ? 'Notif ON' : 'Notif OFF'}
           </button>
         </div>
-        {(planReminder || suppReminder || workReminder) ? (
+        {(planReminder || suppReminder || workReminder || moodReminder) ? (
           <div className="reminder-cards">
             {planReminder && (
               <div
@@ -438,6 +448,24 @@ export default function HomeTab() {
                   <div className="reminder-title">{workReminder.title}</div>
                   <div className="reminder-subtitle">{workReminder.subtitle}</div>
                 </div>
+              </div>
+            )}
+            {moodReminder && (
+              <div className={`reminder-card glass-inner reminder-mood level-${moodReminder.level}`}>
+                <span className="reminder-icon"><UiIcon icon={APP_ICONS.reminders} /></span>
+                <div className="reminder-content">
+                  <div className="reminder-title">{moodReminder.title}</div>
+                  <div className="reminder-subtitle">{moodReminder.subtitle}</div>
+                </div>
+                <button
+                  type="button"
+                  className="btn-glass-mini primary reminder-action"
+                  onClick={() => {
+                    window.dispatchEvent(new CustomEvent('peggy-open-health-mood'))
+                  }}
+                >
+                  Log mood
+                </button>
               </div>
             )}
           </div>

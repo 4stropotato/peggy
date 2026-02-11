@@ -3828,6 +3828,10 @@ input[type="range"]:focus {
   background: rgba(0, 184, 148, 0.06);
   border-color: rgba(0, 184, 148, 0.15);
 }
+.reminder-card.reminder-mood {
+  background: rgba(52, 152, 219, 0.08);
+  border-color: rgba(52, 152, 219, 0.2);
+}
 .reminder-action {
   flex-shrink: 0;
 }
