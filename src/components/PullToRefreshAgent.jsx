@@ -130,6 +130,9 @@ function shouldIgnoreTarget(target) {
   if (!(target instanceof Element)) return false
   // Ignore modal sheets and form controls to avoid accidental refresh while editing.
   if (target.closest('.day-detail-sheet, .photo-modal-content')) return true
+  // Ignore fixed controls (especially draggable theme toggle), otherwise dragging
+  // the control can look like a pull gesture and trigger refresh by mistake.
+  if (target.closest('.theme-toggle, .bottom-nav')) return true
   const formEl = target.closest('input, textarea, select, [contenteditable="true"]')
   return Boolean(formEl)
 }
