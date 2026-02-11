@@ -56,6 +56,20 @@ function AppInner() {
     button.style.right = 'auto'
   }
 
+  const clearThemeToggleInlinePosition = () => {
+    const button = themeToggleRef.current
+    if (!button) return
+    button.style.left = ''
+    button.style.top = ''
+    button.style.right = ''
+  }
+
+  const resetThemeTogglePosition = () => {
+    themeTogglePosRef.current = null
+    setThemeTogglePos(null)
+    clearThemeToggleInlinePosition()
+  }
+
   const clampThemeTogglePos = (x, y, width = FLOATING_TOGGLE_SIZE, height = FLOATING_TOGGLE_SIZE) => {
     if (typeof window === 'undefined') return { x, y }
     const maxX = Math.max(FLOATING_TOGGLE_MARGIN, window.innerWidth - width - FLOATING_TOGGLE_MARGIN)
@@ -173,10 +187,22 @@ function AppInner() {
   }, [])
 
   useEffect(() => {
-    if (!themeTogglePos) return
+    if (!themeTogglePos) {
+      clearThemeToggleInlinePosition()
+      return
+    }
     themeTogglePosRef.current = themeTogglePos
     applyThemeTogglePosition(themeTogglePos)
   }, [themeTogglePos])
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return undefined
+    const onRefreshStarted = () => {
+      resetThemeTogglePosition()
+    }
+    window.addEventListener('peggy-refresh-started', onRefreshStarted)
+    return () => window.removeEventListener('peggy-refresh-started', onRefreshStarted)
+  }, [])
 
   return (
     <div className={`app ${theme} icon-${normalizedIconStyle}`}>

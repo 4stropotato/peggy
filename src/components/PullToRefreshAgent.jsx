@@ -57,16 +57,40 @@ async function checkForUpdate() {
 
 function forceReloadNavigation() {
   if (typeof window === 'undefined') return
+  let leftPage = false
+  const onPageHide = () => { leftPage = true }
+  window.addEventListener('pagehide', onPageHide, { once: true })
+
+  try {
+    window.dispatchEvent(new CustomEvent('peggy-refresh-started', { detail: { source: 'pull' } }))
+  } catch {}
+
+  const stamp = Date.now()
   try {
     const url = new URL(window.location.href)
     // Change URL minimally to force a new navigation entry in stubborn iOS PWAs.
-    url.searchParams.set('_r', String(Date.now()))
-    window.location.replace(url.toString())
-    return
+    url.searchParams.set('_r', String(stamp))
+    window.location.assign(url.toString())
   } catch {
     // fallback
+    try {
+      window.location.reload()
+    } catch {}
   }
-  window.location.reload()
+
+  // Extra fallbacks for iOS standalone cases where first navigation does not happen.
+  window.setTimeout(() => {
+    if (leftPage) return
+    try { window.location.reload() } catch {}
+  }, 900)
+
+  window.setTimeout(() => {
+    if (leftPage) return
+    try {
+      const base = `${window.location.origin}${window.location.pathname}`
+      window.location.href = `${base}?_r=${stamp}&_rf=1`
+    } catch {}
+  }, 1700)
 }
 
 function getPrimaryScroller() {
