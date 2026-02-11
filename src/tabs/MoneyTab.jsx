@@ -625,6 +625,30 @@ export default function MoneyTab() {
                           <div className="detail-text deadline-text">{item.deadline}</div>
                         </div>
                       )}
+                      {item.verifiedAt && (
+                        <div className="detail-section">
+                          <div className="detail-label">Last verified:</div>
+                          <div className="detail-text">{item.verifiedAt}</div>
+                        </div>
+                      )}
+                      {Array.isArray(item.sourceLinks) && item.sourceLinks.length > 0 && (
+                        <div className="detail-section">
+                          <div className="detail-label">Official sources:</div>
+                          <div className="detail-text">
+                            {item.sourceLinks.map((source, index) => (
+                              <div key={`${item.id}-source-${index}`}>
+                                <a
+                                  href={source.url}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                >
+                                  {source.label}
+                                </a>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
                       {Array.isArray(item.phones) && item.phones.length > 0 && (
                         <div className="detail-section">
                           <div className="detail-label">Phone Numbers:</div>

@@ -918,14 +918,18 @@ export const supplements = [
 export const moneyTracker = [
   {
     id: 'm1',
-    label: 'Pregnancy Support Grant (妊娠時 / ninshinji)',
+    label: 'Pregnancy Support Benefit (妊婦のための支援給付 / first payment)',
     amount: 50000,
     phase: 'pregnancy',
-    howTo: 'Complete a consultation (面談 / mendan) with a support worker at Kawasaki Ward Office when you register the pregnancy. This is a NATIONAL program started 2023. You get ¥50,000 at pregnancy registration + another ¥50,000 after birth = ¥100,000 total.',
+    howTo: 'Complete a consultation (面談 / mendan) with a support worker at Kawasaki Ward Office when you register the pregnancy. The current framework transitioned from 出産・子育て応援給付金 to 妊婦のための支援給付 in 2025. First payment is ¥50,000 at pregnancy registration, with a second payment after birth under the same support framework.',
     where: 'Kawasaki Ward Office (川崎区役所 / kawasaki kuyakusho)\n〒210-8570 川崎市川崎区東田町8\nPhone: 044-201-3214 (こども家庭課 / kodomo katei ka)',
     bring: 'Pregnancy confirmation from clinic, residence card (在留カード / zairyuu kaado), health insurance card (保険証 / hokenshou), My Number card',
     deadline: 'When registering pregnancy - do it at the SAME VISIT as getting boshi techo',
     tip: 'DO NOT SKIP THE CONSULTATION. No consultation = no money. Kawasaki gives this as cash or vouchers - ask which one. Get this at the same visit as your boshi techo pickup to save a trip.',
+    verifiedAt: '2026-02-11',
+    sourceLinks: [
+      { label: 'Kawasaki: 妊婦のための支援給付', url: 'https://www.city.kawasaki.jp/450/page/0000181172.html' }
+    ],
     phones: [{ label: 'Kawasaki Ward こども家庭課', number: '044-201-3214' }]
   },
   {
@@ -969,14 +973,18 @@ export const moneyTracker = [
   },
   {
     id: 'm5',
-    label: 'Birth Support Grant (出産時 / shussanji)',
+    label: 'Birth Support Benefit (妊婦のための支援給付 / second payment)',
     amount: 50000,
     phase: 'birth',
-    howTo: 'Complete the 2nd consultation (面談 / mendan) with a support worker AFTER the baby is born. This is the second half of the 出産・子育て応援給付金 (shussan kosodate ouen kyuufukin) program. First ¥50,000 was at pregnancy registration.',
+    howTo: 'Complete the post-birth consultation (面談 / mendan) with a support worker AFTER the baby is born. This is the second payment in the 妊婦のための支援給付 framework (transitioned from the older 出産・子育て応援給付金 naming).',
     where: 'Kawasaki Ward Office (川崎区役所)\nこども家庭課: 044-201-3214',
     bring: 'Boshi Techo, birth certificate, My Number card',
     deadline: 'After submitting birth registration (出生届 / shussei todoke)',
     tip: 'Do this at the SAME TIME as registering the birth to save a trip. Same rules as pregnancy grant - requires consultation.',
+    verifiedAt: '2026-02-11',
+    sourceLinks: [
+      { label: 'Kawasaki: 妊婦のための支援給付', url: 'https://www.city.kawasaki.jp/450/page/0000181172.html' }
+    ],
     phones: [{ label: 'Kawasaki Ward こども家庭課', number: '044-201-3214' }]
   },
   {
@@ -1013,6 +1021,11 @@ export const moneyTracker = [
     bring: 'Birth certificate, both parents\' My Number cards, bank account info (for deposits), health insurance card',
     deadline: 'WITHIN 15 DAYS of birth! Late = lost months forever. Huwag mag-late! Apply the SAME DAY or day after birth registration.',
     tip: 'This is the BIGGEST ongoing benefit. ¥15,000/month for 3 years + ¥10,000/month until 18. For 2 kids that\'s ¥4,680,000 total over 18 years. If you have a 3rd child: ¥30,000/month = ¥6,480,000! Amount shown is Year 1 only (¥15,000 x 12).',
+    verifiedAt: '2026-02-11',
+    sourceLinks: [
+      { label: 'Children and Families Agency: Child Allowance Reform', url: 'https://www.cfa.go.jp/policies/kokoseido/jidouteate/r6kaisei' },
+      { label: 'Kawasaki: 児童手当制度改正', url: 'https://www.city.kawasaki.jp/450/page/0000169414.html' }
+    ],
     phones: [{ label: 'Kawasaki Ward こども家庭課', number: '044-201-3214' }]
   },
   {
@@ -1038,6 +1051,103 @@ export const moneyTracker = [
     deadline: 'Usually within a few months of birth - ask for specific deadlines',
     tip: 'Wag mahiya! Some programs are not advertised. Go through EVERY counter at Kawasaki Ward Office and ask what\'s available for families with a new baby. Amount varies wildly: ¥0 to ¥100,000+. The amount shown (¥50,000) is an estimate.',
     phones: [{ label: 'Kawasaki Ward こども家庭課', number: '044-201-3214' }]
+  },
+  {
+    id: 'm11',
+    label: 'Maternity Leave Allowance (shussan teatekin)',
+    amount: 430000,
+    phase: 'birth',
+    howTo: 'If enrolled in employee health insurance, apply for maternity leave allowance through employer and insurer. Coverage is generally 42 days before birth to 56 days after birth (98 days total for single birth), and payment is about 2/3 of standard salary.',
+    where: 'Your employer HR and health insurance association. Not paid under National Health Insurance.',
+    bring: 'Doctor certificate form, leave dates, bank account details, employer paperwork.',
+    deadline: 'Apply after leave starts; submit as soon as HR gives forms.',
+    tip: 'One of the biggest pregnancy-period cash supports for employed moms. Amount shown is an estimate and varies by salary and leave dates.',
+    verifiedAt: '2026-02-11',
+    sourceLinks: [
+      { label: 'Kyokai Kenpo: 出産手当金', url: 'https://www.kyoukaikenpo.or.jp/g3/sb3270/r148/' }
+    ],
+    phones: []
+  },
+  {
+    id: 'm12',
+    label: 'Childcare Leave Benefit (ikuji kyuugyou kyuufu)',
+    amount: 1200000,
+    phase: 'ongoing',
+    howTo: 'If covered by employment insurance and eligible for childcare leave, apply through employer plus Hello Work. Standard payout is 67% of wage for the first 180 days, then 50% after that. New add-on support (around 13%) can apply for specific postpartum leave periods if conditions are met.',
+    where: 'Employer HR and Hello Work',
+    bring: 'Employment insurance details, leave schedule, wage records, and HR application forms.',
+    deadline: 'Start paperwork before childcare leave begins to avoid payout delays.',
+    tip: 'For many families, this is the largest first-year childcare cash support after childbirth.',
+    verifiedAt: '2026-02-11',
+    sourceLinks: [
+      { label: 'MHLW: 育児休業給付', url: 'https://www.mhlw.go.jp/stf/seisakunitsuite/bunya/0000135090_00001.html' },
+      { label: 'MHLW Leaflet (R7)', url: 'https://www.mhlw.go.jp/content/11600000/001421353.pdf' }
+    ],
+    phones: []
+  },
+  {
+    id: 'm13',
+    label: 'Social Insurance Exemption During Childcare Leave',
+    amount: 200000,
+    phase: 'ongoing',
+    howTo: 'During approved childcare leave, employee social insurance premiums can be exempted (health insurance plus pension). This is handled via employer payroll and insurance procedures.',
+    where: 'Employer HR or payroll team',
+    bring: 'Childcare leave approval records and HR forms.',
+    deadline: 'Confirm exemption setup before first leave month payroll closes.',
+    tip: 'This is savings (money not paid), not a separate cash transfer. Amount shown is an estimate.',
+    verifiedAt: '2026-02-11',
+    sourceLinks: [
+      { label: 'MHLW Leaflet (R7)', url: 'https://www.mhlw.go.jp/content/11600000/001421353.pdf' }
+    ],
+    phones: []
+  },
+  {
+    id: 'm14',
+    label: 'Kawasaki Child Medical Subsidy',
+    amount: 80000,
+    phase: 'ongoing',
+    howTo: 'After birth registration and baby insurance enrollment, apply for child medical subsidy at the ward office. This reduces out-of-pocket medical costs for pediatric visits, prescriptions, and treatment.',
+    where: 'Kawasaki Ward Office child and family counter',
+    bring: 'Baby health insurance card, parent ID, residence details, and account info if requested.',
+    deadline: 'Apply soon after baby insurance card is issued.',
+    tip: 'Kawasaki announced phased expansion toward high-school-age support. Check current age range and co-pay rules at application time.',
+    verifiedAt: '2026-02-11',
+    sourceLinks: [
+      { label: 'Kawasaki: こども医療費助成拡充', url: 'https://www.city.kawasaki.jp/450/page/0000181307.html' }
+    ],
+    phones: [{ label: 'Kawasaki Ward child and family section', number: '044-201-3214' }]
+  },
+  {
+    id: 'm15',
+    label: 'Kawasaki Cost-of-Living Child Support',
+    amount: 20000,
+    phase: 'ongoing',
+    howTo: 'Kawasaki implemented a one-time support payment for child-raising households at JPY 20,000 per eligible child under the published 2025 program.',
+    where: 'Kawasaki City official child policy program page and ward guidance',
+    bring: 'Application or confirmation documents based on Kawasaki rules (if required).',
+    deadline: 'Time-limited program. Example: the 2025 program had a specific filing deadline as published by Kawasaki.',
+    tip: 'Treat this as campaign-style support: check each fiscal year if a new one-time child payment is available.',
+    verifiedAt: '2026-02-11',
+    sourceLinks: [
+      { label: 'Kawasaki: 物価高騰対応支援給付金', url: 'https://www.city.kawasaki.jp/450/page/0000177538.html' }
+    ],
+    phones: []
+  },
+  {
+    id: 'm16',
+    label: 'National Health Insurance Premium Reduction (pregnancy/postpartum)',
+    amount: 40000,
+    phase: 'birth',
+    howTo: 'If enrolled in National Health Insurance (kokuho), apply for pregnancy/postpartum premium reduction at the ward office after pregnancy registration and childbirth filing. Reduction amount depends on your premium bracket and period.',
+    where: 'Kawasaki Ward Office insurance and pension counter',
+    bring: 'Boshi techo, insurance card, parent ID, and required ward forms.',
+    deadline: 'Apply as early as possible once eligible periods are open.',
+    tip: 'This is often missed because families assume it is automatic. Ask specifically about maternal premium reduction and under-school-age child premium reduction.',
+    verifiedAt: '2026-02-11',
+    sourceLinks: [
+      { label: 'Kawasaki: 国保の産前産後保険料軽減', url: 'https://www.city.kawasaki.jp/250/page/0000156338.html' }
+    ],
+    phones: [{ label: 'Kawasaki Ward insurance and pension section', number: '044-201-3151' }]
   },
 ]
 
@@ -1120,3 +1230,4 @@ export const optimalSchedule = [
     tagNote: 'Second calcium dose para hindi sabay sa prenatal iron.'
   }
 ]
+
