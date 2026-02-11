@@ -3232,28 +3232,12 @@ input[type="range"]:focus {
 }
 .task-item-wrap .item .item-tags {
   display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  gap: 0.18rem;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 0.24rem;
   min-width: 0;
   margin-left: auto;
   max-width: calc(100% - 34px);
-}
-.task-item-wrap .item .item-tags-primary {
-  display: inline-flex;
-  flex-wrap: nowrap;
-  align-items: center;
-  justify-content: flex-end;
-  gap: 0.24rem;
-  max-width: 100%;
-}
-.task-item-wrap .item .item-tags-secondary {
-  display: inline-flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: flex-end;
-  gap: 0.24rem;
-  max-width: 100%;
 }
 .task-item-wrap .item .item-text {
   overflow-wrap: anywhere;
@@ -3978,10 +3962,6 @@ input[type="range"]:focus {
     gap: 0.28rem;
   }
   .task-item-wrap .item .item-tags {
-    gap: 0.16rem;
-  }
-  .task-item-wrap .item .item-tags-primary,
-  .task-item-wrap .item .item-tags-secondary {
     gap: 0.2rem;
   }
 
