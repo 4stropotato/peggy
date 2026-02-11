@@ -38,12 +38,26 @@ function getPrimaryScroller() {
   )
 }
 
-function isAtTop(scroller) {
-  if (!scroller) return true
+function getScrollOffset(scroller) {
+  if (!scroller) return 0
   const y = Number(scroller.scrollTop)
-  if (Number.isFinite(y)) return y <= TOP_EPSILON_PX
-  if (typeof window !== 'undefined') return window.scrollY <= TOP_EPSILON_PX
-  return true
+  if (Number.isFinite(y)) return y
+  return 0
+}
+
+function getGlobalScrollTop() {
+  if (typeof document === 'undefined' || typeof window === 'undefined') return 0
+  const appScroller = document.getElementById('peggy-scroll-root')
+  const appY = getScrollOffset(appScroller)
+  const docY = getScrollOffset(document.scrollingElement || document.documentElement || document.body)
+  const winY = Number.isFinite(Number(window.scrollY)) ? Number(window.scrollY) : 0
+  return Math.max(appY, docY, winY)
+}
+
+function isAtTop(scroller) {
+  const localY = getScrollOffset(scroller)
+  if (localY > TOP_EPSILON_PX) return false
+  return getGlobalScrollTop() <= TOP_EPSILON_PX
 }
 
 function shouldIgnoreTarget(target) {
@@ -67,6 +81,7 @@ export default function PullToRefreshAgent() {
     atTop: false,
     triggered: false,
     scroller: null,
+    eligible: false,
   })
   const lastTriggerRef = useRef(0)
   const hideTimerRef = useRef(null)
@@ -101,7 +116,7 @@ export default function PullToRefreshAgent() {
     }
 
     const reset = () => {
-      stateRef.current = { active: false, startY: 0, atTop: false, triggered: false, scroller: null }
+      stateRef.current = { active: false, startY: 0, atTop: false, triggered: false, scroller: null, eligible: false }
     }
 
     const onTouchStart = (event) => {
@@ -122,26 +137,24 @@ export default function PullToRefreshAgent() {
         atTop: isAtTop(scroller),
         triggered: false,
         scroller,
+        eligible: isAtTop(scroller),
       }
-      if (isAtTop(scroller)) {
-        clearHideTimer()
-        setUi({
-          visible: true,
-          progress: 0,
-          armed: false,
-          refreshing: false,
-        })
-      } else {
-        hideUiSoon(40)
-      }
+      // Keep indicator hidden on touch start. We only show when user is actually
+      // pulling down from top; this avoids false positives while mid-scroll.
+      hideUiSoon(30)
     }
 
     const onTouchMove = (event) => {
       if (!stateRef.current.active || stateRef.current.triggered) return
       if (!stateRef.current.atTop) return
+      if (!stateRef.current.eligible) return
       const touch = event.touches?.[0]
       if (!touch) return
-      if (!isAtTop(stateRef.current.scroller)) return
+      if (!isAtTop(stateRef.current.scroller)) {
+        stateRef.current.eligible = false
+        hideUiSoon(20)
+        return
+      }
       const dy = touch.clientY - stateRef.current.startY
       const positiveDy = Math.max(0, dy)
       const progress = Math.min(1, positiveDy / MAX_PULL_PX)
@@ -150,7 +163,7 @@ export default function PullToRefreshAgent() {
         const same = prev.visible && Math.abs(prev.progress - progress) < 0.02 && prev.armed === armed && !prev.refreshing
         if (same) return prev
         return {
-          visible: positiveDy > 4,
+          visible: positiveDy > 6,
           progress,
           armed,
           refreshing: false,
