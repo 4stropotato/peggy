@@ -350,20 +350,15 @@ export default function TasksTab() {
                         {hasMetaRow && (
                           <div className="item-top-row">
                             <span className="item-tags">
-                              {showUrgentBadge && (
-                                <span className="badge urgent-badge">URGENT</span>
-                              )}
                               {showAskBadge && (
                                 <span className="badge ask-badge">ASK</span>
+                              )}
+                              {showUrgentBadge && (
+                                <span className="badge urgent-badge">URGENT</span>
                               )}
                               {showMoneyBadge && (
                                 <span className="badge money-badge">
                                   {moneyTotal > 0 ? `+\u00A5${moneyTotal.toLocaleString()}` : 'BENEFIT'}
-                                </span>
-                              )}
-                              {showScheduleBadge && (
-                                <span className={`badge schedule-badge ${scheduleIsOverdue ? 'overdue' : ''}`}>
-                                  {scheduleLabel}{schedule.time ? ` ${schedule.time}` : ''}
                                 </span>
                               )}
                               {showBundleBadges && bundles.map((bundle) => (
@@ -371,6 +366,11 @@ export default function TasksTab() {
                                   {bundle.shortLabel}
                                 </span>
                               ))}
+                              {showScheduleBadge && (
+                                <span className={`badge schedule-badge ${scheduleIsOverdue ? 'overdue' : ''}`}>
+                                  {scheduleLabel}{schedule.time ? ` ${schedule.time}` : ''}
+                                </span>
+                              )}
                             </span>
                             {hasDetails && (
                               <button className="info-btn glass-inner" onClick={(e) => toggleExpand(item.id, e)}>
