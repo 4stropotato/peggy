@@ -193,7 +193,7 @@ export default function MoneyTab() {
   const includeHusband = familyConfig?.includeHusband !== false
 
   const [subTab, setSubTab] = useState('benefits')
-  const [salaryView, setSalaryView] = useState('wife')
+  const [workView, setWorkView] = useState('wife')
   const [expandedItem, setExpandedItem] = useState(null)
   const [taxStepIndex, setTaxStepIndex] = useState(0)
   const [rateForm, setRateForm] = useState(() => ({
@@ -212,8 +212,8 @@ export default function MoneyTab() {
     .reduce((acc, item) => acc + item.amount, 0)
 
   useEffect(() => {
-    if (!includeHusband && salaryView === 'husband') setSalaryView('wife')
-  }, [includeHusband, salaryView])
+    if (!includeHusband && workView === 'husband') setWorkView('wife')
+  }, [includeHusband, workView])
 
   const currentNaomiRate = useMemo(() => getCurrentRateForPerson(payRates, 'naomi'), [payRates])
   const currentHusbandRate = useMemo(() => getCurrentRateForPerson(payRates, 'husband'), [payRates])
@@ -306,15 +306,31 @@ export default function MoneyTab() {
   return (
     <div className="content">
       <div className="sub-tabs glass-tabs">
-        {['benefits', 'salary', 'tax'].map(tabId => (
+        {['benefits', 'work', 'salary', 'tax'].map(tabId => (
           <button
             key={tabId}
             className={`glass-tab ${subTab === tabId ? 'active' : ''}`}
             onClick={() => setSubTab(tabId)}
           >
             <span className="tab-icon-label">
-              <UiIcon icon={tabId === 'benefits' ? APP_ICONS.benefits : tabId === 'salary' ? APP_ICONS.salary : APP_ICONS.tax} />
-              <span>{tabId === 'benefits' ? 'Benefits' : tabId === 'salary' ? 'Salary' : 'Tax Calc'}</span>
+              <UiIcon icon={
+                tabId === 'benefits'
+                  ? APP_ICONS.benefits
+                  : tabId === 'work'
+                    ? APP_ICONS.work
+                    : tabId === 'salary'
+                      ? APP_ICONS.salary
+                      : APP_ICONS.tax
+              } />
+              <span>
+                {tabId === 'benefits'
+                  ? 'Benefits'
+                  : tabId === 'work'
+                    ? 'Work'
+                    : tabId === 'salary'
+                      ? 'Salary'
+                      : 'Tax Calc'}
+              </span>
             </span>
           </button>
         ))}
@@ -410,14 +426,14 @@ export default function MoneyTab() {
         </>
       )}
 
-      {subTab === 'salary' && (
+      {subTab === 'work' && (
         <>
           <section className="glass-section">
             <div className="section-header">
-              <span className="section-icon"><UiIcon icon={APP_ICONS.salary} /></span>
+              <span className="section-icon"><UiIcon icon={APP_ICONS.work} /></span>
               <div>
-                <h2>Salary Tracker</h2>
-                <span className="section-count">Work-driven income + transparent family total</span>
+                <h2>Work Attendance</h2>
+                <span className="section-count">Keep attendance separate from salary setup</span>
               </div>
             </div>
             <div className="household-toggle-row glass-inner">
@@ -433,21 +449,20 @@ export default function MoneyTab() {
                 {includeHusband ? 'Enabled' : 'Disabled'}
               </button>
             </div>
-
             <div className="glass-tabs salary-mini-tabs">
-              {['wife', includeHusband ? 'husband' : null, 'rates'].filter(Boolean).map(view => (
+              {['wife', includeHusband ? 'husband' : null].filter(Boolean).map(view => (
                 <button
                   key={view}
-                  className={`glass-tab ${salaryView === view ? 'active' : ''} ${view === 'husband' ? 'husband-tab' : ''}`}
-                  onClick={() => setSalaryView(view)}
+                  className={`glass-tab ${workView === view ? 'active' : ''} ${view === 'husband' ? 'husband-tab' : ''}`}
+                  onClick={() => setWorkView(view)}
                 >
-                  <span>{view === 'wife' ? 'Wife Work' : view === 'husband' ? 'Husband Work' : 'Rates & Family'}</span>
+                  <span>{view === 'wife' ? 'Wife Work' : 'Husband Work'}</span>
                 </button>
               ))}
             </div>
           </section>
 
-          {salaryView === 'wife' && (
+          {workView === 'wife' && (
             <WorkFinancePanel
               personKey="naomi"
               title="Wife Work Attendance"
@@ -456,7 +471,7 @@ export default function MoneyTab() {
             />
           )}
 
-          {salaryView === 'husband' && includeHusband && (
+          {workView === 'husband' && includeHusband && (
             <WorkFinancePanel
               personKey="husband"
               title="Husband Work Attendance"
@@ -464,185 +479,208 @@ export default function MoneyTab() {
               allowGeoTracker={false}
             />
           )}
+        </>
+      )}
 
-          {salaryView === 'rates' && (
-            <>
-              <section className="glass-section">
-                <div className="section-header">
-                  <span className="section-icon"><UiIcon icon={APP_ICONS.salary} /></span>
-                  <div>
-                    <h2>Pay Rate Profiles</h2>
-                    <span className="section-count">Hourly / Daily / Monthly with effectivity</span>
-                  </div>
+      {subTab === 'salary' && (
+        <>
+          <section className="glass-section">
+            <div className="section-header">
+              <span className="section-icon"><UiIcon icon={APP_ICONS.salary} /></span>
+              <div>
+                <h2>Salary Tracker</h2>
+                <span className="section-count">Rates + family totals, separate from work logging</span>
+              </div>
+            </div>
+            <div className="household-toggle-row glass-inner">
+              <div>
+                <div className="household-toggle-title">Husband side</div>
+                <div className="household-toggle-note">Disable for single-mother setup</div>
+              </div>
+              <button
+                type="button"
+                className={`notif-pill-btn glass-inner ${includeHusband ? 'on' : ''}`}
+                onClick={() => setFamilyConfig(prev => ({ ...(prev || {}), includeHusband: !includeHusband }))}
+              >
+                {includeHusband ? 'Enabled' : 'Disabled'}
+              </button>
+            </div>
+          </section>
+
+          <section className="glass-section">
+            <div className="section-header">
+              <span className="section-icon"><UiIcon icon={APP_ICONS.salary} /></span>
+              <div>
+                <h2>Pay Rate Profiles</h2>
+                <span className="section-count">Hourly / Daily / Monthly with effectivity</span>
+              </div>
+            </div>
+
+            <form className="salary-rate-form glass-card" onSubmit={handleAddPayRate}>
+              <div className="salary-rate-grid">
+                <div className="form-row">
+                  <label>Side</label>
+                  <select value={rateForm.person} onChange={e => updateRateForm('person', e.target.value)}>
+                    <option value="naomi">Wife</option>
+                    <option value="husband">Husband</option>
+                  </select>
                 </div>
-
-                <form className="salary-rate-form glass-card" onSubmit={handleAddPayRate}>
-                  <div className="salary-rate-grid">
-                    <div className="form-row">
-                      <label>Side</label>
-                      <select value={rateForm.person} onChange={e => updateRateForm('person', e.target.value)}>
-                        <option value="naomi">Wife</option>
-                        <option value="husband">Husband</option>
-                      </select>
-                    </div>
-                    <div className="form-row">
-                      <label>Basis</label>
-                      <select value={rateForm.basis} onChange={e => updateRateForm('basis', e.target.value)}>
-                        <option value="hourly">Hourly</option>
-                        <option value="daily">Daily</option>
-                        <option value="monthly">Monthly</option>
-                      </select>
-                    </div>
-                    <div className="form-row">
-                      <label>Rate ({YEN})</label>
-                      <input
-                        type="number"
-                        value={rateForm.rate}
-                        onChange={e => updateRateForm('rate', e.target.value)}
-                        placeholder={rateForm.basis === 'hourly' ? 'e.g. 1350' : rateForm.basis === 'daily' ? 'e.g. 16000' : 'e.g. 350000'}
-                        required
-                      />
-                    </div>
-                    <div className="form-row">
-                      <label>Effective From</label>
-                      <input
-                        type="date"
-                        value={rateForm.effectiveFrom}
-                        onChange={e => updateRateForm('effectiveFrom', e.target.value)}
-                        required
-                      />
-                    </div>
-                    {rateForm.basis === 'hourly' && (
-                      <div className="form-row">
-                        <label>Hours per Day</label>
-                        <input
-                          type="number"
-                          step="0.25"
-                          min="1"
-                          max="24"
-                          value={rateForm.hoursPerDay}
-                          onChange={e => updateRateForm('hoursPerDay', e.target.value)}
-                        />
-                      </div>
-                    )}
-                    {(rateForm.basis === 'hourly' || rateForm.basis === 'daily') && (
-                      <div className="form-row">
-                        <label>Work Days per Month</label>
-                        <input
-                          type="number"
-                          min="1"
-                          max="31"
-                          value={rateForm.workDaysPerMonth}
-                          onChange={e => updateRateForm('workDaysPerMonth', e.target.value)}
-                        />
-                      </div>
-                    )}
-                  </div>
+                <div className="form-row">
+                  <label>Basis</label>
+                  <select value={rateForm.basis} onChange={e => updateRateForm('basis', e.target.value)}>
+                    <option value="hourly">Hourly</option>
+                    <option value="daily">Daily</option>
+                    <option value="monthly">Monthly</option>
+                  </select>
+                </div>
+                <div className="form-row">
+                  <label>Rate ({YEN})</label>
+                  <input
+                    type="number"
+                    value={rateForm.rate}
+                    onChange={e => updateRateForm('rate', e.target.value)}
+                    placeholder={rateForm.basis === 'hourly' ? 'e.g. 1350' : rateForm.basis === 'daily' ? 'e.g. 16000' : 'e.g. 350000'}
+                    required
+                  />
+                </div>
+                <div className="form-row">
+                  <label>Effective From</label>
+                  <input
+                    type="date"
+                    value={rateForm.effectiveFrom}
+                    onChange={e => updateRateForm('effectiveFrom', e.target.value)}
+                    required
+                  />
+                </div>
+                {rateForm.basis === 'hourly' && (
                   <div className="form-row">
-                    <label>Note (optional)</label>
+                    <label>Hours per Day</label>
                     <input
-                      type="text"
-                      value={rateForm.note}
-                      onChange={e => updateRateForm('note', e.target.value)}
-                      placeholder="e.g. rate increase in April"
+                      type="number"
+                      step="0.25"
+                      min="1"
+                      max="24"
+                      value={rateForm.hoursPerDay}
+                      onChange={e => updateRateForm('hoursPerDay', e.target.value)}
                     />
                   </div>
-                  <button type="submit" className="btn-glass-primary">Save Rate</button>
-                </form>
-              </section>
+                )}
+                {(rateForm.basis === 'hourly' || rateForm.basis === 'daily') && (
+                  <div className="form-row">
+                    <label>Work Days per Month</label>
+                    <input
+                      type="number"
+                      min="1"
+                      max="31"
+                      value={rateForm.workDaysPerMonth}
+                      onChange={e => updateRateForm('workDaysPerMonth', e.target.value)}
+                    />
+                  </div>
+                )}
+              </div>
+              <div className="form-row">
+                <label>Note (optional)</label>
+                <input
+                  type="text"
+                  value={rateForm.note}
+                  onChange={e => updateRateForm('note', e.target.value)}
+                  placeholder="e.g. rate increase in April"
+                />
+              </div>
+              <button type="submit" className="btn-glass-primary">Save Rate</button>
+            </form>
+          </section>
 
-              <section className="glass-section">
-                <div className="section-header">
-                  <span className="section-icon"><UiIcon icon={APP_ICONS.overview} /></span>
-                  <div>
-                    <h2>Family Income Summary</h2>
-                    <span className="section-count">From work logs + rate fallback</span>
-                  </div>
-                </div>
-                <div className="salary-summary-grid">
-                  <div className="glass-inner salary-summary-card">
-                    <div className="salary-person">Wife</div>
-                    <div className="salary-annual">{formatYen(estimatedNaomiAnnual)} / year</div>
-                    <div className="salary-assume">Last 12 months from attendance logs</div>
-                    {naomiAnnualFromWork <= 0 && currentNaomiRate && (
-                      <div className="salary-assume">Fallback: {formatRateLabel(currentNaomiRate)}</div>
-                    )}
-                  </div>
-                  {includeHusband && (
-                    <div className="glass-inner salary-summary-card husband-summary">
-                      <div className="salary-person">Husband</div>
-                      <div className="salary-annual">{formatYen(estimatedHusbandAnnual)} / year</div>
-                      <div className="salary-assume">Last 12 months from attendance logs</div>
-                      {husbandAnnualFromWork <= 0 && currentHusbandRate && (
-                        <div className="salary-assume">Fallback: {formatRateLabel(currentHusbandRate)}</div>
-                      )}
-                    </div>
+          <section className="glass-section">
+            <div className="section-header">
+              <span className="section-icon"><UiIcon icon={APP_ICONS.overview} /></span>
+              <div>
+                <h2>Family Income Summary</h2>
+                <span className="section-count">From work logs + rate fallback</span>
+              </div>
+            </div>
+            <div className="salary-summary-grid">
+              <div className="glass-inner salary-summary-card">
+                <div className="salary-person">Wife</div>
+                <div className="salary-annual">{formatYen(estimatedNaomiAnnual)} / year</div>
+                <div className="salary-assume">Last 12 months from attendance logs</div>
+                {naomiAnnualFromWork <= 0 && currentNaomiRate && (
+                  <div className="salary-assume">Fallback: {formatRateLabel(currentNaomiRate)}</div>
+                )}
+              </div>
+              {includeHusband && (
+                <div className="glass-inner salary-summary-card husband-summary">
+                  <div className="salary-person">Husband</div>
+                  <div className="salary-annual">{formatYen(estimatedHusbandAnnual)} / year</div>
+                  <div className="salary-assume">Last 12 months from attendance logs</div>
+                  {husbandAnnualFromWork <= 0 && currentHusbandRate && (
+                    <div className="salary-assume">Fallback: {formatRateLabel(currentHusbandRate)}</div>
                   )}
                 </div>
-                <div className="glass-inner family-total-card">
-                  <span>Estimated Family Total</span>
-                  <strong>{formatYen(estimatedFamilyAnnual)} / year</strong>
-                </div>
-              </section>
+              )}
+            </div>
+            <div className="glass-inner family-total-card">
+              <span>Estimated Family Total</span>
+              <strong>{formatYen(estimatedFamilyAnnual)} / year</strong>
+            </div>
+          </section>
 
-              <section className="glass-section">
-                <div className="section-header">
-                  <span className="section-icon"><UiIcon icon={APP_ICONS.activity} /></span>
-                  <div>
-                    <h2>Recent Monthly Income</h2>
-                    <span className="section-count">Transparent log-based breakdown</span>
+          <section className="glass-section">
+            <div className="section-header">
+              <span className="section-icon"><UiIcon icon={APP_ICONS.activity} /></span>
+              <div>
+                <h2>Recent Monthly Income</h2>
+                <span className="section-count">Transparent log-based breakdown</span>
+              </div>
+            </div>
+            <div className="salary-month-table">
+              {recentMonthKeys.map((monthKey) => {
+                const wife = Math.round(Number(naomiMonthlyIncomeMap[monthKey] || 0))
+                const husband = Math.round(Number(husbandMonthlyIncomeMap[monthKey] || 0))
+                const total = wife + (includeHusband ? husband : 0)
+                return (
+                  <div key={monthKey} className="glass-inner salary-month-row">
+                    <span>{monthKey}</span>
+                    <span>Wife: {formatYen(wife)}</span>
+                    {includeHusband && <span>Husband: {formatYen(husband)}</span>}
+                    <span>Total: {formatYen(total)}</span>
                   </div>
-                </div>
-                <div className="salary-month-table">
-                  {recentMonthKeys.map((monthKey) => {
-                    const wife = Math.round(Number(naomiMonthlyIncomeMap[monthKey] || 0))
-                    const husband = Math.round(Number(husbandMonthlyIncomeMap[monthKey] || 0))
-                    const total = wife + (includeHusband ? husband : 0)
-                    return (
-                      <div key={monthKey} className="glass-inner salary-month-row">
-                        <span>{monthKey}</span>
-                        <span>Wife: {formatYen(wife)}</span>
-                        {includeHusband && <span>Husband: {formatYen(husband)}</span>}
-                        <span>Total: {formatYen(total)}</span>
-                      </div>
-                    )
-                  })}
-                </div>
-              </section>
+                )
+              })}
+            </div>
+          </section>
 
-              <section className="glass-section">
-                <div className="section-header">
-                  <span className="section-icon"><UiIcon icon={APP_ICONS.activity} /></span>
-                  <div><h2>Rate History</h2></div>
-                </div>
-                {sortedRates.length > 0 ? (
-                  <ul className="salary-rate-list">
-                    {sortedRates.map((item) => {
-                      const annual = estimateAnnualFromRate(item)
-                      return (
-                        <li key={item.id} className="glass-card salary-rate-item">
-                          <div className="salary-rate-top">
-                            <span className="salary-rate-person">{formatPerson(item.person)}</span>
-                            <span className="salary-rate-basis">{getBasisLabel(normalizeBasis(item.basis))}</span>
-                          </div>
-                          <div className="salary-rate-main">{formatRateLabel(item)}</div>
-                          <div className="salary-rate-meta">
-                            <span>From {item.effectiveFrom}</span>
-                            <span>{formatAssumption(item)}</span>
-                          </div>
-                          <div className="salary-rate-annual">Rate-model annual: {formatYen(annual)}</div>
-                          {item.note && <div className="salary-rate-note">{item.note}</div>}
-                          <button type="button" className="btn-delete" onClick={() => removePayRate(item.id)}>Delete</button>
-                        </li>
-                      )
-                    })}
-                  </ul>
-                ) : (
-                  <p className="empty-state">No salary rates yet. Add one above.</p>
-                )}
-              </section>
-            </>
-          )}
+          <section className="glass-section">
+            <div className="section-header">
+              <span className="section-icon"><UiIcon icon={APP_ICONS.activity} /></span>
+              <div><h2>Rate History</h2></div>
+            </div>
+            {sortedRates.length > 0 ? (
+              <ul className="salary-rate-list">
+                {sortedRates.map((item) => {
+                  const annual = estimateAnnualFromRate(item)
+                  return (
+                    <li key={item.id} className="glass-card salary-rate-item">
+                      <div className="salary-rate-top">
+                        <span className="salary-rate-person">{formatPerson(item.person)}</span>
+                        <span className="salary-rate-basis">{getBasisLabel(normalizeBasis(item.basis))}</span>
+                      </div>
+                      <div className="salary-rate-main">{formatRateLabel(item)}</div>
+                      <div className="salary-rate-meta">
+                        <span>From {item.effectiveFrom}</span>
+                        <span>{formatAssumption(item)}</span>
+                      </div>
+                      <div className="salary-rate-annual">Rate-model annual: {formatYen(annual)}</div>
+                      {item.note && <div className="salary-rate-note">{item.note}</div>}
+                      <button type="button" className="btn-delete" onClick={() => removePayRate(item.id)}>Delete</button>
+                    </li>
+                  )
+                })}
+              </ul>
+            ) : (
+              <p className="empty-state">No salary rates yet. Add one above.</p>
+            )}
+          </section>
         </>
       )}
 

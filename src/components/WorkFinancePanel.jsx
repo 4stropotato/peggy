@@ -117,6 +117,27 @@ function toCoordString(value) {
   return parsed.toFixed(6)
 }
 
+function parseCoordinatesInput(value) {
+  const raw = String(value || '').trim()
+  if (!raw) return null
+
+  const patterns = [
+    /@(-?\d+(?:\.\d+)?),(-?\d+(?:\.\d+)?)/,
+    /[?&]ll=(-?\d+(?:\.\d+)?),(-?\d+(?:\.\d+)?)/,
+    /[?&]q=(-?\d+(?:\.\d+)?),(-?\d+(?:\.\d+)?)/,
+    /(-?\d+(?:\.\d+)?)\s*,\s*(-?\d+(?:\.\d+)?)/,
+  ]
+
+  for (const pattern of patterns) {
+    const match = raw.match(pattern)
+    if (!match) continue
+    const lat = Number(match[1])
+    const lng = Number(match[2])
+    if (isValidLatLng(lat, lng)) return { lat, lng }
+  }
+  return null
+}
+
 function toLocationDraft(location) {
   return {
     workName: String(location?.name || ''),
@@ -190,12 +211,16 @@ export default function WorkFinancePanel({
   const activeWorkLocation = isHusband ? husbandWorkLocation : workLocation
   const activeSetWorkLocation = isHusband ? setHusbandWorkLocation : setWorkLocation
   const calendarStorageKey = `baby-prep-finance-work-calendar-${isHusband ? 'husband' : 'wife'}`
+  const geoPanelStorageKey = `baby-prep-finance-work-geo-panel-${isHusband ? 'husband' : 'wife'}`
+  const geoAdvancedStorageKey = `baby-prep-finance-work-geo-advanced-${isHusband ? 'husband' : 'wife'}`
 
   const now = new Date()
   const [workCal, setWorkCal] = useState({ y: now.getFullYear(), m: now.getMonth() + 1 })
   const [attendanceDate, setAttendanceDate] = useState(now.toISOString().split('T')[0])
   const [attendanceForm, setAttendanceForm] = useState(() => createDefaultAttendanceForm())
   const [showWorkCalendar, setShowWorkCalendar] = useState(() => readCalendarPreference(calendarStorageKey, true))
+  const [showGeoPanel, setShowGeoPanel] = useState(() => readCalendarPreference(geoPanelStorageKey, false))
+  const [showGeoAdvanced, setShowGeoAdvanced] = useState(() => readCalendarPreference(geoAdvancedStorageKey, false))
   const [geoMessage, setGeoMessage] = useState('')
   const [geoStatus, setGeoStatus] = useState(() => String(getGeoTelemetry()?.status || ''))
   const [geoLive, setGeoLive] = useState(() => ({
@@ -203,6 +228,7 @@ export default function WorkFinancePanel({
     ...(getGeoTelemetry()?.live || {}),
   }))
   const [locationDraft, setLocationDraft] = useState(() => toLocationDraft(activeWorkLocation))
+  const [mapPinInput, setMapPinInput] = useState({ work: '', home: '' })
   const draftDirtyRef = useRef(false)
   const geoMessageTimerRef = useRef(null)
   const savedWorkTargetValid = isValidLatLng(activeWorkLocation.lat, activeWorkLocation.lng)
@@ -237,6 +263,16 @@ export default function WorkFinancePanel({
     if (typeof window === 'undefined') return
     window.localStorage.setItem(calendarStorageKey, showWorkCalendar ? '1' : '0')
   }, [calendarStorageKey, showWorkCalendar])
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    window.localStorage.setItem(geoPanelStorageKey, showGeoPanel ? '1' : '0')
+  }, [geoPanelStorageKey, showGeoPanel])
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    window.localStorage.setItem(geoAdvancedStorageKey, showGeoAdvanced ? '1' : '0')
+  }, [geoAdvancedStorageKey, showGeoAdvanced])
 
   useEffect(() => {
     if (typeof window === 'undefined') return undefined
@@ -360,6 +396,43 @@ export default function WorkFinancePanel({
     }
   }
 
+  const openMapPicker = (target = 'work') => {
+    if (typeof window === 'undefined') return
+    const lat = target === 'home' ? activeWorkLocation.homeLat : activeWorkLocation.lat
+    const lng = target === 'home' ? activeWorkLocation.homeLng : activeWorkLocation.lng
+    const hasPin = isValidLatLng(lat, lng)
+    const base = hasPin
+      ? `https://www.google.com/maps/search/?api=1&query=${lat},${lng}`
+      : 'https://www.google.com/maps'
+    window.open(base, '_blank', 'noopener,noreferrer')
+  }
+
+  const handleApplyMapPin = (target = 'work') => {
+    const raw = target === 'home' ? mapPinInput.home : mapPinInput.work
+    const parsed = parseCoordinatesInput(raw)
+    if (!parsed) {
+      setGeoMessage('Pin not recognized. Paste a maps link or "lat,lng".')
+      return
+    }
+    if (target === 'home') {
+      updateLocationDraft({
+        homeLat: parsed.lat.toFixed(6),
+        homeLng: parsed.lng.toFixed(6),
+        homeName: String(locationDraft.homeName || '').trim() || 'Home',
+      })
+      setMapPinInput(prev => ({ ...prev, home: '' }))
+      setGeoMessage('Home pin captured from map. Tap Save Locations.')
+      return
+    }
+    updateLocationDraft({
+      workLat: parsed.lat.toFixed(6),
+      workLng: parsed.lng.toFixed(6),
+      workName: String(locationDraft.workName || '').trim() || 'Work',
+    })
+    setMapPinInput(prev => ({ ...prev, work: '' }))
+    setGeoMessage('Work pin captured from map. Tap Save Locations.')
+  }
+
   const handleEnableTracker = () => {
     if (!hasSavedGeoTarget) {
       setGeoMessage('Save at least one valid location (Work or Home) before enabling tracker.')
@@ -424,228 +497,11 @@ export default function WorkFinancePanel({
             {showWorkCalendar ? 'Hide calendar' : 'Show calendar'}
           </button>
         </div>
-        <p className="section-note">Save Work or Home pin first, then enable tracker for auto attendance logs.</p>
-
-        {allowGeoTracker && (
-          <div className="glass-card work-location-card">
-            <h3>Work/Home Location Auto-Log</h3>
-
-            <div className="attendance-toggle">
-              <button
-                type="button"
-                className={`att-btn ${activeWorkLocation.enabled ? 'active worked' : ''}`}
-                onClick={handleEnableTracker}
-              >
-                Tracker ON
-              </button>
-              <button
-                type="button"
-                className={`att-btn ${!activeWorkLocation.enabled ? 'active absent' : ''}`}
-                onClick={handleDisableTracker}
-              >
-                Tracker OFF
-              </button>
-            </div>
-
-          <div className="work-location-sections">
-            <div className="work-location-block glass-inner">
-              <h4>Work Location</h4>
-              <div className="form-row">
-                <label>Name</label>
-                <input
-                  type="text"
-                  value={locationDraft.workName}
-                  onChange={e => updateLocationDraft({ workName: e.target.value })}
-                  placeholder="e.g. Kawasaki Office"
-                />
-              </div>
-
-              <div className="work-location-grid">
-                <div className="form-row">
-                  <label>Latitude</label>
-                  <input
-                    type="number"
-                    step="0.000001"
-                    value={locationDraft.workLat}
-                    onChange={e => updateLocationDraft({ workLat: e.target.value })}
-                    placeholder="35.530000"
-                  />
-                </div>
-                <div className="form-row">
-                  <label>Longitude</label>
-                  <input
-                    type="number"
-                    step="0.000001"
-                    value={locationDraft.workLng}
-                    onChange={e => updateLocationDraft({ workLng: e.target.value })}
-                    placeholder="139.700000"
-                  />
-                </div>
-              </div>
-
-              <div className="form-row">
-                <label>Radius (meters)</label>
-                <input
-                  type="number"
-                  min={MIN_WORK_RADIUS_METERS}
-                  max={MAX_GEOFENCE_RADIUS_METERS}
-                  value={locationDraft.workRadiusMeters}
-                  onChange={e => updateLocationDraft({
-                    workRadiusMeters: String(normalizeRadius(e.target.value, DEFAULT_WORK_RADIUS_METERS)),
-                  })}
-                />
-              </div>
-
-              <div className="work-location-actions">
-                <button type="button" className="btn-glass-secondary" onClick={() => handleUseCurrentLocation('work')}>
-                  Use Current for Work
-                </button>
-              </div>
-            </div>
-
-            <div className="work-location-block glass-inner">
-              <h4>Home Location</h4>
-              <div className="form-row">
-                <label>Name</label>
-                <input
-                  type="text"
-                  value={locationDraft.homeName}
-                  onChange={e => updateLocationDraft({ homeName: e.target.value })}
-                  placeholder="e.g. Home"
-                />
-              </div>
-
-              <div className="work-location-grid">
-                <div className="form-row">
-                  <label>Latitude</label>
-                  <input
-                    type="number"
-                    step="0.000001"
-                    value={locationDraft.homeLat}
-                    onChange={e => updateLocationDraft({ homeLat: e.target.value })}
-                    placeholder="35.530000"
-                  />
-                </div>
-                <div className="form-row">
-                  <label>Longitude</label>
-                  <input
-                    type="number"
-                    step="0.000001"
-                    value={locationDraft.homeLng}
-                    onChange={e => updateLocationDraft({ homeLng: e.target.value })}
-                    placeholder="139.700000"
-                  />
-                </div>
-              </div>
-
-              <div className="form-row">
-                <label>Radius (meters)</label>
-                <input
-                  type="number"
-                  min={MIN_WORK_RADIUS_METERS}
-                  max={MAX_GEOFENCE_RADIUS_METERS}
-                  value={locationDraft.homeRadiusMeters}
-                  onChange={e => updateLocationDraft({
-                    homeRadiusMeters: String(normalizeRadius(e.target.value, DEFAULT_HOME_RADIUS_METERS)),
-                  })}
-                />
-              </div>
-
-              <div className="work-location-actions">
-                <button type="button" className="btn-glass-secondary" onClick={() => handleUseCurrentLocation('home')}>
-                  Use Current for Home
-                </button>
-              </div>
-            </div>
-          </div>
-
-          <div className="work-location-grid">
-            <div className="form-row">
-              <label>Auto work duration</label>
-              <div className="work-duration-row">
-                <input
-                  type="number"
-                  min="0"
-                  max="12"
-                  step="1"
-                  value={autoDurationParts.hours}
-                  onFocus={e => e.target.select()}
-                  onChange={e => updateAutoDurationDraft('hours', e.target.value)}
-                />
-                <span className="work-duration-sep">h</span>
-                <input
-                  type="number"
-                  min="0"
-                  max="59"
-                  step="5"
-                  value={autoDurationParts.minutes}
-                  onFocus={e => e.target.select()}
-                  onChange={e => updateAutoDurationDraft('minutes', e.target.value)}
-                />
-                <span className="work-duration-sep">m</span>
-              </div>
-            </div>
-            <div className="form-row">
-              <label>Away minutes (home-only mode)</label>
-              <input
-                type="number"
-                min="15"
-                max={MAX_AWAY_MINUTES}
-                value={locationDraft.awayMinutesForWork}
-                onChange={e => updateLocationDraft({
-                  awayMinutesForWork: String(normalizeAwayMinutes(e.target.value)),
-                })}
-              />
-            </div>
-          </div>
-
-          <div className="work-location-save-row">
-            <button type="button" className="btn-glass-primary" onClick={handleSaveLocationConfig}>
-              Save Locations
-            </button>
-          </div>
-
-            {geoMessage && <p className="section-note">{geoMessage}</p>}
-            {geoStatus && geoStatus !== geoMessage && <p className="section-note">{geoStatus}</p>}
-            <p className="section-note">
-              Tracking mode: {nativeTrackingMode ? 'Native iOS (background-capable)' : 'Web (foreground-only)'}
-            </p>
-            {activeWorkLocation.enabled && geoLive.tracking && (
-              <div className={`work-geo-live glass-inner ${geoLive.insideWork ? 'inside' : geoLive.insideHome ? 'home' : 'outside'}`}>
-                <span>
-                  {geoLive.insideWork ? 'Inside work zone' : geoLive.insideHome ? 'Inside home zone' : 'Outside zones'}
-                </span>
-                <span>
-                  {geoLive.distanceWorkMeters !== null ? `Work ${geoLive.distanceWorkMeters}m` : 'Work n/a'}
-                  {' | '}
-                  {geoLive.distanceHomeMeters !== null ? `Home ${geoLive.distanceHomeMeters}m` : 'Home n/a'}
-                </span>
-              </div>
-            )}
-            {activeWorkLocation.enabled && geoLive.accuracyMeters !== null && (
-              <p className="section-note">GPS accuracy: +/-{geoLive.accuracyMeters}m</p>
-            )}
-            {activeWorkLocation.lastAutoLogDate && (
-              <p className="section-note">
-                Last auto log date: {activeWorkLocation.lastAutoLogDate}
-                {activeWorkLocation.lastAutoReason ? ` (${activeWorkLocation.lastAutoReason === 'work-zone' ? 'work zone' : 'away from home'})` : ''}
-              </p>
-            )}
-            {!hasSavedGeoTarget && (
-              <p className="section-note">Save valid Work or Home coordinates to activate tracking.</p>
-            )}
-            <p className="section-note disclaimer">
-              {nativeTrackingMode
-                ? 'Native mode can continue tracking in background after location permissions are granted.'
-                : 'Web mode auto logging works while Peggy is open and location permission is granted.'}
-            </p>
-          </div>
-        )}
-        {!allowGeoTracker && (
-          <p className="section-note">
-            Manual mode: log attendance below for salary computation.
-          </p>
-        )}
+        <p className="section-note">
+          {allowGeoTracker
+            ? 'Log attendance here. Auto-log settings are available at the bottom of this page.'
+            : 'Manual mode: log attendance below for salary computation.'}
+        </p>
 
         {showWorkCalendar && (
           <>
@@ -826,6 +682,297 @@ export default function WorkFinancePanel({
           </ul>
         )}
       </section>
+
+      {allowGeoTracker && (
+        <section className={`glass-section finance-work-section ${accent}`}>
+          <div className="section-header">
+            <span className="section-icon"><UiIcon icon={APP_ICONS.activity} /></span>
+            <div><h2>Work/Home Location Auto-Log</h2></div>
+            <button
+              type="button"
+              className="cal-collapse-btn"
+              onClick={() => setShowGeoPanel(prev => !prev)}
+              aria-expanded={showGeoPanel}
+            >
+              {showGeoPanel ? 'Hide tracker' : 'Show tracker'}
+            </button>
+          </div>
+          <p className="section-note">
+            Open map, pin the place, paste pin link, then save. Latitude/longitude are under Advanced options.
+          </p>
+
+          {showGeoPanel && (
+            <div className="glass-card work-location-card">
+              <div className="attendance-toggle">
+                <button
+                  type="button"
+                  className={`att-btn ${activeWorkLocation.enabled ? 'active worked' : ''}`}
+                  onClick={handleEnableTracker}
+                >
+                  Tracker ON
+                </button>
+                <button
+                  type="button"
+                  className={`att-btn ${!activeWorkLocation.enabled ? 'active absent' : ''}`}
+                  onClick={handleDisableTracker}
+                >
+                  Tracker OFF
+                </button>
+              </div>
+
+              <div className="work-location-sections">
+                <div className="work-location-block glass-inner">
+                  <h4>Work Location</h4>
+                  <div className="form-row">
+                    <label>Name</label>
+                    <input
+                      type="text"
+                      value={locationDraft.workName}
+                      onChange={e => updateLocationDraft({ workName: e.target.value })}
+                      placeholder="e.g. Kawasaki Office"
+                    />
+                  </div>
+                  <div className="work-location-actions map-actions">
+                    <button type="button" className="btn-glass-secondary" onClick={() => handleUseCurrentLocation('work')}>
+                      Use Current
+                    </button>
+                    <button type="button" className="btn-glass-secondary" onClick={() => openMapPicker('work')}>
+                      Open Map
+                    </button>
+                  </div>
+                  <div className="form-row">
+                    <label>Map pin link or lat,lng</label>
+                    <input
+                      type="text"
+                      value={mapPinInput.work}
+                      onChange={e => setMapPinInput(prev => ({ ...prev, work: e.target.value }))}
+                      placeholder="Paste maps link or 35.680000,139.760000"
+                    />
+                  </div>
+                  <button type="button" className="btn-glass-mini primary" onClick={() => handleApplyMapPin('work')}>
+                    Apply Work Pin
+                  </button>
+                  {savedWorkTargetValid && (
+                    <p className="section-note pin-preview">
+                      Saved: {activeWorkLocation.lat}, {activeWorkLocation.lng}
+                    </p>
+                  )}
+                </div>
+
+                <div className="work-location-block glass-inner">
+                  <h4>Home Location</h4>
+                  <div className="form-row">
+                    <label>Name</label>
+                    <input
+                      type="text"
+                      value={locationDraft.homeName}
+                      onChange={e => updateLocationDraft({ homeName: e.target.value })}
+                      placeholder="e.g. Home"
+                    />
+                  </div>
+                  <div className="work-location-actions map-actions">
+                    <button type="button" className="btn-glass-secondary" onClick={() => handleUseCurrentLocation('home')}>
+                      Use Current
+                    </button>
+                    <button type="button" className="btn-glass-secondary" onClick={() => openMapPicker('home')}>
+                      Open Map
+                    </button>
+                  </div>
+                  <div className="form-row">
+                    <label>Map pin link or lat,lng</label>
+                    <input
+                      type="text"
+                      value={mapPinInput.home}
+                      onChange={e => setMapPinInput(prev => ({ ...prev, home: e.target.value }))}
+                      placeholder="Paste maps link or 35.680000,139.760000"
+                    />
+                  </div>
+                  <button type="button" className="btn-glass-mini primary" onClick={() => handleApplyMapPin('home')}>
+                    Apply Home Pin
+                  </button>
+                  {savedHomeTargetValid && (
+                    <p className="section-note pin-preview">
+                      Saved: {activeWorkLocation.homeLat}, {activeWorkLocation.homeLng}
+                    </p>
+                  )}
+                </div>
+              </div>
+
+              <div className="work-location-save-row">
+                <button type="button" className="btn-glass-primary" onClick={handleSaveLocationConfig}>
+                  Save Locations
+                </button>
+              </div>
+
+              <div className="work-location-advanced-toggle">
+                <button
+                  type="button"
+                  className="btn-glass-mini"
+                  onClick={() => setShowGeoAdvanced(prev => !prev)}
+                >
+                  {showGeoAdvanced ? 'Hide Advanced Options' : 'Show Advanced Options'}
+                </button>
+              </div>
+
+              {showGeoAdvanced && (
+                <div className="glass-inner work-location-advanced">
+                  <div className="work-location-sections">
+                    <div className="work-location-block">
+                      <h4>Work Advanced</h4>
+                      <div className="work-location-grid">
+                        <div className="form-row">
+                          <label>Latitude</label>
+                          <input
+                            type="number"
+                            step="0.000001"
+                            value={locationDraft.workLat}
+                            onChange={e => updateLocationDraft({ workLat: e.target.value })}
+                            placeholder="35.530000"
+                          />
+                        </div>
+                        <div className="form-row">
+                          <label>Longitude</label>
+                          <input
+                            type="number"
+                            step="0.000001"
+                            value={locationDraft.workLng}
+                            onChange={e => updateLocationDraft({ workLng: e.target.value })}
+                            placeholder="139.700000"
+                          />
+                        </div>
+                      </div>
+                      <div className="form-row">
+                        <label>Radius (meters)</label>
+                        <input
+                          type="number"
+                          min={MIN_WORK_RADIUS_METERS}
+                          max={MAX_GEOFENCE_RADIUS_METERS}
+                          value={locationDraft.workRadiusMeters}
+                          onChange={e => updateLocationDraft({
+                            workRadiusMeters: String(normalizeRadius(e.target.value, DEFAULT_WORK_RADIUS_METERS)),
+                          })}
+                        />
+                      </div>
+                    </div>
+                    <div className="work-location-block">
+                      <h4>Home Advanced</h4>
+                      <div className="work-location-grid">
+                        <div className="form-row">
+                          <label>Latitude</label>
+                          <input
+                            type="number"
+                            step="0.000001"
+                            value={locationDraft.homeLat}
+                            onChange={e => updateLocationDraft({ homeLat: e.target.value })}
+                            placeholder="35.530000"
+                          />
+                        </div>
+                        <div className="form-row">
+                          <label>Longitude</label>
+                          <input
+                            type="number"
+                            step="0.000001"
+                            value={locationDraft.homeLng}
+                            onChange={e => updateLocationDraft({ homeLng: e.target.value })}
+                            placeholder="139.700000"
+                          />
+                        </div>
+                      </div>
+                      <div className="form-row">
+                        <label>Radius (meters)</label>
+                        <input
+                          type="number"
+                          min={MIN_WORK_RADIUS_METERS}
+                          max={MAX_GEOFENCE_RADIUS_METERS}
+                          value={locationDraft.homeRadiusMeters}
+                          onChange={e => updateLocationDraft({
+                            homeRadiusMeters: String(normalizeRadius(e.target.value, DEFAULT_HOME_RADIUS_METERS)),
+                          })}
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="work-location-grid">
+                    <div className="form-row">
+                      <label>Auto work duration</label>
+                      <div className="work-duration-row">
+                        <input
+                          type="number"
+                          min="0"
+                          max="12"
+                          step="1"
+                          value={autoDurationParts.hours}
+                          onFocus={e => e.target.select()}
+                          onChange={e => updateAutoDurationDraft('hours', e.target.value)}
+                        />
+                        <span className="work-duration-sep">h</span>
+                        <input
+                          type="number"
+                          min="0"
+                          max="59"
+                          step="5"
+                          value={autoDurationParts.minutes}
+                          onFocus={e => e.target.select()}
+                          onChange={e => updateAutoDurationDraft('minutes', e.target.value)}
+                        />
+                        <span className="work-duration-sep">m</span>
+                      </div>
+                    </div>
+                    <div className="form-row">
+                      <label>Away minutes (home-only mode)</label>
+                      <input
+                        type="number"
+                        min="15"
+                        max={MAX_AWAY_MINUTES}
+                        value={locationDraft.awayMinutesForWork}
+                        onChange={e => updateLocationDraft({
+                          awayMinutesForWork: String(normalizeAwayMinutes(e.target.value)),
+                        })}
+                      />
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {geoMessage && <p className="section-note">{geoMessage}</p>}
+              {geoStatus && geoStatus !== geoMessage && <p className="section-note">{geoStatus}</p>}
+              <p className="section-note">
+                Tracking mode: {nativeTrackingMode ? 'Native iOS (background-capable)' : 'Web (foreground-only)'}
+              </p>
+              {activeWorkLocation.enabled && geoLive.tracking && (
+                <div className={`work-geo-live glass-inner ${geoLive.insideWork ? 'inside' : geoLive.insideHome ? 'home' : 'outside'}`}>
+                  <span>
+                    {geoLive.insideWork ? 'Inside work zone' : geoLive.insideHome ? 'Inside home zone' : 'Outside zones'}
+                  </span>
+                  <span>
+                    {geoLive.distanceWorkMeters !== null ? `Work ${geoLive.distanceWorkMeters}m` : 'Work n/a'}
+                    {' | '}
+                    {geoLive.distanceHomeMeters !== null ? `Home ${geoLive.distanceHomeMeters}m` : 'Home n/a'}
+                  </span>
+                </div>
+              )}
+              {activeWorkLocation.enabled && geoLive.accuracyMeters !== null && (
+                <p className="section-note">GPS accuracy: +/-{geoLive.accuracyMeters}m</p>
+              )}
+              {activeWorkLocation.lastAutoLogDate && (
+                <p className="section-note">
+                  Last auto log date: {activeWorkLocation.lastAutoLogDate}
+                  {activeWorkLocation.lastAutoReason ? ` (${activeWorkLocation.lastAutoReason === 'work-zone' ? 'work zone' : 'away from home'})` : ''}
+                </p>
+              )}
+              {!hasSavedGeoTarget && (
+                <p className="section-note">Save valid Work or Home coordinates to activate tracking.</p>
+              )}
+              <p className="section-note disclaimer">
+                {nativeTrackingMode
+                  ? 'Native mode can continue tracking in background after location permissions are granted.'
+                  : 'Web mode auto logging works while Peggy is open and location permission is granted.'}
+              </p>
+            </div>
+          )}
+        </section>
+      )}
     </div>
   )
 }

@@ -1353,6 +1353,15 @@ ul { list-style: none; }
 .work-location-actions .btn-glass-secondary {
   width: 100%;
 }
+.work-location-actions.map-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.35rem;
+  margin-top: 0.35rem;
+}
+.work-location-actions.map-actions .btn-glass-secondary {
+  width: 100%;
+}
 .work-location-save-row {
   margin-top: 0.45rem;
   display: flex;
@@ -1360,6 +1369,21 @@ ul { list-style: none; }
 }
 .work-location-save-row .btn-glass-primary {
   min-width: 160px;
+}
+.work-location-advanced-toggle {
+  margin-top: 0.45rem;
+  display: flex;
+  justify-content: flex-start;
+}
+.work-location-advanced {
+  margin-top: 0.45rem;
+  padding: 0.55rem;
+  border-radius: 10px;
+}
+.pin-preview {
+  margin-top: 0.35rem;
+  margin-bottom: 0;
+  font-size: 0.66rem;
 }
 .work-geo-live {
   margin-top: 0.45rem;
@@ -1497,6 +1521,9 @@ ul { list-style: none; }
     grid-template-columns: 1fr;
   }
   .work-location-grid {
+    grid-template-columns: 1fr;
+  }
+  .work-location-actions.map-actions {
     grid-template-columns: 1fr;
   }
 }
