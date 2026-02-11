@@ -489,6 +489,8 @@ export default function MoreTab() {
   const [notifLastTestAt, setNotifLastTestAt] = useState('')
   const quietHoursActiveNow = isNowInSmartNotifQuietHours(new Date(), quietHours)
   const notifNow = useMemo(() => new Date(notifNowTick), [notifNowTick])
+  const isStandaloneMode = typeof window !== 'undefined'
+    && (window.matchMedia?.('(display-mode: standalone)')?.matches || window.navigator?.standalone === true)
 
   useEffect(() => {
     if (subTab === 'photos') loadPhotos()
@@ -1059,6 +1061,10 @@ export default function MoreTab() {
     () => (Array.isArray(notifInbox) ? notifInbox.filter(item => !item?.read).length : 0),
     [notifInbox],
   )
+  const latestNotifEntry = useMemo(
+    () => (Array.isArray(notifInbox) && notifInbox.length ? notifInbox[0] : null),
+    [notifInbox],
+  )
   const livePendingNotifications = useMemo(() => {
     const out = []
     if (suppReminderCtx.remainingDoses > 0 && isSmartNotifChannelEnabled('reminders', notifChannels)) {
@@ -1416,52 +1422,79 @@ export default function MoreTab() {
                     Names {isSmartNotifChannelEnabled('names', notifChannels) ? 'ON' : 'OFF'}
                   </button>
                 </div>
-                <button
-                  type="button"
-                  className={`notif-pill-btn glass-inner ${quietHours.enabled ? 'on' : ''}`}
-                  onClick={handleQuietHoursToggle}
-                >
-                  {quietHours.enabled ? 'Quiet Hours ON' : 'Quiet Hours OFF'}
-                </button>
-                <label className="notif-time-field">
-                  <span>Start</span>
-                  <input
-                    type="time"
-                    value={quietHours.start}
-                    disabled={!quietHours.enabled}
-                    onChange={e => handleQuietHoursTimeChange('start', e.target.value)}
-                  />
-                </label>
-                <label className="notif-time-field">
-                  <span>End</span>
-                  <input
-                    type="time"
-                    value={quietHours.end}
-                    disabled={!quietHours.enabled}
-                    onChange={e => handleQuietHoursTimeChange('end', e.target.value)}
-                  />
-                </label>
+                <div className="notif-quiet-grid">
+                  <button
+                    type="button"
+                    className={`notif-pill-btn glass-inner ${quietHours.enabled ? 'on' : ''}`}
+                    onClick={handleQuietHoursToggle}
+                  >
+                    {quietHours.enabled ? 'Quiet Hours ON' : 'Quiet Hours OFF'}
+                  </button>
+                  <div className="notif-time-row">
+                    <label className="notif-time-field">
+                      <span>Start</span>
+                      <input
+                        type="time"
+                        value={quietHours.start}
+                        disabled={!quietHours.enabled}
+                        onChange={e => handleQuietHoursTimeChange('start', e.target.value)}
+                      />
+                    </label>
+                    <label className="notif-time-field">
+                      <span>End</span>
+                      <input
+                        type="time"
+                        value={quietHours.end}
+                        disabled={!quietHours.enabled}
+                        onChange={e => handleQuietHoursTimeChange('end', e.target.value)}
+                      />
+                    </label>
+                  </div>
+                </div>
               </div>
               <p className="section-note">
                 Quiet hours: {formatSmartNotifQuietHoursLabel(quietHours)}. During quiet hours, reminders stay silent pero badge updates continue.
               </p>
-              <p className="section-note">
-                Permission: {notifPermission === 'unsupported' ? 'unsupported' : notifPermission}.
-                {' '}Quiet hours active now: {quietHoursActiveNow ? 'yes' : 'no'}.
-              </p>
-              <p className="section-note">
-                Mode: {(typeof window !== 'undefined' && (window.matchMedia?.('(display-mode: standalone)')?.matches || window.navigator?.standalone === true))
-                  ? 'Home Screen App'
-                  : 'Browser tab'}.
-                {notifLastTestAt ? ` Last local test: ${new Date(notifLastTestAt).toLocaleString()}.` : ''}
-              </p>
+              <div className="notif-diagnostics glass-inner">
+                <div className="notif-diagnostic-row">
+                  <span>Permission</span>
+                  <strong>{notifPermission === 'unsupported' ? 'unsupported' : notifPermission}</strong>
+                </div>
+                <div className="notif-diagnostic-row">
+                  <span>Mode</span>
+                  <strong>{isStandaloneMode ? 'Home Screen App' : 'Browser tab'}</strong>
+                </div>
+                <div className="notif-diagnostic-row">
+                  <span>Quiet Hours Active</span>
+                  <strong>{quietHoursActiveNow ? 'yes' : 'no'}</strong>
+                </div>
+                <div className="notif-diagnostic-row">
+                  <span>Latest Status</span>
+                  <strong>{notifStatus || 'none'}</strong>
+                </div>
+                <div className="notif-diagnostic-row">
+                  <span>Last Local Test</span>
+                  <strong>{notifLastTestAt ? new Date(notifLastTestAt).toLocaleString() : 'none'}</strong>
+                </div>
+                <div className="notif-diagnostic-row">
+                  <span>Latest History</span>
+                  <strong>
+                    {latestNotifEntry
+                      ? `${String(latestNotifEntry.status || 'sent')} - ${String(latestNotifEntry.title || '').trim() || 'Untitled'}`
+                      : 'none'}
+                  </strong>
+                </div>
+              </div>
               <p className="section-note">
                 New installs start with Notifications OFF by default. Enable manually per device.
               </p>
               <p className="section-note">
                 Mood reminder slots: 12:00, 17:00, 20:00 (only if today has no mood log yet).
               </p>
-              <div className="backup-cloud-actions">
+              <p className="section-note">
+                iPhone note: local test can be silent while app is open. For real lock-screen check, use <strong>Send Test Push</strong> and lock phone for 5-10 seconds.
+              </p>
+              <div className="backup-cloud-actions notif-test-actions">
                 <button
                   type="button"
                   className="btn-glass-secondary"
@@ -1469,8 +1502,20 @@ export default function MoreTab() {
                 >
                   Send Local Test
                 </button>
+                <button
+                  type="button"
+                  className="btn-glass-secondary"
+                  onClick={handlePushTest}
+                  disabled={cloudBusy || !cloudSession}
+                >
+                  Send Test Push
+                </button>
               </div>
+              {!cloudSession && (
+                <p className="section-note">Sign in to Cloud Sync first to enable Send Test Push.</p>
+              )}
               {notifStatus && <p className="section-note">{notifStatus}</p>}
+              {pushStatus && <p className="section-note">{pushStatus}</p>}
             </div>
 
             <div className="glass-card backup-card">
