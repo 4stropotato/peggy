@@ -89,6 +89,25 @@ function createDefaultWorkLocation() {
   }
 }
 
+function createDefaultFinanceConfig() {
+  return {
+    payrollProfiles: {
+      naomi: {
+        payMode: 'fixed_day',
+        payDay: 15,
+        delayMonths: 1,
+        monthlyAdjustment: 0,
+      },
+      husband: {
+        payMode: 'month_end',
+        payDay: 30,
+        delayMonths: 1,
+        monthlyAdjustment: 0,
+      },
+    },
+  }
+}
+
 export function AppProvider({ children }) {
   const [checked, setChecked] = useLS('baby-prep-checked', {})
   const [dailySupp, setDailySupp] = useLS('baby-prep-daily', {})
@@ -127,6 +146,9 @@ export function AppProvider({ children }) {
   const [familyConfig, setFamilyConfig] = useLS('baby-prep-family-config', {
     includeHusband: true,
   })
+  // Finance settings and household expense tracker.
+  const [financeConfig, setFinanceConfig] = useLS('baby-prep-finance-config', createDefaultFinanceConfig())
+  const [expenses, setExpenses] = useLS('baby-prep-expenses', [])
   // Work geofence auto-logging config (synced per account via cloud backup).
   const [workLocation, setWorkLocation] = useLS('baby-prep-work-location', createDefaultWorkLocation())
   // Husband geofence config (separate from Naomi).
@@ -393,6 +415,21 @@ export function AppProvider({ children }) {
   }
   const getHusbandAttendance = (date) => husbandAttendance[date] || null
 
+  const addExpense = (entry) => {
+    const date = String(entry?.date || '').trim()
+    const amount = Math.max(0, Number(entry?.amount) || 0)
+    if (!date || amount <= 0) return
+    const category = String(entry?.category || 'other').trim() || 'other'
+    const note = String(entry?.note || '').trim()
+    const id = Date.now().toString(36) + Math.random().toString(36).slice(2, 6)
+    setExpenses(prev => [{ id, date, category, amount, note }, ...(Array.isArray(prev) ? prev : [])])
+  }
+  const removeExpense = (id) => {
+    const targetId = String(id || '').trim()
+    if (!targetId) return
+    setExpenses(prev => (Array.isArray(prev) ? prev.filter(item => item?.id !== targetId) : []))
+  }
+
   // Supplement bottle functions
   const resetBottle = (suppId) => {
     const supp = supplements.find(s => s.id === suppId)
@@ -421,6 +458,8 @@ export function AppProvider({ children }) {
     attendance, markAttendance, getAttendance, workLocation, setWorkLocation,
     husbandAttendance, markHusbandAttendance, getHusbandAttendance, husbandWorkLocation, setHusbandWorkLocation,
     familyConfig, setFamilyConfig,
+    financeConfig, setFinanceConfig,
+    expenses, addExpense, removeExpense,
     suppSchedule,
     suppLastTaken, suppBottles, resetBottle,
     theme, toggleTheme,

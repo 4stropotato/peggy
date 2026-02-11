@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+﻿import { useEffect, useMemo, useState } from 'react'
 import { useApp } from '../AppContext'
 import { moneyTracker } from '../data'
 import { calculateTax } from '../taxCalc'
@@ -14,6 +14,17 @@ const TAX_STEPS = [
 
 const MEDICAL_PRESETS = [0, 50000, 100000, 200000, 300000]
 const SOCIAL_PRESETS = [0, 300000, 500000, 700000]
+const EXPENSE_CATEGORIES = [
+  { id: 'bills', label: 'Bills' },
+  { id: 'loan', label: 'Loan' },
+  { id: 'credit_card', label: 'Credit Card' },
+  { id: 'grocery', label: 'Groceries' },
+  { id: 'transport', label: 'Transport' },
+  { id: 'medical', label: 'Medical' },
+  { id: 'childcare', label: 'Childcare' },
+  { id: 'extra', label: 'Extra' },
+  { id: 'other', label: 'Other' },
+]
 
 function formatYen(value) {
   return `${YEN}${Number(value || 0).toLocaleString()}`
@@ -142,6 +153,60 @@ function getRecentMonthKeys(count = 6, now = new Date()) {
   return out
 }
 
+function shiftMonthKey(monthKey, deltaMonths = 0) {
+  const raw = String(monthKey || '').trim()
+  if (!raw || raw.length < 7) return ''
+  const [y, m] = raw.split('-').map(Number)
+  if (!Number.isFinite(y) || !Number.isFinite(m)) return ''
+  const d = new Date(y, (m - 1) + Number(deltaMonths || 0), 1)
+  return toMonthKey(d)
+}
+
+function normalizePayrollProfile(profile, fallback = {}) {
+  const source = profile && typeof profile === 'object' ? profile : {}
+  const fallbackSource = fallback && typeof fallback === 'object' ? fallback : {}
+  const payModeRaw = String(source.payMode || fallbackSource.payMode || 'fixed_day').trim().toLowerCase()
+  const payMode = payModeRaw === 'month_end' ? 'month_end' : 'fixed_day'
+  const payDay = Math.min(31, Math.max(1, Number(source.payDay ?? fallbackSource.payDay ?? 15) || 15))
+  const delayMonths = Math.min(3, Math.max(0, Number(source.delayMonths ?? fallbackSource.delayMonths ?? 0) || 0))
+  const monthlyAdjustment = Number(source.monthlyAdjustment ?? fallbackSource.monthlyAdjustment ?? 0) || 0
+  return { payMode, payDay, delayMonths, monthlyAdjustment }
+}
+
+function applyPayrollProfileToMonthlyMap(monthlyMap, profile, recentMonthKeys = []) {
+  const normalized = normalizePayrollProfile(profile)
+  const out = {}
+  for (const [monthKey, value] of Object.entries(monthlyMap || {})) {
+    const shiftedKey = shiftMonthKey(monthKey, normalized.delayMonths)
+    if (!shiftedKey) continue
+    out[shiftedKey] = (out[shiftedKey] || 0) + (Number(value) || 0)
+  }
+
+  if ((Number(normalized.monthlyAdjustment) || 0) !== 0) {
+    const targets = Array.isArray(recentMonthKeys) ? recentMonthKeys : []
+    for (const monthKey of targets) {
+      out[monthKey] = (out[monthKey] || 0) + Number(normalized.monthlyAdjustment || 0)
+    }
+  }
+  return out
+}
+
+function sumExpensesForMonths(expenseList, monthKeys) {
+  if (!Array.isArray(expenseList) || !Array.isArray(monthKeys) || !monthKeys.length) return 0
+  const target = new Set(monthKeys)
+  return Math.round(expenseList.reduce((acc, item) => {
+    const monthKey = getMonthKeyFromISO(item?.date)
+    if (!target.has(monthKey)) return acc
+    return acc + Math.max(0, Number(item?.amount) || 0)
+  }, 0))
+}
+
+function getExpenseCategoryLabel(categoryId) {
+  const id = String(categoryId || 'other').trim().toLowerCase()
+  const found = EXPENSE_CATEGORIES.find(item => item.id === id)
+  return found ? found.label : 'Other'
+}
+
 function getBasisLabel(basis) {
   if (basis === 'hourly') return 'Hourly'
   if (basis === 'daily') return 'Daily'
@@ -189,11 +254,18 @@ export default function MoneyTab() {
     husbandAttendance,
     familyConfig,
     setFamilyConfig,
+    financeConfig,
+    setFinanceConfig,
+    expenses,
+    addExpense,
+    removeExpense,
   } = useApp()
   const includeHusband = familyConfig?.includeHusband !== false
 
   const [subTab, setSubTab] = useState('benefits')
   const [workView, setWorkView] = useState('wife')
+  const [summaryPeriod, setSummaryPeriod] = useState('annual')
+  const [summaryMonthKey, setSummaryMonthKey] = useState(() => toMonthKey(new Date()))
   const [expandedItem, setExpandedItem] = useState(null)
   const [taxStepIndex, setTaxStepIndex] = useState(0)
   const [rateForm, setRateForm] = useState(() => ({
@@ -203,6 +275,12 @@ export default function MoneyTab() {
     effectiveFrom: toIsoDate(),
     hoursPerDay: '7.5',
     workDaysPerMonth: '20',
+    note: '',
+  }))
+  const [expenseForm, setExpenseForm] = useState(() => ({
+    date: toIsoDate(),
+    category: 'bills',
+    amount: '',
     note: '',
   }))
 
@@ -215,24 +293,67 @@ export default function MoneyTab() {
     if (!includeHusband && workView === 'husband') setWorkView('wife')
   }, [includeHusband, workView])
 
+  const recentMonthKeys = useMemo(() => getRecentMonthKeys(6), [])
+  const recentYearMonthKeys = useMemo(() => getRecentMonthKeys(12), [])
+  const naomiPayrollProfile = useMemo(
+    () => normalizePayrollProfile(financeConfig?.payrollProfiles?.naomi, { payMode: 'fixed_day', payDay: 15, delayMonths: 1, monthlyAdjustment: 0 }),
+    [financeConfig]
+  )
+  const husbandPayrollProfile = useMemo(
+    () => normalizePayrollProfile(financeConfig?.payrollProfiles?.husband, { payMode: 'month_end', payDay: 30, delayMonths: 1, monthlyAdjustment: 0 }),
+    [financeConfig]
+  )
+
   const currentNaomiRate = useMemo(() => getCurrentRateForPerson(payRates, 'naomi'), [payRates])
   const currentHusbandRate = useMemo(() => getCurrentRateForPerson(payRates, 'husband'), [payRates])
-  const naomiMonthlyIncomeMap = useMemo(
+  const naomiWorkMonthlyIncomeMap = useMemo(
     () => buildMonthlyIncomeMap(attendance, payRates, 'naomi'),
     [attendance, payRates]
   )
-  const husbandMonthlyIncomeMap = useMemo(
+  const husbandWorkMonthlyIncomeMap = useMemo(
     () => buildMonthlyIncomeMap(husbandAttendance, payRates, 'husband'),
     [husbandAttendance, payRates]
   )
+  const naomiMonthlyIncomeMap = useMemo(
+    () => applyPayrollProfileToMonthlyMap(naomiWorkMonthlyIncomeMap, naomiPayrollProfile, recentYearMonthKeys),
+    [naomiWorkMonthlyIncomeMap, naomiPayrollProfile, recentYearMonthKeys]
+  )
+  const husbandMonthlyIncomeMap = useMemo(
+    () => applyPayrollProfileToMonthlyMap(husbandWorkMonthlyIncomeMap, husbandPayrollProfile, recentYearMonthKeys),
+    [husbandWorkMonthlyIncomeMap, husbandPayrollProfile, recentYearMonthKeys]
+  )
   const naomiAnnualFromWork = useMemo(() => sumLastMonths(naomiMonthlyIncomeMap, 12), [naomiMonthlyIncomeMap])
   const husbandAnnualFromWork = useMemo(() => sumLastMonths(husbandMonthlyIncomeMap, 12), [husbandMonthlyIncomeMap])
-  const naomiAnnualFallback = useMemo(() => estimateAnnualFromRate(currentNaomiRate), [currentNaomiRate])
-  const husbandAnnualFallback = useMemo(() => estimateAnnualFromRate(currentHusbandRate), [currentHusbandRate])
+  const naomiAnnualFallback = useMemo(
+    () => Math.round(Math.max(0, estimateAnnualFromRate(currentNaomiRate) + (Number(naomiPayrollProfile.monthlyAdjustment || 0) * 12))),
+    [currentNaomiRate, naomiPayrollProfile.monthlyAdjustment]
+  )
+  const husbandAnnualFallback = useMemo(
+    () => Math.round(Math.max(0, estimateAnnualFromRate(currentHusbandRate) + (Number(husbandPayrollProfile.monthlyAdjustment || 0) * 12))),
+    [currentHusbandRate, husbandPayrollProfile.monthlyAdjustment]
+  )
   const estimatedNaomiAnnual = naomiAnnualFromWork > 0 ? naomiAnnualFromWork : naomiAnnualFallback
   const estimatedHusbandAnnual = husbandAnnualFromWork > 0 ? husbandAnnualFromWork : husbandAnnualFallback
   const estimatedFamilyAnnual = estimatedNaomiAnnual + (includeHusband ? estimatedHusbandAnnual : 0)
-  const recentMonthKeys = useMemo(() => getRecentMonthKeys(6), [])
+  const selectedMonth = String(summaryMonthKey || '').trim() || toMonthKey(new Date())
+  const selectedPeriodMonthKeys = summaryPeriod === 'monthly' ? [selectedMonth] : recentYearMonthKeys
+  const selectedNaomiIncome = summaryPeriod === 'monthly'
+    ? Math.round(Number(naomiMonthlyIncomeMap[selectedMonth] || 0))
+    : estimatedNaomiAnnual
+  const selectedHusbandIncome = summaryPeriod === 'monthly'
+    ? Math.round(Number(husbandMonthlyIncomeMap[selectedMonth] || 0))
+    : estimatedHusbandAnnual
+  const selectedFamilyIncome = selectedNaomiIncome + (includeHusband ? selectedHusbandIncome : 0)
+  const selectedExpensesTotal = useMemo(
+    () => sumExpensesForMonths(expenses, selectedPeriodMonthKeys),
+    [expenses, selectedPeriodMonthKeys]
+  )
+  const selectedFamilyNet = selectedFamilyIncome - selectedExpensesTotal
+  const expenseItemsSorted = useMemo(
+    () => [...(Array.isArray(expenses) ? expenses : [])]
+      .sort((a, b) => String(b?.date || '').localeCompare(String(a?.date || ''))),
+    [expenses]
+  )
 
   const effectiveAnnualIncome = includeHusband
     ? (Number(taxInputs.annualIncome) || estimatedHusbandAnnual)
@@ -268,6 +389,33 @@ export default function MoneyTab() {
     setRateForm(prev => ({ ...prev, [field]: value }))
   }
 
+  const updatePayrollProfile = (person, patch) => {
+    const target = normalizePerson(person)
+    setFinanceConfig(prev => {
+      const safe = prev && typeof prev === 'object' ? prev : {}
+      const payrollProfiles = safe.payrollProfiles && typeof safe.payrollProfiles === 'object'
+        ? safe.payrollProfiles
+        : {}
+      const current = normalizePayrollProfile(payrollProfiles[target], target === 'husband'
+        ? { payMode: 'month_end', payDay: 30, delayMonths: 1, monthlyAdjustment: 0 }
+        : { payMode: 'fixed_day', payDay: 15, delayMonths: 1, monthlyAdjustment: 0 })
+      return {
+        ...safe,
+        payrollProfiles: {
+          ...payrollProfiles,
+          [target]: {
+            ...current,
+            ...patch,
+          },
+        },
+      }
+    })
+  }
+
+  const updateExpenseForm = (field, value) => {
+    setExpenseForm(prev => ({ ...prev, [field]: value }))
+  }
+
   const applyTaxIncomeFromRates = () => {
     if (includeHusband) {
       if (estimatedHusbandAnnual > 0) updateTax('annualIncome', String(estimatedHusbandAnnual))
@@ -299,6 +447,24 @@ export default function MoneyTab() {
     setRateForm(prev => ({
       ...prev,
       rate: '',
+      note: '',
+    }))
+  }
+
+  const handleAddExpense = (event) => {
+    event.preventDefault()
+    const date = String(expenseForm.date || '').trim()
+    const amount = Math.max(0, Number(expenseForm.amount) || 0)
+    if (!date || amount <= 0) return
+    addExpense({
+      date,
+      category: expenseForm.category,
+      amount,
+      note: expenseForm.note,
+    })
+    setExpenseForm(prev => ({
+      ...prev,
+      amount: '',
       note: '',
     }))
   }
@@ -354,7 +520,7 @@ export default function MoneyTab() {
                 <li key={item.id} className={`glass-card money-card ${moneyClaimed[item.id] ? 'done' : ''}`}>
                   <div className="money-card-top">
                     <span className="checkbox glass-inner" onClick={() => toggleMoney(item.id)}>
-                      {moneyClaimed[item.id] ? '✓' : ''}
+                      {moneyClaimed[item.id] ? '?' : ''}
                     </span>
                     <span className={`item-text ${moneyClaimed[item.id] ? 'claimed' : ''}`}>{item.label}</span>
                     <span className="money-amount">{formatYen(item.amount)}</span>
@@ -505,6 +671,144 @@ export default function MoneyTab() {
                 {includeHusband ? 'Enabled' : 'Disabled'}
               </button>
             </div>
+
+            <div className="glass-inner summary-period-row">
+              <div className="household-toggle-title">Summary Period</div>
+              <div className="summary-period-controls">
+                <button
+                  type="button"
+                  className={`tax-preset-btn glass-inner ${summaryPeriod === 'annual' ? 'active' : ''}`}
+                  onClick={() => setSummaryPeriod('annual')}
+                >
+                  Annual
+                </button>
+                <button
+                  type="button"
+                  className={`tax-preset-btn glass-inner ${summaryPeriod === 'monthly' ? 'active' : ''}`}
+                  onClick={() => setSummaryPeriod('monthly')}
+                >
+                  This Month
+                </button>
+              </div>
+              {summaryPeriod === 'monthly' && (
+                <div className="form-row summary-month-select">
+                  <label>Month</label>
+                  <select value={selectedMonth} onChange={e => setSummaryMonthKey(e.target.value)}>
+                    {recentYearMonthKeys.map(monthKey => (
+                      <option key={monthKey} value={monthKey}>{monthKey}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
+            </div>
+          </section>
+
+          <section className="glass-section">
+            <div className="section-header">
+              <span className="section-icon"><UiIcon icon={APP_ICONS.activity} /></span>
+              <div>
+                <h2>Payroll Timing & Adjustments</h2>
+                <span className="section-count">Shift work-month income into real payout months</span>
+              </div>
+            </div>
+
+            <div className="salary-summary-grid">
+              <div className="glass-card payroll-card">
+                <h3>Wife Payroll</h3>
+                <div className="salary-rate-grid">
+                  <div className="form-row">
+                    <label>Payday Type</label>
+                    <select
+                      value={naomiPayrollProfile.payMode}
+                      onChange={e => updatePayrollProfile('naomi', { payMode: e.target.value === 'month_end' ? 'month_end' : 'fixed_day' })}
+                    >
+                      <option value="fixed_day">Fixed Day</option>
+                      <option value="month_end">Month End</option>
+                    </select>
+                  </div>
+                  {naomiPayrollProfile.payMode === 'fixed_day' && (
+                    <div className="form-row">
+                      <label>Payday (1-31)</label>
+                      <input
+                        type="number"
+                        min="1"
+                        max="31"
+                        value={naomiPayrollProfile.payDay}
+                        onChange={e => updatePayrollProfile('naomi', { payDay: Math.min(31, Math.max(1, Number(e.target.value) || 1)) })}
+                      />
+                    </div>
+                  )}
+                  <div className="form-row">
+                    <label>Work Month Delay</label>
+                    <input
+                      type="number"
+                      min="0"
+                      max="3"
+                      value={naomiPayrollProfile.delayMonths}
+                      onChange={e => updatePayrollProfile('naomi', { delayMonths: Math.min(3, Math.max(0, Number(e.target.value) || 0)) })}
+                    />
+                  </div>
+                  <div className="form-row">
+                    <label>Monthly Adjustment ({YEN})</label>
+                    <input
+                      type="number"
+                      value={naomiPayrollProfile.monthlyAdjustment}
+                      onChange={e => updatePayrollProfile('naomi', { monthlyAdjustment: Number(e.target.value) || 0 })}
+                      placeholder="Use negative for advances/bale deductions"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {includeHusband && (
+                <div className="glass-card payroll-card husband-summary">
+                  <h3>Husband Payroll</h3>
+                  <div className="salary-rate-grid">
+                    <div className="form-row">
+                      <label>Payday Type</label>
+                      <select
+                        value={husbandPayrollProfile.payMode}
+                        onChange={e => updatePayrollProfile('husband', { payMode: e.target.value === 'month_end' ? 'month_end' : 'fixed_day' })}
+                      >
+                        <option value="fixed_day">Fixed Day</option>
+                        <option value="month_end">Month End</option>
+                      </select>
+                    </div>
+                    {husbandPayrollProfile.payMode === 'fixed_day' && (
+                      <div className="form-row">
+                        <label>Payday (1-31)</label>
+                        <input
+                          type="number"
+                          min="1"
+                          max="31"
+                          value={husbandPayrollProfile.payDay}
+                          onChange={e => updatePayrollProfile('husband', { payDay: Math.min(31, Math.max(1, Number(e.target.value) || 1)) })}
+                        />
+                      </div>
+                    )}
+                    <div className="form-row">
+                      <label>Work Month Delay</label>
+                      <input
+                        type="number"
+                        min="0"
+                        max="3"
+                        value={husbandPayrollProfile.delayMonths}
+                        onChange={e => updatePayrollProfile('husband', { delayMonths: Math.min(3, Math.max(0, Number(e.target.value) || 0)) })}
+                      />
+                    </div>
+                    <div className="form-row">
+                      <label>Monthly Adjustment ({YEN})</label>
+                      <input
+                        type="number"
+                        value={husbandPayrollProfile.monthlyAdjustment}
+                        onChange={e => updatePayrollProfile('husband', { monthlyAdjustment: Number(e.target.value) || 0 })}
+                        placeholder="Use negative for deductions"
+                      />
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
           </section>
 
           <section className="glass-section">
@@ -596,14 +900,22 @@ export default function MoneyTab() {
               <span className="section-icon"><UiIcon icon={APP_ICONS.overview} /></span>
               <div>
                 <h2>Family Income Summary</h2>
-                <span className="section-count">From work logs + rate fallback</span>
+                <span className="section-count">
+                  {summaryPeriod === 'monthly' ? `Payout month: ${selectedMonth}` : 'Last 12 months'}
+                </span>
               </div>
             </div>
             <div className="salary-summary-grid">
               <div className="glass-inner salary-summary-card">
                 <div className="salary-person">Wife</div>
-                <div className="salary-annual">{formatYen(estimatedNaomiAnnual)} / year</div>
-                <div className="salary-assume">Last 12 months from attendance logs</div>
+                <div className="salary-annual">
+                  {formatYen(selectedNaomiIncome)} / {summaryPeriod === 'monthly' ? 'month' : 'year'}
+                </div>
+                <div className="salary-assume">
+                  {summaryPeriod === 'monthly'
+                    ? 'Received amount in selected payout month'
+                    : 'Last 12 months from attendance logs'}
+                </div>
                 {naomiAnnualFromWork <= 0 && currentNaomiRate && (
                   <div className="salary-assume">Fallback: {formatRateLabel(currentNaomiRate)}</div>
                 )}
@@ -611,8 +923,14 @@ export default function MoneyTab() {
               {includeHusband && (
                 <div className="glass-inner salary-summary-card husband-summary">
                   <div className="salary-person">Husband</div>
-                  <div className="salary-annual">{formatYen(estimatedHusbandAnnual)} / year</div>
-                  <div className="salary-assume">Last 12 months from attendance logs</div>
+                  <div className="salary-annual">
+                    {formatYen(selectedHusbandIncome)} / {summaryPeriod === 'monthly' ? 'month' : 'year'}
+                  </div>
+                  <div className="salary-assume">
+                    {summaryPeriod === 'monthly'
+                      ? 'Received amount in selected payout month'
+                      : 'Last 12 months from attendance logs'}
+                  </div>
                   {husbandAnnualFromWork <= 0 && currentHusbandRate && (
                     <div className="salary-assume">Fallback: {formatRateLabel(currentHusbandRate)}</div>
                   )}
@@ -620,9 +938,86 @@ export default function MoneyTab() {
               )}
             </div>
             <div className="glass-inner family-total-card">
-              <span>Estimated Family Total</span>
-              <strong>{formatYen(estimatedFamilyAnnual)} / year</strong>
+              <span>Gross Family Total</span>
+              <strong>{formatYen(selectedFamilyIncome)} / {summaryPeriod === 'monthly' ? 'month' : 'year'}</strong>
             </div>
+            <div className="glass-inner family-total-card finance-expense-total">
+              <span>Tracked Expenses</span>
+              <strong>- {formatYen(selectedExpensesTotal)} / {summaryPeriod === 'monthly' ? 'month' : 'year'}</strong>
+            </div>
+            <div className="glass-inner family-total-card finance-net-total">
+              <span>Net Family Total</span>
+              <strong>{formatYen(selectedFamilyNet)} / {summaryPeriod === 'monthly' ? 'month' : 'year'}</strong>
+            </div>
+          </section>
+
+          <section className="glass-section">
+            <div className="section-header">
+              <span className="section-icon"><UiIcon icon={APP_ICONS.benefits} /></span>
+              <div>
+                <h2>Expense Tracker</h2>
+                <span className="section-count">Bills, loans, groceries, credit card, extras</span>
+              </div>
+            </div>
+            <form className="salary-rate-form glass-card" onSubmit={handleAddExpense}>
+              <div className="salary-rate-grid">
+                <div className="form-row">
+                  <label>Date</label>
+                  <input
+                    type="date"
+                    value={expenseForm.date}
+                    onChange={e => updateExpenseForm('date', e.target.value)}
+                    required
+                  />
+                </div>
+                <div className="form-row">
+                  <label>Category</label>
+                  <select value={expenseForm.category} onChange={e => updateExpenseForm('category', e.target.value)}>
+                    {EXPENSE_CATEGORIES.map(item => (
+                      <option key={item.id} value={item.id}>{item.label}</option>
+                    ))}
+                  </select>
+                </div>
+                <div className="form-row">
+                  <label>Amount ({YEN})</label>
+                  <input
+                    type="number"
+                    value={expenseForm.amount}
+                    onChange={e => updateExpenseForm('amount', e.target.value)}
+                    placeholder="e.g. 58000"
+                    required
+                  />
+                </div>
+              </div>
+              <div className="form-row">
+                <label>Note (optional)</label>
+                <input
+                  type="text"
+                  value={expenseForm.note}
+                  onChange={e => updateExpenseForm('note', e.target.value)}
+                  placeholder="e.g. rent, electric, grocery run"
+                />
+              </div>
+              <button type="submit" className="btn-glass-primary">Add Expense</button>
+            </form>
+
+            {expenseItemsSorted.length > 0 ? (
+              <ul className="salary-rate-list">
+                {expenseItemsSorted.slice(0, 20).map(item => (
+                  <li key={item.id} className="glass-card salary-rate-item expense-item">
+                    <div className="salary-rate-top">
+                      <span className="salary-rate-person">{item.date}</span>
+                      <span className="salary-rate-basis">{getExpenseCategoryLabel(item.category)}</span>
+                    </div>
+                    <div className="salary-rate-main">- {formatYen(item.amount)}</div>
+                    {item.note && <div className="salary-rate-note">{item.note}</div>}
+                    <button type="button" className="btn-delete" onClick={() => removeExpense(item.id)}>Delete</button>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="empty-state">No expenses yet. Add your first bill or grocery expense above.</p>
+            )}
           </section>
 
           <section className="glass-section">
@@ -630,7 +1025,7 @@ export default function MoneyTab() {
               <span className="section-icon"><UiIcon icon={APP_ICONS.activity} /></span>
               <div>
                 <h2>Recent Monthly Income</h2>
-                <span className="section-count">Transparent log-based breakdown</span>
+                <span className="section-count">Payout-month view (with payroll delay/adjustments)</span>
               </div>
             </div>
             <div className="salary-month-table">
@@ -883,3 +1278,5 @@ export default function MoneyTab() {
     </div>
   )
 }
+
+
