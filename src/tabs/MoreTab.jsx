@@ -993,8 +993,18 @@ export default function MoreTab() {
       let route = 'notification-api'
       let sent = false
       let swMessageQueued = false
+      let registration = null
       if ('serviceWorker' in navigator) {
-        const registration = await navigator.serviceWorker.ready
+        setNotifStatus('Running local notification test... waiting for Service Worker')
+        try {
+          registration = await withTimeout(
+            navigator.serviceWorker.ready,
+            4500,
+            'service worker ready',
+          )
+        } catch {
+          registration = null
+        }
         if (registration?.active) {
           registration.active.postMessage({
             type: 'peggy-local-test',
@@ -1011,12 +1021,21 @@ export default function MoreTab() {
           swMessageQueued = true
         }
         if (registration?.showNotification) {
-          await registration.showNotification(title, options)
-          route = swMessageQueued ? 'service-worker-message+showNotification' : 'service-worker-showNotification'
-          sent = true
+          try {
+            await withTimeout(
+              registration.showNotification(title, options),
+              5000,
+              'service worker showNotification',
+            )
+            route = swMessageQueued ? 'service-worker-message+showNotification' : 'service-worker-showNotification'
+            sent = true
+          } catch {
+            sent = false
+          }
         }
       }
       if (!sent) {
+        setNotifStatus('Running local notification test... fallback to Notification API')
         new Notification(title, options)
         route = swMessageQueued ? 'service-worker-message+notification-api' : 'notification-api'
         sent = true
