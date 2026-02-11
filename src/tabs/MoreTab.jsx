@@ -496,7 +496,7 @@ export default function MoreTab() {
 
   useEffect(() => {
     if (!notifStatus) return undefined
-    const id = setTimeout(() => setNotifStatus(''), 4000)
+    const id = setTimeout(() => setNotifStatus(''), 10000)
     return () => clearTimeout(id)
   }, [notifStatus])
 
@@ -536,6 +536,7 @@ export default function MoreTab() {
     window.addEventListener('peggy-backup-restored', syncAll)
     window.addEventListener('storage', syncAll)
     window.addEventListener('focus', refreshNotifPermission)
+    window.addEventListener('peggy-local-test-ack', syncNotifInbox)
     document.addEventListener('visibilitychange', refreshNotifPermission)
     refreshNotifPermission()
     return () => {
@@ -546,8 +547,24 @@ export default function MoreTab() {
       window.removeEventListener('peggy-backup-restored', syncAll)
       window.removeEventListener('storage', syncAll)
       window.removeEventListener('focus', refreshNotifPermission)
+      window.removeEventListener('peggy-local-test-ack', syncNotifInbox)
       document.removeEventListener('visibilitychange', refreshNotifPermission)
     }
+  }, [])
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return undefined
+    const onLocalTestAck = (event) => {
+      const ok = Boolean(event?.detail?.ok)
+      const err = String(event?.detail?.error || '').trim()
+      setNotifStatus(ok
+        ? 'Local test acknowledged by Service Worker.'
+        : `Local test failed in Service Worker${err ? `: ${err}` : ''}`)
+      setNotifInbox(readSmartNotifInbox())
+      setNotifLastTestAt(String(event?.detail?.createdAt || new Date().toISOString()))
+    }
+    window.addEventListener('peggy-local-test-ack', onLocalTestAck)
+    return () => window.removeEventListener('peggy-local-test-ack', onLocalTestAck)
   }, [])
 
   useEffect(() => {
@@ -951,16 +968,37 @@ export default function MoreTab() {
 
     try {
       let route = 'notification-api'
+      let sent = false
+      let swMessageQueued = false
       if ('serviceWorker' in navigator) {
         const registration = await navigator.serviceWorker.ready
+        if (registration?.active) {
+          registration.active.postMessage({
+            type: 'peggy-local-test',
+            payload: {
+              title,
+              body,
+              icon: options.icon,
+              badge: options.badge,
+              tag: options.tag,
+              url: import.meta.env.BASE_URL || '/',
+            },
+          })
+          swMessageQueued = true
+        }
         if (registration?.showNotification) {
           await registration.showNotification(title, options)
-          route = 'service-worker'
-        } else {
-          new Notification(title, options)
+          route = swMessageQueued ? 'service-worker-message+showNotification' : 'service-worker-showNotification'
+          sent = true
         }
-      } else {
+      }
+      if (!sent) {
         new Notification(title, options)
+        route = swMessageQueued ? 'service-worker-message+notification-api' : 'notification-api'
+        sent = true
+      }
+      if (!sent) {
+        throw new Error('No available notification route')
       }
       const testAt = new Date().toISOString()
       setNotifLastTestAt(testAt)
