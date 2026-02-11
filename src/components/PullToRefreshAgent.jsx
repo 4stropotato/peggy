@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 
-const PULL_THRESHOLD_PX = 110
-const MAX_PULL_PX = 170
+const PULL_THRESHOLD_PX = 145
 const TRIGGER_COOLDOWN_MS = 12000
 const TOP_EPSILON_PX = 2
 const UPDATE_CHECK_TIMEOUT_MS = 2200
