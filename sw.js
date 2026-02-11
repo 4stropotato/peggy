@@ -1,6 +1,6 @@
 // Cache version bump: change this whenever static assets (icons, CSS, JS) change
 // so installed PWAs pick up updates reliably.
-const CACHE_NAME = 'peggy-v15';
+const CACHE_NAME = 'peggy-v16';
 const CACHE_PREFIXES = ['peggy-', 'baby-prep-'];
 
 function resolveBasePath() {
@@ -197,4 +197,63 @@ self.addEventListener('notificationclick', (event) => {
       }),
     ])
   );
+});
+
+self.addEventListener('message', (event) => {
+  const data = event?.data && typeof event.data === 'object' ? event.data : {};
+  const type = String(data.type || '').trim();
+  if (type !== 'peggy-local-test') return;
+
+  const payload = data?.payload && typeof data.payload === 'object' ? data.payload : {};
+  const icon = `${BASE}icon-192.png`;
+  const title = String(payload.title || 'Peggy local test').trim() || 'Peggy local test';
+  const body = String(payload.body || 'Notification pipeline is active on this device.').trim();
+  const tag = String(payload.tag || `peggy-local-test-${Date.now()}`).trim();
+  const targetUrl = toAbsoluteUrl(payload.url || BASE);
+
+  event.waitUntil((async () => {
+    try {
+      await self.registration.showNotification(title, {
+        body,
+        icon: payload.icon || icon,
+        badge: payload.badge || icon,
+        tag,
+        renotify: false,
+        requireInteraction: false,
+        data: {
+          url: targetUrl,
+          actionUrls: {},
+        },
+      });
+      await notifyClients({
+        type: 'peggy-sw-local-test-ack',
+        payload: {
+          ok: true,
+          title,
+          body,
+          tag,
+          createdAt: new Date().toISOString(),
+        },
+      });
+      await notifyClients({
+        type: 'peggy-sw-push',
+        payload: {
+          title,
+          body,
+          tag,
+          url: targetUrl,
+          createdAt: new Date().toISOString(),
+        },
+      });
+    } catch (error) {
+      await notifyClients({
+        type: 'peggy-sw-local-test-ack',
+        payload: {
+          ok: false,
+          error: String(error?.message || error || 'unknown-error'),
+          createdAt: new Date().toISOString(),
+        },
+      });
+    }
+  })());
 });
