@@ -3227,14 +3227,17 @@ input[type="range"]:focus {
 .task-item-wrap .item .item-top-row {
   display: flex;
   align-items: flex-start;
-  justify-content: space-between;
+  justify-content: flex-end;
   gap: 0.35rem;
 }
 .task-item-wrap .item .item-tags {
   display: flex;
   flex-wrap: wrap;
+  justify-content: flex-end;
   gap: 0.24rem;
   min-width: 0;
+  margin-left: auto;
+  max-width: calc(100% - 34px);
 }
 .task-item-wrap .item .item-text {
   overflow-wrap: anywhere;
