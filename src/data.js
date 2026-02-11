@@ -94,7 +94,7 @@ export const phases = [
       },
       {
         id: 'p4', text: 'Ask Kawasaki Ward Office about municipal baby gift programs', priority: 'high',
-        moneyIds: ['m10'],
+        moneyIds: ['m10', 'm15'],
         howTo: [
           'While at the ward office for boshi techo, ask about ALL available programs',
           'Some programs are not advertised publicly',
@@ -116,6 +116,7 @@ export const phases = [
       },
       {
         id: 'p5', text: 'Ask about Kokuho Ryou Genmen (国保料減免 / kokuho ryou genmen) - insurance premium reduction', priority: 'high',
+        moneyIds: ['m16'],
         howTo: [
           'If your household income is low, you may qualify for insurance premium reduction',
           '7-wari (70% off), 5-wari (50% off), or 2-wari (20% off)',
@@ -238,6 +239,7 @@ export const phases = [
       },
       {
         id: 'p10', text: 'Check employer: birth bonus, Fuka Kyuufu (付加給付 / fuka kyuufu), company benefits', priority: 'high',
+        moneyIds: ['m7', 'm11', 'm12', 'm13'],
         howTo: [
           'Ask BOTH Shinji\'s and Naomi\'s HR departments',
           'Things to ask about: Birth bonus (出産祝い金), Additional insurance benefit (付加給付)',
@@ -475,6 +477,7 @@ export const phases = [
       },
       {
         id: 'd6', text: 'If employed: arrange maternity leave with employer', priority: 'high',
+        moneyIds: ['m11', 'm12', 'm13'],
         howTo: [
           'For Naomi: Talk to HR at least 1 month before leave starts',
           'Maternity leave (産前産後休暇): 6 weeks before + 8 weeks after birth',
@@ -589,6 +592,7 @@ export const phases = [
       },
       {
         id: 'b5', text: 'Apply for Nyuuyouji Iryouhi Josei (乳幼児医療費助成 / nyuuyouji iryouhi josei) - Child Medical Subsidy', priority: 'urgent',
+        moneyIds: ['m14'],
         howTo: [
           'Free medical care for children until age 15 in Kawasaki!',
           'Apply AFTER getting baby\'s health insurance card',
@@ -779,6 +783,7 @@ export const phases = [
       },
       {
         id: 'o7', text: 'Check Kawasaki Ward Office annually for new programs', priority: 'medium',
+        moneyIds: ['m10', 'm15'],
         howTo: [
           'Visit or call the ward office once a year to check for new programs',
           'Japan frequently adds new family support programs',

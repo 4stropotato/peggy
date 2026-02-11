@@ -168,6 +168,20 @@ export default function TasksTab() {
         <h2>Task Checklist</h2>
         <span className="tab-header-count">{doneItems}/{totalItems} done</span>
       </div>
+      <section className="glass-section">
+        <div className="section-header">
+          <span className="section-icon"><UiIcon icon={APP_ICONS.overview} /></span>
+          <div>
+            <h2>Recommended Bundles</h2>
+            <span className="section-count">Do these together to save trips</span>
+          </div>
+        </div>
+        <ul className="task-steps">
+          <li><strong>Pregnancy ward visit:</strong> Boshi Techo + pregnancy support consultation + prenatal vouchers + ask municipal programs + ask kokuho reduction.</li>
+          <li><strong>Employer packet:</strong> Maternity leave paperwork + childcare leave benefit + social insurance exemption + extra employer benefit.</li>
+          <li><strong>Post-birth ward visit:</strong> Birth registration + second support payment + child allowance + baby insurance + child medical subsidy.</li>
+        </ul>
+      </section>
       {phases.map(phase => {
         const done = phase.items.filter(i => checked[i.id]).length
         const total = phase.items.length

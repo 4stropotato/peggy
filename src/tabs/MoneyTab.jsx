@@ -1,6 +1,6 @@
 ﻿import { useEffect, useMemo, useState } from 'react'
 import { useApp } from '../AppContext'
-import { moneyTracker } from '../data'
+import { moneyTracker, phases } from '../data'
 import { calculateTax } from '../taxCalc'
 import { APP_ICONS, UiIcon } from '../uiIcons'
 import WorkFinancePanel from '../components/WorkFinancePanel'
@@ -29,6 +29,58 @@ const EXPENSE_CATEGORIES = [
   { id: 'extra', label: 'Extra' },
   { id: 'other', label: 'Other' },
 ]
+
+const BENEFIT_SOURCE_BY_ID = {
+  m1: 'kawasaki',
+  m2: 'kawasaki',
+  m3: 'national',
+  m4: 'national',
+  m5: 'kawasaki',
+  m6: 'national',
+  m7: 'employer',
+  m8: 'national',
+  m9: 'national',
+  m10: 'kawasaki',
+  m11: 'employer',
+  m12: 'employer',
+  m13: 'employer',
+  m14: 'kawasaki',
+  m15: 'kawasaki',
+  m16: 'kawasaki',
+}
+
+const BENEFIT_TIMING_HINT_BY_ID = {
+  m1: 'Pregnancy registration day (ward office)',
+  m2: 'As early as possible in pregnancy',
+  m3: 'Before due month window',
+  m4: 'Before delivery (hospital paperwork)',
+  m5: 'Right after birth registration',
+  m6: 'After delivery invoice is finalized',
+  m7: 'During pregnancy and right after birth',
+  m8: 'Within 15 days after birth',
+  m9: 'Feb-March tax filing period',
+  m10: 'During ward visits and annual check-ins',
+  m11: 'Before maternity leave starts',
+  m12: 'Before childcare leave starts',
+  m13: 'Before first childcare leave payroll month',
+  m14: "After baby's insurance card is issued",
+  m15: 'When Kawasaki announces yearly campaign window',
+  m16: 'During pregnancy/postpartum insurance consultation',
+}
+
+const BENEFIT_BATCH_HINT_BY_ID = {
+  m1: 'Do together with Boshi Techo visit and voucher pickup.',
+  m2: 'Do together with pregnancy registration and support consultation.',
+  m5: 'Bundle with birth registration + child allowance + baby insurance.',
+  m8: 'Bundle with birth registration visit to avoid lost months.',
+  m10: 'Ask this at every ward office visit so no missed campaigns.',
+  m11: 'Ask HR at same time as maternity leave paperwork.',
+  m12: 'Ask HR at same time as childcare leave paperwork.',
+  m13: 'Confirm together with childcare leave setup in payroll.',
+  m14: "Apply right after baby's insurance card processing.",
+  m15: 'Check together with municipal baby gift and annual program checks.',
+  m16: 'Ask at insurance counter while handling other kokuho procedures.',
+}
 
 function formatYen(value) {
   return `${YEN}${Number(value || 0).toLocaleString()}`
@@ -307,6 +359,7 @@ export default function MoneyTab() {
   )
 
   const [subTab, setSubTab] = useState('benefits')
+  const [benefitSourceFilter, setBenefitSourceFilter] = useState('all')
   const [workView, setWorkView] = useState('wife')
   const [summaryPeriod, setSummaryPeriod] = useState('annual')
   const [summaryMonthKey, setSummaryMonthKey] = useState(() => toMonthKey(new Date()))
@@ -335,6 +388,35 @@ export default function MoneyTab() {
   const claimedMoney = moneyTracker
     .filter(item => moneyClaimed[item.id])
     .reduce((acc, item) => acc + item.amount, 0)
+  const benefitTasksById = useMemo(() => {
+    const map = {}
+    phases.forEach((phase) => {
+      phase.items.forEach((task) => {
+        const moneyIds = Array.isArray(task.moneyIds) ? task.moneyIds : []
+        moneyIds.forEach((moneyId) => {
+          if (!map[moneyId]) map[moneyId] = []
+          map[moneyId].push({
+            id: task.id,
+            text: task.text,
+            phaseTitle: phase.title,
+          })
+        })
+      })
+    })
+    return map
+  }, [])
+  const filteredMoneyTracker = useMemo(() => {
+    if (benefitSourceFilter === 'all') return moneyTracker
+    return moneyTracker.filter((item) => (BENEFIT_SOURCE_BY_ID[item.id] || 'kawasaki') === benefitSourceFilter)
+  }, [benefitSourceFilter])
+  const visibleMoneyTotal = useMemo(
+    () => filteredMoneyTracker.reduce((acc, item) => acc + item.amount, 0),
+    [filteredMoneyTracker]
+  )
+  const visibleClaimedMoney = useMemo(
+    () => filteredMoneyTracker.filter((item) => moneyClaimed[item.id]).reduce((acc, item) => acc + item.amount, 0),
+    [filteredMoneyTracker, moneyClaimed]
+  )
 
   useEffect(() => {
     if (!includeHusband && workView === 'husband') setWorkView('wife')
@@ -581,14 +663,33 @@ export default function MoneyTab() {
               <span className="section-icon"><UiIcon icon={APP_ICONS.benefits} /></span>
               <div>
                 <h2>Finance Tracker</h2>
-                <span className="section-count">{formatYen(claimedMoney)} / {formatYen(totalMoney)}</span>
+                <span className="section-count">
+                  {formatYen(benefitSourceFilter === 'all' ? claimedMoney : visibleClaimedMoney)} / {formatYen(benefitSourceFilter === 'all' ? totalMoney : visibleMoneyTotal)}
+                </span>
               </div>
             </div>
             <p className="section-note">
-              Tap checkbox to mark as claimed. Tap info for how to claim.
+              Tap checkbox to mark as claimed. Tap info for claim flow, related tasks, and what to batch together.
             </p>
+            <div className="glass-tabs salary-mini-tabs">
+              {[
+                { id: 'all', label: 'All' },
+                { id: 'national', label: 'National' },
+                { id: 'kawasaki', label: 'Kawasaki' },
+                { id: 'employer', label: 'Employer' },
+              ].map(option => (
+                <button
+                  key={option.id}
+                  type="button"
+                  className={`glass-tab ${benefitSourceFilter === option.id ? 'active' : ''}`}
+                  onClick={() => setBenefitSourceFilter(option.id)}
+                >
+                  <span>{option.label}</span>
+                </button>
+              ))}
+            </div>
             <ul>
-              {moneyTracker.map(item => (
+              {filteredMoneyTracker.map(item => (
                 <li key={item.id} className={`glass-card money-card ${moneyClaimed[item.id] ? 'done' : ''}`}>
                   <div className="money-card-top">
                     <span className="checkbox glass-inner" onClick={() => toggleMoney(item.id)}>
@@ -623,6 +724,30 @@ export default function MoneyTab() {
                         <div className="detail-section">
                           <div className="detail-label">Deadline:</div>
                           <div className="detail-text deadline-text">{item.deadline}</div>
+                        </div>
+                      )}
+                      {BENEFIT_TIMING_HINT_BY_ID[item.id] && (
+                        <div className="detail-section">
+                          <div className="detail-label">Recommended timing:</div>
+                          <div className="detail-text">{BENEFIT_TIMING_HINT_BY_ID[item.id]}</div>
+                        </div>
+                      )}
+                      {BENEFIT_BATCH_HINT_BY_ID[item.id] && (
+                        <div className="detail-section">
+                          <div className="detail-label">Batch this with:</div>
+                          <div className="detail-text">{BENEFIT_BATCH_HINT_BY_ID[item.id]}</div>
+                        </div>
+                      )}
+                      {Array.isArray(benefitTasksById[item.id]) && benefitTasksById[item.id].length > 0 && (
+                        <div className="detail-section">
+                          <div className="detail-label">Related tasks in checklist:</div>
+                          <div className="detail-text">
+                            {benefitTasksById[item.id].map((task) => (
+                              <div key={`${item.id}-task-${task.id}`}>
+                                <strong>{task.id.toUpperCase()}</strong> - {task.text} ({task.phaseTitle})
+                              </div>
+                            ))}
+                          </div>
                         </div>
                       )}
                       {item.verifiedAt && (
