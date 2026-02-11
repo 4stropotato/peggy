@@ -291,6 +291,7 @@ function AppInner() {
       if (kind === 'peggy-sw-local-test-ack') {
         const ok = Boolean(payload.ok)
         const createdAt = payload.createdAt || new Date().toISOString()
+        const tag = String(payload.tag || '').trim()
         appendSmartNotifInbox({
           title: ok ? 'Local test acknowledged by Service Worker' : 'Local test failed in Service Worker',
           body: ok
@@ -301,9 +302,9 @@ function AppInner() {
           status: ok ? 'sent' : 'missed',
           source: 'service-worker',
           reason: ok ? '' : 'sw-local-test-failed',
-          slotKey: String(payload.tag || '').trim(),
+          slotKey: tag,
           dedupeKey: ok
-            ? `sw-local-test-ok|${String(payload.tag || '')}|${String(createdAt).slice(0, 16)}`
+            ? `sw-local-test-ok|${tag}|${String(createdAt).slice(0, 16)}`
             : `sw-local-test-failed|${String(createdAt).slice(0, 16)}`,
           createdAt,
           read: false,
@@ -311,6 +312,7 @@ function AppInner() {
         window.dispatchEvent(new CustomEvent('peggy-local-test-ack', {
           detail: {
             ok,
+            tag,
             error: String(payload.error || '').trim(),
             createdAt,
           },

@@ -95,6 +95,28 @@ function withTimeout(promise, timeoutMs, label = 'operation') {
   })
 }
 
+function waitForLocalTestAck(expectedTag, timeoutMs = 10000) {
+  const tag = String(expectedTag || '').trim()
+  const ms = Math.max(1000, Number(timeoutMs) || 10000)
+  return new Promise((resolve, reject) => {
+    let done = false
+    const finish = (fn, value) => {
+      if (done) return
+      done = true
+      window.removeEventListener('peggy-local-test-ack', onAck)
+      clearTimeout(timer)
+      fn(value)
+    }
+    const onAck = (event) => {
+      const eventTag = String(event?.detail?.tag || '').trim()
+      if (tag && eventTag && eventTag !== tag) return
+      finish(resolve, event?.detail || {})
+    }
+    const timer = setTimeout(() => finish(reject, new Error(`local test ack timed out after ${ms}ms`)), ms)
+    window.addEventListener('peggy-local-test-ack', onAck)
+  })
+}
+
 function InfoPanel({ section }) {
   const [expandedPhase, setExpandedPhase] = useState(null)
   const [expandedItem, setExpandedItem] = useState(null)
@@ -997,15 +1019,30 @@ export default function MoreTab() {
       if ('serviceWorker' in navigator) {
         setNotifStatus('Running local notification test... waiting for Service Worker')
         try {
-          registration = await withTimeout(
-            navigator.serviceWorker.ready,
-            4500,
-            'service worker ready',
-          )
+          const base = import.meta.env.BASE_URL || '/'
+          const byScope = await withTimeout(
+            navigator.serviceWorker.getRegistration(base),
+            2200,
+            'service worker getRegistration(scope)',
+          ).catch(() => null)
+          const anyScope = byScope || await withTimeout(
+            navigator.serviceWorker.getRegistration(),
+            2200,
+            'service worker getRegistration',
+          ).catch(() => null)
+          registration = anyScope
+          if (!registration) {
+            registration = await withTimeout(
+              navigator.serviceWorker.ready,
+              12000,
+              'service worker ready',
+            )
+          }
         } catch {
           registration = null
         }
         if (registration?.active) {
+          const testTag = String(options.tag || '').trim()
           registration.active.postMessage({
             type: 'peggy-local-test',
             payload: {
@@ -1013,21 +1050,16 @@ export default function MoreTab() {
               body,
               icon: options.icon,
               badge: options.badge,
-              tag: options.tag,
+              tag: testTag,
               url: import.meta.env.BASE_URL || '/',
               delayMs: 3800,
             },
           })
           swMessageQueued = true
-        }
-        if (registration?.showNotification) {
           try {
-            await withTimeout(
-              registration.showNotification(title, options),
-              5000,
-              'service worker showNotification',
-            )
-            route = swMessageQueued ? 'service-worker-message+showNotification' : 'service-worker-showNotification'
+            setNotifStatus('Local test queued in Service Worker. Lock phone now...')
+            await waitForLocalTestAck(testTag, 12000)
+            route = 'service-worker-message-delayed'
             sent = true
           } catch {
             sent = false
