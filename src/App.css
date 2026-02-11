@@ -2161,6 +2161,81 @@ ul { list-style: none; }
   font-size: 0.7rem;
   color: var(--text2);
 }
+.salary-mini-tabs {
+  margin-top: 0.55rem;
+}
+.salary-mini-tabs .glass-tab.husband-tab {
+  border-color: rgba(79, 162, 255, 0.42);
+}
+.household-toggle-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.6rem;
+  border: 1px solid var(--glass-border);
+  border-radius: 12px;
+  padding: 0.55rem 0.65rem;
+  margin-top: 0.4rem;
+}
+.household-toggle-title {
+  font-size: 0.76rem;
+  font-weight: 800;
+  color: var(--text);
+}
+.household-toggle-note {
+  margin-top: 0.12rem;
+  font-size: 0.67rem;
+  color: var(--text2);
+}
+.husband-summary {
+  border-color: rgba(79, 162, 255, 0.3);
+  background: rgba(79, 162, 255, 0.09);
+}
+.family-total-card {
+  margin-top: 0.55rem;
+  border: 1px solid var(--glass-border);
+  border-radius: 12px;
+  padding: 0.6rem 0.7rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.5rem;
+  background: linear-gradient(135deg, rgba(233, 30, 139, 0.13), rgba(108, 92, 231, 0.14));
+}
+.family-total-card span {
+  font-size: 0.72rem;
+  color: var(--text2);
+}
+.family-total-card strong {
+  font-size: 0.88rem;
+  color: var(--text);
+}
+.salary-month-table {
+  display: flex;
+  flex-direction: column;
+  gap: 0.38rem;
+}
+.salary-month-row {
+  border: 1px solid var(--glass-border);
+  border-radius: 10px;
+  padding: 0.5rem 0.6rem;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.35rem;
+  font-size: 0.68rem;
+  color: var(--text2);
+}
+.salary-month-row span:first-child {
+  color: var(--text);
+  font-weight: 800;
+}
+.work-finance-wrap.husband .finance-work-section {
+  border-left: 3px solid #4fa2ff;
+  background: linear-gradient(145deg, rgba(79, 162, 255, 0.1), rgba(79, 162, 255, 0.04));
+}
+.work-finance-wrap.husband .section-icon {
+  color: #4fa2ff;
+}
 
 /* ===== Tax Calculator ===== */
 .tax-form {
@@ -2950,6 +3025,36 @@ input[type="range"]:focus {
   color: #7a3e5e;
   background: rgba(255, 255, 255, 0.68);
 }
+.app.light .household-toggle-row {
+  border-color: rgba(200, 100, 140, 0.24);
+  background: rgba(255, 255, 255, 0.7);
+}
+.app.light .household-toggle-note {
+  color: #8a5070;
+}
+.app.light .salary-mini-tabs .glass-tab.husband-tab {
+  border-color: rgba(76, 132, 217, 0.45);
+}
+.app.light .husband-summary {
+  border-color: rgba(76, 132, 217, 0.28);
+  background: rgba(76, 132, 217, 0.1);
+}
+.app.light .family-total-card {
+  border-color: rgba(200, 100, 140, 0.24);
+  background: linear-gradient(135deg, rgba(214, 51, 132, 0.16), rgba(76, 132, 217, 0.14));
+}
+.app.light .salary-month-row {
+  border-color: rgba(200, 100, 140, 0.2);
+  background: rgba(255, 255, 255, 0.72);
+  color: #7a3e5e;
+}
+.app.light .work-finance-wrap.husband .finance-work-section {
+  border-left-color: #4c84d9;
+  background: linear-gradient(145deg, rgba(76, 132, 217, 0.12), rgba(76, 132, 217, 0.06));
+}
+.app.light .work-finance-wrap.husband .section-icon {
+  color: #3f73c9;
+}
 
 /* ===== Theme Toggle Button ===== */
 .theme-toggle {
@@ -3594,6 +3699,13 @@ input[type="range"]:focus {
   .salary-rate-grid,
   .salary-summary-grid {
     grid-template-columns: 1fr;
+  }
+  .salary-month-row {
+    grid-template-columns: 1fr;
+  }
+  .household-toggle-row {
+    flex-direction: column;
+    align-items: flex-start;
   }
 }
 

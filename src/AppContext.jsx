@@ -70,6 +70,25 @@ const defaultHealthCalendarVisibility = Object.freeze({
   mood: true,
 })
 
+function createDefaultWorkLocation() {
+  return {
+    enabled: false,
+    name: '',
+    lat: '',
+    lng: '',
+    radiusMeters: 180,
+    homeName: '',
+    homeLat: '',
+    homeLng: '',
+    homeRadiusMeters: 220,
+    autoHours: 8,
+    awayMinutesForWork: 90,
+    lastAutoLogDate: '',
+    lastInsideAt: '',
+    lastAutoReason: '',
+  }
+}
+
 export function AppProvider({ children }) {
   const [checked, setChecked] = useLS('baby-prep-checked', {})
   const [dailySupp, setDailySupp] = useLS('baby-prep-daily', {})
@@ -102,23 +121,16 @@ export function AppProvider({ children }) {
   })
   // Work attendance for Naomi: { '2026-02-07': { worked: true, hours: 8, note: '' } }
   const [attendance, setAttendance] = useLS('baby-prep-attendance', {})
-  // Work geofence auto-logging config (synced per account via cloud backup).
-  const [workLocation, setWorkLocation] = useLS('baby-prep-work-location', {
-    enabled: false,
-    name: '',
-    lat: '',
-    lng: '',
-    radiusMeters: 180,
-    homeName: '',
-    homeLat: '',
-    homeLng: '',
-    homeRadiusMeters: 220,
-    autoHours: 8,
-    awayMinutesForWork: 90,
-    lastAutoLogDate: '',
-    lastInsideAt: '',
-    lastAutoReason: '',
+  // Husband work attendance for family-income transparency.
+  const [husbandAttendance, setHusbandAttendance] = useLS('baby-prep-attendance-husband', {})
+  // Finance household settings (single mother mode support).
+  const [familyConfig, setFamilyConfig] = useLS('baby-prep-family-config', {
+    includeHusband: true,
   })
+  // Work geofence auto-logging config (synced per account via cloud backup).
+  const [workLocation, setWorkLocation] = useLS('baby-prep-work-location', createDefaultWorkLocation())
+  // Husband geofence config (separate from Naomi).
+  const [husbandWorkLocation, setHusbandWorkLocation] = useLS('baby-prep-work-location-husband', createDefaultWorkLocation())
   // Supplement schedule config: { suppId: { enabled, times: ['08:00', '20:00'], timesPerDay } }
   const [suppSchedule, setSuppSchedule] = useLS('baby-prep-supp-schedule', defaultSuppSchedule)
   // Supplement last taken timestamps: { 'suppId-doseIndex': 'ISO timestamp' }
@@ -376,6 +388,10 @@ export function AppProvider({ children }) {
     setAttendance(prev => ({ ...prev, [date]: data }))
   }
   const getAttendance = (date) => attendance[date] || null
+  const markHusbandAttendance = (date, data) => {
+    setHusbandAttendance(prev => ({ ...prev, [date]: data }))
+  }
+  const getHusbandAttendance = (date) => husbandAttendance[date] || null
 
   // Supplement bottle functions
   const resetBottle = (suppId) => {
@@ -403,6 +419,8 @@ export function AppProvider({ children }) {
     contacts, addContact, removeContact, updateContact,
     taxInputs, setTaxInputs,
     attendance, markAttendance, getAttendance, workLocation, setWorkLocation,
+    husbandAttendance, markHusbandAttendance, getHusbandAttendance, husbandWorkLocation, setHusbandWorkLocation,
+    familyConfig, setFamilyConfig,
     suppSchedule,
     suppLastTaken, suppBottles, resetBottle,
     theme, toggleTheme,

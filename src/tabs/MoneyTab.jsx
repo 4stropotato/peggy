@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useApp } from '../AppContext'
 import { moneyTracker } from '../data'
 import { calculateTax } from '../taxCalc'
@@ -25,6 +25,13 @@ function normalizeBasis(value) {
   return 'monthly'
 }
 
+function normalizePerson(value) {
+  const raw = String(value || '').trim().toLowerCase()
+  if (raw === 'shinji' || raw === 'husband' || raw === 'partner') return 'husband'
+  if (raw === 'naomi' || raw === 'wife') return 'naomi'
+  return raw || 'naomi'
+}
+
 function estimateAnnualFromRate(rateEntry) {
   if (!rateEntry || typeof rateEntry !== 'object') return 0
   const basis = normalizeBasis(rateEntry.basis)
@@ -44,16 +51,95 @@ function toDateStamp(value) {
 }
 
 function getCurrentRateForPerson(payRates, person, now = new Date()) {
-  const target = String(person || '').trim().toLowerCase()
+  const target = normalizePerson(person)
   const nowStamp = now.getTime()
   const all = (Array.isArray(payRates) ? payRates : [])
-    .filter(item => String(item?.person || '').trim().toLowerCase() === target)
+    .filter(item => normalizePerson(item?.person) === target)
     .map(item => ({ ...item, __stamp: toDateStamp(item?.effectiveFrom) }))
     .sort((a, b) => b.__stamp - a.__stamp)
   if (!all.length) return null
 
   const active = all.find(item => item.__stamp <= nowStamp)
   return active || all[0]
+}
+
+function getRateForDate(payRates, person, dateISO) {
+  const target = normalizePerson(person)
+  const dayStamp = Date.parse(`${String(dateISO || '').trim()}T23:59:59`)
+  const all = (Array.isArray(payRates) ? payRates : [])
+    .filter(item => normalizePerson(item?.person) === target)
+    .map(item => ({ ...item, __stamp: toDateStamp(item?.effectiveFrom) }))
+    .sort((a, b) => b.__stamp - a.__stamp)
+  if (!all.length) return null
+  if (!Number.isFinite(dayStamp)) return all[0]
+  const active = all.find(item => item.__stamp <= dayStamp)
+  return active || all[0]
+}
+
+function getMonthKeyFromISO(dateISO) {
+  const raw = String(dateISO || '').trim()
+  if (!raw || raw.length < 7) return ''
+  return raw.slice(0, 7)
+}
+
+function buildMonthlyIncomeMap(attendanceMap, payRates, person) {
+  const monthly = {}
+  const monthlyFixed = {}
+  for (const [dateISO, record] of Object.entries(attendanceMap || {})) {
+    if (!record?.worked) continue
+    const monthKey = getMonthKeyFromISO(dateISO)
+    if (!monthKey) continue
+    const rate = getRateForDate(payRates, person, dateISO)
+    if (!rate) continue
+    const basis = normalizeBasis(rate.basis)
+    const amount = Math.max(0, Number(rate.rate) || 0)
+
+    if (basis === 'hourly') {
+      const hours = Math.max(0, Number(record.hours) || 0)
+      monthly[monthKey] = (monthly[monthKey] || 0) + (hours * amount)
+      continue
+    }
+    if (basis === 'daily') {
+      monthly[monthKey] = (monthly[monthKey] || 0) + amount
+      continue
+    }
+
+    const stamp = toDateStamp(rate.effectiveFrom)
+    const prev = monthlyFixed[monthKey]
+    if (!prev || stamp > prev.stamp) {
+      monthlyFixed[monthKey] = { value: amount, stamp }
+    }
+  }
+
+  for (const [monthKey, meta] of Object.entries(monthlyFixed)) {
+    monthly[monthKey] = (monthly[monthKey] || 0) + (Number(meta.value) || 0)
+  }
+  return monthly
+}
+
+function toMonthKey(dateLike) {
+  const d = dateLike instanceof Date ? dateLike : new Date(dateLike)
+  if (Number.isNaN(d.getTime())) return ''
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
+}
+
+function sumLastMonths(monthlyMap, months = 12, now = new Date()) {
+  let total = 0
+  for (let i = 0; i < months; i += 1) {
+    const d = new Date(now.getFullYear(), now.getMonth() - i, 1)
+    const key = toMonthKey(d)
+    total += Number(monthlyMap?.[key] || 0)
+  }
+  return Math.round(total)
+}
+
+function getRecentMonthKeys(count = 6, now = new Date()) {
+  const out = []
+  for (let i = 0; i < count; i += 1) {
+    const d = new Date(now.getFullYear(), now.getMonth() - i, 1)
+    out.push(toMonthKey(d))
+  }
+  return out
 }
 
 function getBasisLabel(basis) {
@@ -80,8 +166,9 @@ function formatAssumption(item) {
 }
 
 function formatPerson(personKey) {
-  if (String(personKey || '').toLowerCase() === 'naomi') return 'Naomi'
-  if (String(personKey || '').toLowerCase() === 'shinji') return 'Shinji'
+  const normalized = normalizePerson(personKey)
+  if (normalized === 'naomi') return 'Wife'
+  if (normalized === 'husband') return 'Husband'
   return String(personKey || 'Other')
 }
 
@@ -98,9 +185,15 @@ export default function MoneyTab() {
     removePayRate,
     taxInputs,
     setTaxInputs,
+    attendance,
+    husbandAttendance,
+    familyConfig,
+    setFamilyConfig,
   } = useApp()
+  const includeHusband = familyConfig?.includeHusband !== false
 
   const [subTab, setSubTab] = useState('benefits')
+  const [salaryView, setSalaryView] = useState('wife')
   const [expandedItem, setExpandedItem] = useState(null)
   const [taxStepIndex, setTaxStepIndex] = useState(0)
   const [rateForm, setRateForm] = useState(() => ({
@@ -118,13 +211,35 @@ export default function MoneyTab() {
     .filter(item => moneyClaimed[item.id])
     .reduce((acc, item) => acc + item.amount, 0)
 
-  const currentNaomiRate = useMemo(() => getCurrentRateForPerson(payRates, 'naomi'), [payRates])
-  const currentShinjiRate = useMemo(() => getCurrentRateForPerson(payRates, 'shinji'), [payRates])
-  const estimatedNaomiAnnual = useMemo(() => estimateAnnualFromRate(currentNaomiRate), [currentNaomiRate])
-  const estimatedShinjiAnnual = useMemo(() => estimateAnnualFromRate(currentShinjiRate), [currentShinjiRate])
+  useEffect(() => {
+    if (!includeHusband && salaryView === 'husband') setSalaryView('wife')
+  }, [includeHusband, salaryView])
 
-  const effectiveAnnualIncome = Number(taxInputs.annualIncome) || estimatedShinjiAnnual
-  const effectiveSpouseIncome = Number(taxInputs.spouseIncome) || estimatedNaomiAnnual
+  const currentNaomiRate = useMemo(() => getCurrentRateForPerson(payRates, 'naomi'), [payRates])
+  const currentHusbandRate = useMemo(() => getCurrentRateForPerson(payRates, 'husband'), [payRates])
+  const naomiMonthlyIncomeMap = useMemo(
+    () => buildMonthlyIncomeMap(attendance, payRates, 'naomi'),
+    [attendance, payRates]
+  )
+  const husbandMonthlyIncomeMap = useMemo(
+    () => buildMonthlyIncomeMap(husbandAttendance, payRates, 'husband'),
+    [husbandAttendance, payRates]
+  )
+  const naomiAnnualFromWork = useMemo(() => sumLastMonths(naomiMonthlyIncomeMap, 12), [naomiMonthlyIncomeMap])
+  const husbandAnnualFromWork = useMemo(() => sumLastMonths(husbandMonthlyIncomeMap, 12), [husbandMonthlyIncomeMap])
+  const naomiAnnualFallback = useMemo(() => estimateAnnualFromRate(currentNaomiRate), [currentNaomiRate])
+  const husbandAnnualFallback = useMemo(() => estimateAnnualFromRate(currentHusbandRate), [currentHusbandRate])
+  const estimatedNaomiAnnual = naomiAnnualFromWork > 0 ? naomiAnnualFromWork : naomiAnnualFallback
+  const estimatedHusbandAnnual = husbandAnnualFromWork > 0 ? husbandAnnualFromWork : husbandAnnualFallback
+  const estimatedFamilyAnnual = estimatedNaomiAnnual + (includeHusband ? estimatedHusbandAnnual : 0)
+  const recentMonthKeys = useMemo(() => getRecentMonthKeys(6), [])
+
+  const effectiveAnnualIncome = includeHusband
+    ? (Number(taxInputs.annualIncome) || estimatedHusbandAnnual)
+    : (Number(taxInputs.annualIncome) || estimatedNaomiAnnual)
+  const effectiveSpouseIncome = includeHusband
+    ? (Number(taxInputs.spouseIncome) || estimatedNaomiAnnual)
+    : 0
   const taxResult = calculateTax({
     annualIncome: effectiveAnnualIncome,
     spouseIncome: effectiveSpouseIncome,
@@ -154,8 +269,13 @@ export default function MoneyTab() {
   }
 
   const applyTaxIncomeFromRates = () => {
-    if (estimatedShinjiAnnual > 0) updateTax('annualIncome', String(estimatedShinjiAnnual))
-    if (estimatedNaomiAnnual > 0) updateTax('spouseIncome', String(estimatedNaomiAnnual))
+    if (includeHusband) {
+      if (estimatedHusbandAnnual > 0) updateTax('annualIncome', String(estimatedHusbandAnnual))
+      if (estimatedNaomiAnnual > 0) updateTax('spouseIncome', String(estimatedNaomiAnnual))
+      return
+    }
+    if (estimatedNaomiAnnual > 0) updateTax('annualIncome', String(estimatedNaomiAnnual))
+    updateTax('spouseIncome', '')
   }
 
   const handleAddPayRate = (event) => {
@@ -165,7 +285,7 @@ export default function MoneyTab() {
     if (!String(rateForm.effectiveFrom || '').trim()) return
 
     addPayRate({
-      person: rateForm.person,
+      person: normalizePerson(rateForm.person),
       basis: normalizeBasis(rateForm.basis),
       rate,
       effectiveFrom: rateForm.effectiveFrom,
@@ -297,157 +417,232 @@ export default function MoneyTab() {
               <span className="section-icon"><UiIcon icon={APP_ICONS.salary} /></span>
               <div>
                 <h2>Salary Tracker</h2>
-                <span className="section-count">Merged with Work (attendance + salary + rate changes)</span>
+                <span className="section-count">Work-driven income + transparent family total</span>
               </div>
             </div>
-            <p className="section-note">
-              Set effective rates per person. The latest active rate auto-feeds Tax Calc.
-            </p>
-
-            <form className="salary-rate-form glass-card" onSubmit={handleAddPayRate}>
-              <div className="salary-rate-grid">
-                <div className="form-row">
-                  <label>Person</label>
-                  <select value={rateForm.person} onChange={e => updateRateForm('person', e.target.value)}>
-                    <option value="naomi">Naomi</option>
-                    <option value="shinji">Shinji</option>
-                  </select>
-                </div>
-                <div className="form-row">
-                  <label>Basis</label>
-                  <select value={rateForm.basis} onChange={e => updateRateForm('basis', e.target.value)}>
-                    <option value="hourly">Hourly</option>
-                    <option value="daily">Daily</option>
-                    <option value="monthly">Monthly</option>
-                  </select>
-                </div>
-                <div className="form-row">
-                  <label>Rate ({YEN})</label>
-                  <input
-                    type="number"
-                    value={rateForm.rate}
-                    onChange={e => updateRateForm('rate', e.target.value)}
-                    placeholder={rateForm.basis === 'hourly' ? 'e.g. 1350' : rateForm.basis === 'daily' ? 'e.g. 16000' : 'e.g. 350000'}
-                    required
-                  />
-                </div>
-                <div className="form-row">
-                  <label>Effective From</label>
-                  <input
-                    type="date"
-                    value={rateForm.effectiveFrom}
-                    onChange={e => updateRateForm('effectiveFrom', e.target.value)}
-                    required
-                  />
-                </div>
-                {rateForm.basis === 'hourly' && (
-                  <div className="form-row">
-                    <label>Hours per Day</label>
-                    <input
-                      type="number"
-                      step="0.25"
-                      min="1"
-                      max="24"
-                      value={rateForm.hoursPerDay}
-                      onChange={e => updateRateForm('hoursPerDay', e.target.value)}
-                    />
-                  </div>
-                )}
-                {(rateForm.basis === 'hourly' || rateForm.basis === 'daily') && (
-                  <div className="form-row">
-                    <label>Work Days per Month</label>
-                    <input
-                      type="number"
-                      min="1"
-                      max="31"
-                      value={rateForm.workDaysPerMonth}
-                      onChange={e => updateRateForm('workDaysPerMonth', e.target.value)}
-                    />
-                  </div>
-                )}
-              </div>
-              <div className="form-row">
-                <label>Note (optional)</label>
-                <input
-                  type="text"
-                  value={rateForm.note}
-                  onChange={e => updateRateForm('note', e.target.value)}
-                  placeholder="e.g. possible raise in April"
-                />
-              </div>
-              <button type="submit" className="btn-glass-primary">Save Rate</button>
-            </form>
-          </section>
-
-          <section className="glass-section">
-            <div className="section-header">
-              <span className="section-icon"><UiIcon icon={APP_ICONS.overview} /></span>
+            <div className="household-toggle-row glass-inner">
               <div>
-                <h2>Current Annual Estimates</h2>
-                <span className="section-count">Used by Tax Calc when fields are blank</span>
+                <div className="household-toggle-title">Husband side</div>
+                <div className="household-toggle-note">Disable for single-mother setup</div>
               </div>
+              <button
+                type="button"
+                className={`notif-pill-btn glass-inner ${includeHusband ? 'on' : ''}`}
+                onClick={() => setFamilyConfig(prev => ({ ...(prev || {}), includeHusband: !includeHusband }))}
+              >
+                {includeHusband ? 'Enabled' : 'Disabled'}
+              </button>
             </div>
-            <div className="salary-summary-grid">
-              <div className="glass-inner salary-summary-card">
-                <div className="salary-person">Naomi</div>
-                {currentNaomiRate ? (
-                  <>
-                    <div className="salary-rate-main">{formatRateLabel(currentNaomiRate)}</div>
-                    <div className="salary-assume">{formatAssumption(currentNaomiRate)}</div>
+
+            <div className="glass-tabs salary-mini-tabs">
+              {['wife', includeHusband ? 'husband' : null, 'rates'].filter(Boolean).map(view => (
+                <button
+                  key={view}
+                  className={`glass-tab ${salaryView === view ? 'active' : ''} ${view === 'husband' ? 'husband-tab' : ''}`}
+                  onClick={() => setSalaryView(view)}
+                >
+                  <span>{view === 'wife' ? 'Wife Work' : view === 'husband' ? 'Husband Work' : 'Rates & Family'}</span>
+                </button>
+              ))}
+            </div>
+          </section>
+
+          {salaryView === 'wife' && (
+            <WorkFinancePanel
+              personKey="naomi"
+              title="Wife Work Attendance"
+              accent="wife"
+              allowGeoTracker={true}
+            />
+          )}
+
+          {salaryView === 'husband' && includeHusband && (
+            <WorkFinancePanel
+              personKey="husband"
+              title="Husband Work Attendance"
+              accent="husband"
+              allowGeoTracker={false}
+            />
+          )}
+
+          {salaryView === 'rates' && (
+            <>
+              <section className="glass-section">
+                <div className="section-header">
+                  <span className="section-icon"><UiIcon icon={APP_ICONS.salary} /></span>
+                  <div>
+                    <h2>Pay Rate Profiles</h2>
+                    <span className="section-count">Hourly / Daily / Monthly with effectivity</span>
+                  </div>
+                </div>
+
+                <form className="salary-rate-form glass-card" onSubmit={handleAddPayRate}>
+                  <div className="salary-rate-grid">
+                    <div className="form-row">
+                      <label>Side</label>
+                      <select value={rateForm.person} onChange={e => updateRateForm('person', e.target.value)}>
+                        <option value="naomi">Wife</option>
+                        <option value="husband">Husband</option>
+                      </select>
+                    </div>
+                    <div className="form-row">
+                      <label>Basis</label>
+                      <select value={rateForm.basis} onChange={e => updateRateForm('basis', e.target.value)}>
+                        <option value="hourly">Hourly</option>
+                        <option value="daily">Daily</option>
+                        <option value="monthly">Monthly</option>
+                      </select>
+                    </div>
+                    <div className="form-row">
+                      <label>Rate ({YEN})</label>
+                      <input
+                        type="number"
+                        value={rateForm.rate}
+                        onChange={e => updateRateForm('rate', e.target.value)}
+                        placeholder={rateForm.basis === 'hourly' ? 'e.g. 1350' : rateForm.basis === 'daily' ? 'e.g. 16000' : 'e.g. 350000'}
+                        required
+                      />
+                    </div>
+                    <div className="form-row">
+                      <label>Effective From</label>
+                      <input
+                        type="date"
+                        value={rateForm.effectiveFrom}
+                        onChange={e => updateRateForm('effectiveFrom', e.target.value)}
+                        required
+                      />
+                    </div>
+                    {rateForm.basis === 'hourly' && (
+                      <div className="form-row">
+                        <label>Hours per Day</label>
+                        <input
+                          type="number"
+                          step="0.25"
+                          min="1"
+                          max="24"
+                          value={rateForm.hoursPerDay}
+                          onChange={e => updateRateForm('hoursPerDay', e.target.value)}
+                        />
+                      </div>
+                    )}
+                    {(rateForm.basis === 'hourly' || rateForm.basis === 'daily') && (
+                      <div className="form-row">
+                        <label>Work Days per Month</label>
+                        <input
+                          type="number"
+                          min="1"
+                          max="31"
+                          value={rateForm.workDaysPerMonth}
+                          onChange={e => updateRateForm('workDaysPerMonth', e.target.value)}
+                        />
+                      </div>
+                    )}
+                  </div>
+                  <div className="form-row">
+                    <label>Note (optional)</label>
+                    <input
+                      type="text"
+                      value={rateForm.note}
+                      onChange={e => updateRateForm('note', e.target.value)}
+                      placeholder="e.g. rate increase in April"
+                    />
+                  </div>
+                  <button type="submit" className="btn-glass-primary">Save Rate</button>
+                </form>
+              </section>
+
+              <section className="glass-section">
+                <div className="section-header">
+                  <span className="section-icon"><UiIcon icon={APP_ICONS.overview} /></span>
+                  <div>
+                    <h2>Family Income Summary</h2>
+                    <span className="section-count">From work logs + rate fallback</span>
+                  </div>
+                </div>
+                <div className="salary-summary-grid">
+                  <div className="glass-inner salary-summary-card">
+                    <div className="salary-person">Wife</div>
                     <div className="salary-annual">{formatYen(estimatedNaomiAnnual)} / year</div>
-                  </>
-                ) : (
-                  <div className="salary-empty">No active rate yet</div>
-                )}
-              </div>
-              <div className="glass-inner salary-summary-card">
-                <div className="salary-person">Shinji</div>
-                {currentShinjiRate ? (
-                  <>
-                    <div className="salary-rate-main">{formatRateLabel(currentShinjiRate)}</div>
-                    <div className="salary-assume">{formatAssumption(currentShinjiRate)}</div>
-                    <div className="salary-annual">{formatYen(estimatedShinjiAnnual)} / year</div>
-                  </>
-                ) : (
-                  <div className="salary-empty">No active rate yet</div>
-                )}
-              </div>
-            </div>
-          </section>
+                    <div className="salary-assume">Last 12 months from attendance logs</div>
+                    {naomiAnnualFromWork <= 0 && currentNaomiRate && (
+                      <div className="salary-assume">Fallback: {formatRateLabel(currentNaomiRate)}</div>
+                    )}
+                  </div>
+                  {includeHusband && (
+                    <div className="glass-inner salary-summary-card husband-summary">
+                      <div className="salary-person">Husband</div>
+                      <div className="salary-annual">{formatYen(estimatedHusbandAnnual)} / year</div>
+                      <div className="salary-assume">Last 12 months from attendance logs</div>
+                      {husbandAnnualFromWork <= 0 && currentHusbandRate && (
+                        <div className="salary-assume">Fallback: {formatRateLabel(currentHusbandRate)}</div>
+                      )}
+                    </div>
+                  )}
+                </div>
+                <div className="glass-inner family-total-card">
+                  <span>Estimated Family Total</span>
+                  <strong>{formatYen(estimatedFamilyAnnual)} / year</strong>
+                </div>
+              </section>
 
-          <section className="glass-section">
-            <div className="section-header">
-              <span className="section-icon"><UiIcon icon={APP_ICONS.activity} /></span>
-              <div><h2>Rate History</h2></div>
-            </div>
-            {sortedRates.length > 0 ? (
-              <ul className="salary-rate-list">
-                {sortedRates.map((item) => {
-                  const annual = estimateAnnualFromRate(item)
-                  return (
-                    <li key={item.id} className="glass-card salary-rate-item">
-                      <div className="salary-rate-top">
-                        <span className="salary-rate-person">{formatPerson(item.person)}</span>
-                        <span className="salary-rate-basis">{getBasisLabel(normalizeBasis(item.basis))}</span>
+              <section className="glass-section">
+                <div className="section-header">
+                  <span className="section-icon"><UiIcon icon={APP_ICONS.activity} /></span>
+                  <div>
+                    <h2>Recent Monthly Income</h2>
+                    <span className="section-count">Transparent log-based breakdown</span>
+                  </div>
+                </div>
+                <div className="salary-month-table">
+                  {recentMonthKeys.map((monthKey) => {
+                    const wife = Math.round(Number(naomiMonthlyIncomeMap[monthKey] || 0))
+                    const husband = Math.round(Number(husbandMonthlyIncomeMap[monthKey] || 0))
+                    const total = wife + (includeHusband ? husband : 0)
+                    return (
+                      <div key={monthKey} className="glass-inner salary-month-row">
+                        <span>{monthKey}</span>
+                        <span>Wife: {formatYen(wife)}</span>
+                        {includeHusband && <span>Husband: {formatYen(husband)}</span>}
+                        <span>Total: {formatYen(total)}</span>
                       </div>
-                      <div className="salary-rate-main">{formatRateLabel(item)}</div>
-                      <div className="salary-rate-meta">
-                        <span>From {item.effectiveFrom}</span>
-                        <span>{formatAssumption(item)}</span>
-                      </div>
-                      <div className="salary-rate-annual">Estimated annual: {formatYen(annual)}</div>
-                      {item.note && <div className="salary-rate-note">{item.note}</div>}
-                      <button type="button" className="btn-delete" onClick={() => removePayRate(item.id)}>Delete</button>
-                    </li>
-                  )
-                })}
-              </ul>
-            ) : (
-              <p className="empty-state">No salary rates yet. Add one above.</p>
-            )}
-          </section>
+                    )
+                  })}
+                </div>
+              </section>
 
-          <WorkFinancePanel />
+              <section className="glass-section">
+                <div className="section-header">
+                  <span className="section-icon"><UiIcon icon={APP_ICONS.activity} /></span>
+                  <div><h2>Rate History</h2></div>
+                </div>
+                {sortedRates.length > 0 ? (
+                  <ul className="salary-rate-list">
+                    {sortedRates.map((item) => {
+                      const annual = estimateAnnualFromRate(item)
+                      return (
+                        <li key={item.id} className="glass-card salary-rate-item">
+                          <div className="salary-rate-top">
+                            <span className="salary-rate-person">{formatPerson(item.person)}</span>
+                            <span className="salary-rate-basis">{getBasisLabel(normalizeBasis(item.basis))}</span>
+                          </div>
+                          <div className="salary-rate-main">{formatRateLabel(item)}</div>
+                          <div className="salary-rate-meta">
+                            <span>From {item.effectiveFrom}</span>
+                            <span>{formatAssumption(item)}</span>
+                          </div>
+                          <div className="salary-rate-annual">Rate-model annual: {formatYen(annual)}</div>
+                          {item.note && <div className="salary-rate-note">{item.note}</div>}
+                          <button type="button" className="btn-delete" onClick={() => removePayRate(item.id)}>Delete</button>
+                        </li>
+                      )
+                    })}
+                  </ul>
+                ) : (
+                  <p className="empty-state">No salary rates yet. Add one above.</p>
+                )}
+              </section>
+            </>
+          )}
         </>
       )}
 
@@ -485,42 +680,44 @@ export default function MoneyTab() {
                 <h3>Income Inputs</h3>
                 <div className="tax-form">
                   <div className="tax-field">
-                    <label>Shinji annual income ({YEN})</label>
+                    <label>{includeHusband ? `Husband annual income (${YEN})` : `Primary annual income (${YEN})`}</label>
                     <input
                       type="number"
                       value={taxInputs.annualIncome}
                       onChange={e => updateTax('annualIncome', e.target.value)}
-                      placeholder={estimatedShinjiAnnual > 0 ? `Auto available: ${formatYen(estimatedShinjiAnnual)}` : 'e.g. 5,000,000'}
+                      placeholder={effectiveAnnualIncome > 0 ? `Auto available: ${formatYen(effectiveAnnualIncome)}` : 'e.g. 5,000,000'}
                     />
                   </div>
-                  <div className="tax-field">
-                    <label>Naomi annual income ({YEN})</label>
-                    <input
-                      type="number"
-                      value={taxInputs.spouseIncome}
-                      onChange={e => updateTax('spouseIncome', e.target.value)}
-                      placeholder={estimatedNaomiAnnual > 0 ? `Auto available: ${formatYen(estimatedNaomiAnnual)}` : 'e.g. 1,200,000'}
-                    />
-                  </div>
+                  {includeHusband && (
+                    <div className="tax-field">
+                      <label>Wife annual income ({YEN})</label>
+                      <input
+                        type="number"
+                        value={taxInputs.spouseIncome}
+                        onChange={e => updateTax('spouseIncome', e.target.value)}
+                        placeholder={estimatedNaomiAnnual > 0 ? `Auto available: ${formatYen(estimatedNaomiAnnual)}` : 'e.g. 1,200,000'}
+                      />
+                    </div>
+                  )}
                 </div>
 
                 <div className="tax-input-actions">
                   <button type="button" className="btn-glass-secondary" onClick={applyTaxIncomeFromRates}>
-                    Use Salary Tracker Estimates
+                    Use Work-Based Salary Estimates
                   </button>
                 </div>
 
                 <div className="glass-inner tax-feed-guide">
                   <div className="tax-feed-title">What to feed here</div>
                   <ul className="tax-feed-list">
-                    <li>Gross annual income for Shinji and Naomi</li>
+                    <li>Annual income from work logs/rates or official salary slips</li>
                     <li>Medical receipts total for the year</li>
                     <li>Social insurance paid (if known)</li>
                   </ul>
                 </div>
 
                 {effectiveAnnualIncome <= 0 && (
-                  <p className="section-note">Required: set Shinji annual income (manual or from Salary Tracker) to continue.</p>
+                  <p className="section-note">Required: set primary annual income to continue.</p>
                 )}
               </div>
             )}
@@ -587,9 +784,9 @@ export default function MoneyTab() {
               <div className="tax-step-body">
                 <h3>Estimated Result</h3>
                 <div className="tax-summary-strip">
-                  <span>Income: {formatYen(effectiveAnnualIncome)}</span>
-                  <span>Spouse: {formatYen(effectiveSpouseIncome)}</span>
-                  <span>Medical: {formatYen(Number(taxInputs.medicalExpenses) || 0)}</span>
+                  <span>Primary: {formatYen(effectiveAnnualIncome)}</span>
+                  {includeHusband && <span>Partner: {formatYen(effectiveSpouseIncome)}</span>}
+                  <span>Family: {formatYen(effectiveAnnualIncome + effectiveSpouseIncome)}</span>
                 </div>
                 <div className="tax-results">
                   <div className="tax-row"><span>Employment Income</span><span>{formatYen(taxResult.employmentIncome)}</span></div>

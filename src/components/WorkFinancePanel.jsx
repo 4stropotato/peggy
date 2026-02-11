@@ -159,39 +159,54 @@ function toAttendanceForm(record) {
   }
 }
 
-export default function WorkFinancePanel() {
+function readCalendarPreference(storageKey, fallback = true) {
+  if (typeof window === 'undefined') return fallback
+  const raw = window.localStorage.getItem(storageKey)
+  if (raw === '0') return false
+  if (raw === '1') return true
+  return fallback
+}
+
+export default function WorkFinancePanel({
+  personKey = 'naomi',
+  title = 'Work Attendance',
+  accent = 'wife',
+  allowGeoTracker = true,
+}) {
   const {
     attendance,
     markAttendance,
     workLocation,
     setWorkLocation,
-    healthCalendarVisibility,
-    setHealthCalendarVisibility,
+    husbandAttendance,
+    markHusbandAttendance,
+    husbandWorkLocation,
+    setHusbandWorkLocation,
   } = useApp()
+
+  const isHusband = String(personKey || '').toLowerCase() === 'husband'
+  const activeAttendance = isHusband ? husbandAttendance : attendance
+  const activeMarkAttendance = isHusband ? markHusbandAttendance : markAttendance
+  const activeWorkLocation = isHusband ? husbandWorkLocation : workLocation
+  const activeSetWorkLocation = isHusband ? setHusbandWorkLocation : setWorkLocation
+  const calendarStorageKey = `baby-prep-finance-work-calendar-${isHusband ? 'husband' : 'wife'}`
 
   const now = new Date()
   const [workCal, setWorkCal] = useState({ y: now.getFullYear(), m: now.getMonth() + 1 })
   const [attendanceDate, setAttendanceDate] = useState(now.toISOString().split('T')[0])
   const [attendanceForm, setAttendanceForm] = useState(() => createDefaultAttendanceForm())
+  const [showWorkCalendar, setShowWorkCalendar] = useState(() => readCalendarPreference(calendarStorageKey, true))
   const [geoMessage, setGeoMessage] = useState('')
   const [geoStatus, setGeoStatus] = useState(() => String(getGeoTelemetry()?.status || ''))
   const [geoLive, setGeoLive] = useState(() => ({
     ...DEFAULT_GEO_LIVE,
     ...(getGeoTelemetry()?.live || {}),
   }))
-  const [locationDraft, setLocationDraft] = useState(() => toLocationDraft(workLocation))
+  const [locationDraft, setLocationDraft] = useState(() => toLocationDraft(activeWorkLocation))
   const draftDirtyRef = useRef(false)
   const geoMessageTimerRef = useRef(null)
-
-  const showWorkCalendar = useMemo(() => {
-    const source = healthCalendarVisibility && typeof healthCalendarVisibility === 'object'
-      ? healthCalendarVisibility
-      : {}
-    return source.work !== false
-  }, [healthCalendarVisibility])
-
-  const savedWorkTargetValid = isValidLatLng(workLocation.lat, workLocation.lng)
-  const savedHomeTargetValid = isValidLatLng(workLocation.homeLat, workLocation.homeLng)
+  const savedWorkTargetValid = isValidLatLng(activeWorkLocation.lat, activeWorkLocation.lng)
+  const savedHomeTargetValid = isValidLatLng(activeWorkLocation.homeLat, activeWorkLocation.homeLng)
   const hasSavedGeoTarget = savedWorkTargetValid || savedHomeTargetValid
   const nativeTrackingMode = isNativeIos()
   const attendanceDurationParts = toHoursAndMinutes(attendanceForm.hours, { minHours: 0.5, maxHours: 24 })
@@ -204,19 +219,24 @@ export default function WorkFinancePanel() {
 
   useEffect(() => {
     if (draftDirtyRef.current) return
-    setLocationDraft(toLocationDraft(workLocation))
+    setLocationDraft(toLocationDraft(activeWorkLocation))
   }, [
-    workLocation.name,
-    workLocation.lat,
-    workLocation.lng,
-    workLocation.radiusMeters,
-    workLocation.homeName,
-    workLocation.homeLat,
-    workLocation.homeLng,
-    workLocation.homeRadiusMeters,
-    workLocation.autoHours,
-    workLocation.awayMinutesForWork,
+    activeWorkLocation.name,
+    activeWorkLocation.lat,
+    activeWorkLocation.lng,
+    activeWorkLocation.radiusMeters,
+    activeWorkLocation.homeName,
+    activeWorkLocation.homeLat,
+    activeWorkLocation.homeLng,
+    activeWorkLocation.homeRadiusMeters,
+    activeWorkLocation.autoHours,
+    activeWorkLocation.awayMinutesForWork,
   ])
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    window.localStorage.setItem(calendarStorageKey, showWorkCalendar ? '1' : '0')
+  }, [calendarStorageKey, showWorkCalendar])
 
   useEffect(() => {
     if (typeof window === 'undefined') return undefined
@@ -285,7 +305,7 @@ export default function WorkFinancePanel() {
       return
     }
 
-    setWorkLocation(prev => ({
+    activeSetWorkLocation(prev => ({
       ...prev,
       name: String(locationDraft.workName || '').trim(),
       lat: toCoordString(locationDraft.workLat),
@@ -345,12 +365,12 @@ export default function WorkFinancePanel() {
       setGeoMessage('Save at least one valid location (Work or Home) before enabling tracker.')
       return
     }
-    setWorkLocation(prev => ({ ...prev, enabled: true }))
+    activeSetWorkLocation(prev => ({ ...prev, enabled: true }))
     setGeoMessage('Location tracker enabled.')
   }
 
   const handleDisableTracker = () => {
-    setWorkLocation(prev => ({ ...prev, enabled: false }))
+    activeSetWorkLocation(prev => ({ ...prev, enabled: false }))
     setGeoMessage('Location tracker disabled.')
   }
 
@@ -369,41 +389,32 @@ export default function WorkFinancePanel() {
       hours: attendanceForm.worked ? Math.max(0, Number(nextHours) || 0) : 0,
       breakMinutes: normalizeBreakMinutes(attendanceForm.breakMinutes),
     }
-    markAttendance(attendanceDate, payload)
+    activeMarkAttendance(attendanceDate, payload)
     setAttendanceForm(createDefaultAttendanceForm())
   }
 
   const toggleWorkCalendar = () => {
-    setHealthCalendarVisibility(prev => {
-      const safe = prev && typeof prev === 'object' ? prev : {}
-      const normalized = {
-        supps: safe.supps !== false,
-        work: safe.work !== false,
-        checkups: safe.checkups !== false,
-        mood: safe.mood !== false,
-      }
-      return { ...normalized, work: !normalized.work }
-    })
+    setShowWorkCalendar(prev => !prev)
   }
 
   const viewMonth = `${workCal.y}-${String(workCal.m).padStart(2, '0')}`
   const monthAttendance = useMemo(() => (
-    Object.entries(attendance)
+    Object.entries(activeAttendance)
       .filter(([date]) => date.startsWith(viewMonth))
       .map(([date, data]) => ({ date, ...data }))
       .sort((a, b) => b.date.localeCompare(a.date))
-  ), [attendance, viewMonth])
+  ), [activeAttendance, viewMonth])
   const daysWorked = monthAttendance.filter(a => a.worked).length
   const totalHours = monthAttendance
     .filter(a => a.worked)
     .reduce((acc, a) => acc + (Number(a.hours) || 0), 0)
 
   return (
-    <>
-      <section className="glass-section">
+    <div className={`work-finance-wrap ${accent}`}>
+      <section className={`glass-section finance-work-section ${accent}`}>
         <div className="section-header">
           <span className="section-icon"><UiIcon icon={APP_ICONS.work} /></span>
-          <div><h2>Work Attendance</h2></div>
+          <div><h2>{title}</h2></div>
           <button
             type="button"
             className="cal-collapse-btn"
@@ -415,25 +426,26 @@ export default function WorkFinancePanel() {
         </div>
         <p className="section-note">Save Work or Home pin first, then enable tracker for auto attendance logs.</p>
 
-        <div className="glass-card work-location-card">
-          <h3>Work/Home Location Auto-Log</h3>
+        {allowGeoTracker && (
+          <div className="glass-card work-location-card">
+            <h3>Work/Home Location Auto-Log</h3>
 
-          <div className="attendance-toggle">
-            <button
-              type="button"
-              className={`att-btn ${workLocation.enabled ? 'active worked' : ''}`}
-              onClick={handleEnableTracker}
-            >
-              Tracker ON
-            </button>
-            <button
-              type="button"
-              className={`att-btn ${!workLocation.enabled ? 'active absent' : ''}`}
-              onClick={handleDisableTracker}
-            >
-              Tracker OFF
-            </button>
-          </div>
+            <div className="attendance-toggle">
+              <button
+                type="button"
+                className={`att-btn ${activeWorkLocation.enabled ? 'active worked' : ''}`}
+                onClick={handleEnableTracker}
+              >
+                Tracker ON
+              </button>
+              <button
+                type="button"
+                className={`att-btn ${!activeWorkLocation.enabled ? 'active absent' : ''}`}
+                onClick={handleDisableTracker}
+              >
+                Tracker OFF
+              </button>
+            </div>
 
           <div className="work-location-sections">
             <div className="work-location-block glass-inner">
@@ -593,41 +605,47 @@ export default function WorkFinancePanel() {
             </button>
           </div>
 
-          {geoMessage && <p className="section-note">{geoMessage}</p>}
-          {geoStatus && geoStatus !== geoMessage && <p className="section-note">{geoStatus}</p>}
-          <p className="section-note">
-            Tracking mode: {nativeTrackingMode ? 'Native iOS (background-capable)' : 'Web (foreground-only)'}
-          </p>
-          {workLocation.enabled && geoLive.tracking && (
-            <div className={`work-geo-live glass-inner ${geoLive.insideWork ? 'inside' : geoLive.insideHome ? 'home' : 'outside'}`}>
-              <span>
-                {geoLive.insideWork ? 'Inside work zone' : geoLive.insideHome ? 'Inside home zone' : 'Outside zones'}
-              </span>
-              <span>
-                {geoLive.distanceWorkMeters !== null ? `Work ${geoLive.distanceWorkMeters}m` : 'Work n/a'}
-                {' | '}
-                {geoLive.distanceHomeMeters !== null ? `Home ${geoLive.distanceHomeMeters}m` : 'Home n/a'}
-              </span>
-            </div>
-          )}
-          {workLocation.enabled && geoLive.accuracyMeters !== null && (
-            <p className="section-note">GPS accuracy: +/-{geoLive.accuracyMeters}m</p>
-          )}
-          {workLocation.lastAutoLogDate && (
+            {geoMessage && <p className="section-note">{geoMessage}</p>}
+            {geoStatus && geoStatus !== geoMessage && <p className="section-note">{geoStatus}</p>}
             <p className="section-note">
-              Last auto log date: {workLocation.lastAutoLogDate}
-              {workLocation.lastAutoReason ? ` (${workLocation.lastAutoReason === 'work-zone' ? 'work zone' : 'away from home'})` : ''}
+              Tracking mode: {nativeTrackingMode ? 'Native iOS (background-capable)' : 'Web (foreground-only)'}
             </p>
-          )}
-          {!hasSavedGeoTarget && (
-            <p className="section-note">Save valid Work or Home coordinates to activate tracking.</p>
-          )}
-          <p className="section-note disclaimer">
-            {nativeTrackingMode
-              ? 'Native mode can continue tracking in background after location permissions are granted.'
-              : 'Web mode auto logging works while Peggy is open and location permission is granted.'}
+            {activeWorkLocation.enabled && geoLive.tracking && (
+              <div className={`work-geo-live glass-inner ${geoLive.insideWork ? 'inside' : geoLive.insideHome ? 'home' : 'outside'}`}>
+                <span>
+                  {geoLive.insideWork ? 'Inside work zone' : geoLive.insideHome ? 'Inside home zone' : 'Outside zones'}
+                </span>
+                <span>
+                  {geoLive.distanceWorkMeters !== null ? `Work ${geoLive.distanceWorkMeters}m` : 'Work n/a'}
+                  {' | '}
+                  {geoLive.distanceHomeMeters !== null ? `Home ${geoLive.distanceHomeMeters}m` : 'Home n/a'}
+                </span>
+              </div>
+            )}
+            {activeWorkLocation.enabled && geoLive.accuracyMeters !== null && (
+              <p className="section-note">GPS accuracy: +/-{geoLive.accuracyMeters}m</p>
+            )}
+            {activeWorkLocation.lastAutoLogDate && (
+              <p className="section-note">
+                Last auto log date: {activeWorkLocation.lastAutoLogDate}
+                {activeWorkLocation.lastAutoReason ? ` (${activeWorkLocation.lastAutoReason === 'work-zone' ? 'work zone' : 'away from home'})` : ''}
+              </p>
+            )}
+            {!hasSavedGeoTarget && (
+              <p className="section-note">Save valid Work or Home coordinates to activate tracking.</p>
+            )}
+            <p className="section-note disclaimer">
+              {nativeTrackingMode
+                ? 'Native mode can continue tracking in background after location permissions are granted.'
+                : 'Web mode auto logging works while Peggy is open and location permission is granted.'}
+            </p>
+          </div>
+        )}
+        {!allowGeoTracker && (
+          <p className="section-note">
+            Manual mode: log attendance below for salary computation.
           </p>
-        </div>
+        )}
 
         {showWorkCalendar && (
           <>
@@ -639,10 +657,10 @@ export default function WorkFinancePanel() {
               selectedDate={attendanceDate}
               onDayClick={(d) => {
                 setAttendanceDate(d)
-                setAttendanceForm(toAttendanceForm(attendance[d]))
+                setAttendanceForm(toAttendanceForm(activeAttendance[d]))
               }}
               renderDay={(dateISO) => {
-                const att = attendance[dateISO]
+                const att = activeAttendance[dateISO]
                 if (!att) return null
                 return <span className={`cal-dot ${att.worked ? 'work-dot-yes' : 'work-dot-no'}`} />
               }}
@@ -765,7 +783,7 @@ export default function WorkFinancePanel() {
         </div>
       </section>
 
-      <section className="glass-section">
+      <section className={`glass-section finance-work-section ${accent}`}>
         <div className="section-header">
           <span className="section-icon"><UiIcon icon={APP_ICONS.overview} /></span>
           <div><h2>Monthly Summary - {viewMonth}</h2></div>
@@ -808,6 +826,6 @@ export default function WorkFinancePanel() {
           </ul>
         )}
       </section>
-    </>
+    </div>
   )
 }
