@@ -219,6 +219,16 @@ function countDatesInMonths(dateList, monthKeys) {
   }, 0)
 }
 
+function buildMonthCountMap(dateList) {
+  const out = {}
+  for (const dateISO of Array.isArray(dateList) ? dateList : []) {
+    const monthKey = getMonthKeyFromISO(dateISO)
+    if (!monthKey) continue
+    out[monthKey] = (out[monthKey] || 0) + 1
+  }
+  return out
+}
+
 function sumExpensesForMonths(expenseList, monthKeys) {
   if (!Array.isArray(expenseList) || !Array.isArray(monthKeys) || !monthKeys.length) return 0
   const target = new Set(monthKeys)
@@ -304,6 +314,7 @@ export default function MoneyTab() {
   const [taxStepIndex, setTaxStepIndex] = useState(0)
   const [salarySetupOpen, setSalarySetupOpen] = useState(false)
   const [salarySetupTab, setSalarySetupTab] = useState('rates')
+  const [recentIncomeMode, setRecentIncomeMode] = useState('work')
   const [rateForm, setRateForm] = useState(() => ({
     person: 'naomi',
     basis: 'hourly',
@@ -390,6 +401,14 @@ export default function MoneyTab() {
     [safeExpenses, selectedPeriodMonthKeys]
   )
   const selectedFamilyNet = selectedFamilyIncome - selectedExpensesTotal
+  const naomiMissingRateByMonth = useMemo(
+    () => buildMonthCountMap(naomiIncomeDetails.missingRateDates),
+    [naomiIncomeDetails.missingRateDates]
+  )
+  const husbandMissingRateByMonth = useMemo(
+    () => buildMonthCountMap(husbandIncomeDetails.missingRateDates),
+    [husbandIncomeDetails.missingRateDates]
+  )
   const expenseItemsSorted = useMemo(
     () => [...safeExpenses]
       .sort((a, b) => String(b?.date || '').localeCompare(String(a?.date || ''))),
@@ -781,20 +800,49 @@ export default function MoneyTab() {
               <span className="section-icon"><UiIcon icon={APP_ICONS.activity} /></span>
               <div>
                 <h2>Recent Monthly Income</h2>
-                <span className="section-count">Payout-month view (with payroll delay/adjustments)</span>
+                <span className="section-count">
+                  {recentIncomeMode === 'work'
+                    ? 'Work-month view (direct from attendance logs)'
+                    : 'Payout-month view (with payroll delay/adjustments)'}
+                </span>
+              </div>
+            </div>
+            <div className="glass-inner summary-period-row">
+              <div className="household-toggle-title">Monthly View</div>
+              <div className="summary-period-controls">
+                <button
+                  type="button"
+                  className={`tax-preset-btn glass-inner ${recentIncomeMode === 'work' ? 'active' : ''}`}
+                  onClick={() => setRecentIncomeMode('work')}
+                >
+                  Work Month
+                </button>
+                <button
+                  type="button"
+                  className={`tax-preset-btn glass-inner ${recentIncomeMode === 'payout' ? 'active' : ''}`}
+                  onClick={() => setRecentIncomeMode('payout')}
+                >
+                  Payout Month
+                </button>
               </div>
             </div>
             <div className="salary-month-table">
               {recentMonthKeys.map((monthKey) => {
-                const wife = Math.round(Number(naomiMonthlyIncomeMap[monthKey] || 0))
-                const husband = Math.round(Number(husbandMonthlyIncomeMap[monthKey] || 0))
+                const wife = Math.round(Number((recentIncomeMode === 'work' ? naomiWorkMonthlyIncomeMap : naomiMonthlyIncomeMap)[monthKey] || 0))
+                const husband = Math.round(Number((recentIncomeMode === 'work' ? husbandWorkMonthlyIncomeMap : husbandMonthlyIncomeMap)[monthKey] || 0))
                 const total = wife + (includeHusband ? husband : 0)
+                const wifeMissing = Number(naomiMissingRateByMonth[monthKey] || 0)
+                const husbandMissing = Number(husbandMissingRateByMonth[monthKey] || 0)
+                const monthMissing = wifeMissing + (includeHusband ? husbandMissing : 0)
                 return (
                   <div key={monthKey} className="glass-inner salary-month-row">
                     <span>{monthKey}</span>
                     <span>{PERSON_LABELS.naomi}: {formatYen(wife)}</span>
                     {includeHusband && <span>{PERSON_LABELS.husband}: {formatYen(husband)}</span>}
                     <span>Total: {formatYen(total)}</span>
+                    {recentIncomeMode === 'work' && monthMissing > 0 && (
+                      <span>Missing rate days: {monthMissing}</span>
+                    )}
                   </div>
                 )
               })}
