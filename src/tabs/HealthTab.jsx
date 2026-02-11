@@ -671,11 +671,11 @@ export default function HealthTab() {
   return (
     <div className="content">
       <div className="sub-tabs glass-tabs">
-        {['supps', 'work', 'checkups', 'mood'].map(t => (
+        {['supps', 'checkups', 'mood'].map(t => (
           <button key={t} className={`glass-tab ${subTab === t ? 'active' : ''}`} onClick={() => setSubTab(t)}>
             <span className="tab-icon-label">
-              <UiIcon icon={t === 'supps' ? APP_ICONS.supplements : t === 'work' ? APP_ICONS.work : t === 'checkups' ? APP_ICONS.checkup : APP_ICONS.tip} />
-              <span>{t === 'supps' ? 'Supps' : t === 'work' ? 'Work' : t === 'checkups' ? 'Checkups' : 'Mood'}</span>
+              <UiIcon icon={t === 'supps' ? APP_ICONS.supplements : t === 'checkups' ? APP_ICONS.checkup : APP_ICONS.tip} />
+              <span>{t === 'supps' ? 'Supps' : t === 'checkups' ? 'Checkups' : 'Mood'}</span>
             </span>
           </button>
         ))}

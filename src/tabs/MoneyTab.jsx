@@ -3,6 +3,7 @@ import { useApp } from '../AppContext'
 import { moneyTracker } from '../data'
 import { calculateTax } from '../taxCalc'
 import { APP_ICONS, UiIcon } from '../uiIcons'
+import WorkFinancePanel from '../components/WorkFinancePanel'
 
 const YEN = '\u00A5'
 const TAX_STEPS = [
@@ -296,7 +297,7 @@ export default function MoneyTab() {
               <span className="section-icon"><UiIcon icon={APP_ICONS.salary} /></span>
               <div>
                 <h2>Salary Tracker</h2>
-                <span className="section-count">Hourly, Daily, Monthly + Rate Changes</span>
+                <span className="section-count">Merged with Work (attendance + salary + rate changes)</span>
               </div>
             </div>
             <p className="section-note">
@@ -445,6 +446,8 @@ export default function MoneyTab() {
               <p className="empty-state">No salary rates yet. Add one above.</p>
             )}
           </section>
+
+          <WorkFinancePanel />
         </>
       )}
 
