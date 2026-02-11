@@ -1380,6 +1380,23 @@ ul { list-style: none; }
   gap: 0.4rem;
   margin-bottom: 0.6rem;
 }
+.attendance-mode-row {
+  display: flex;
+  gap: 0.4rem;
+  margin-bottom: 0.6rem;
+}
+.attendance-time-range-grid {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  gap: 0.45rem;
+  align-items: end;
+}
+.time-range-sep {
+  padding-bottom: 0.42rem;
+}
+.attendance-computed {
+  margin-top: -0.15rem;
+}
 .att-btn {
   flex: 1;
   padding: 0.5rem;

@@ -90,6 +90,29 @@ function formatHoursAndMinutes(value) {
   return `${wholeHours}h ${minutes}m`
 }
 
+function parseTimeToMinutes(value) {
+  const raw = String(value || '').trim()
+  if (!raw) return null
+  const [h, m] = raw.split(':').map(Number)
+  if (!Number.isFinite(h) || !Number.isFinite(m)) return null
+  if (h < 0 || h > 23 || m < 0 || m > 59) return null
+  return (h * 60) + m
+}
+
+function normalizeBreakMinutes(value) {
+  return Math.min(12 * 60, Math.max(0, Number(value) || 0))
+}
+
+function computeWorkedHoursFromRange(startTime, endTime, breakMinutes = 0) {
+  const start = parseTimeToMinutes(startTime)
+  const end = parseTimeToMinutes(endTime)
+  if (start === null || end === null) return null
+  let total = end - start
+  if (total < 0) total += 24 * 60
+  const paidMinutes = Math.max(0, total - normalizeBreakMinutes(breakMinutes))
+  return paidMinutes / 60
+}
+
 function toCoordString(value) {
   if (value === '' || value === null || typeof value === 'undefined') return ''
   const parsed = Number(value)
@@ -109,6 +132,33 @@ function toLocationDraft(location) {
     homeRadiusMeters: String(normalizeRadius(location?.homeRadiusMeters, DEFAULT_HOME_RADIUS_METERS)),
     autoHours: String(normalizeAutoHours(location?.autoHours)),
     awayMinutesForWork: String(normalizeAwayMinutes(location?.awayMinutesForWork)),
+  }
+}
+
+function createDefaultAttendanceForm() {
+  return {
+    worked: true,
+    hours: 7.5,
+    note: '',
+    useTimeRange: false,
+    startTime: '',
+    endTime: '',
+    breakMinutes: 0,
+  }
+}
+
+function toAttendanceForm(record) {
+  const base = createDefaultAttendanceForm()
+  const source = record && typeof record === 'object' ? record : {}
+  return {
+    ...base,
+    worked: source.worked !== false,
+    hours: Math.max(0, Number(source.hours) || base.hours),
+    note: String(source.note || ''),
+    useTimeRange: Boolean(source.useTimeRange),
+    startTime: String(source.startTime || ''),
+    endTime: String(source.endTime || ''),
+    breakMinutes: normalizeBreakMinutes(source.breakMinutes),
   }
 }
 
@@ -346,7 +396,7 @@ export default function HealthTab() {
   const [moodCal, setMoodCal] = useState({ y: now.getFullYear(), m: now.getMonth() + 1 })
 
   const [attendanceDate, setAttendanceDate] = useState(now.toISOString().split('T')[0])
-  const [attendanceForm, setAttendanceForm] = useState({ worked: true, hours: 7.5, note: '' })
+  const [attendanceForm, setAttendanceForm] = useState(() => createDefaultAttendanceForm())
   const [geoMessage, setGeoMessage] = useState('')
   const [geoStatus, setGeoStatus] = useState(() => String(getGeoTelemetry()?.status || ''))
   const [geoLive, setGeoLive] = useState(() => ({
@@ -385,12 +435,28 @@ export default function HealthTab() {
   const nativeTrackingMode = isNativeIos()
   const attendanceDurationParts = toHoursAndMinutes(attendanceForm.hours, { minHours: 0.5, maxHours: 24 })
   const autoDurationParts = toHoursAndMinutes(locationDraft.autoHours, { minHours: 0.5, maxHours: 12 })
+  const computedRangeHours = computeWorkedHoursFromRange(
+    attendanceForm.startTime,
+    attendanceForm.endTime,
+    attendanceForm.breakMinutes
+  )
 
   const updateAttendanceDuration = (field, rawValue) => {
     const nextHours = field === 'hours' ? Number(rawValue) : attendanceDurationParts.hours
     const nextMinutes = field === 'minutes' ? Number(rawValue) : attendanceDurationParts.minutes
     const normalized = toDecimalHours(nextHours, nextMinutes, { minHours: 0.5, maxHours: 24 })
     setAttendanceForm(prev => ({ ...prev, hours: normalized }))
+  }
+
+  const updateAttendanceTimeRange = (field, rawValue) => {
+    setAttendanceForm(prev => {
+      const next = { ...prev, [field]: field === 'breakMinutes' ? normalizeBreakMinutes(rawValue) : rawValue }
+      const computed = computeWorkedHoursFromRange(next.startTime, next.endTime, next.breakMinutes)
+      if (computed !== null) {
+        next.hours = computed
+      }
+      return next
+    })
   }
 
   const updateAutoDurationDraft = (field, rawValue) => {
@@ -445,8 +511,22 @@ export default function HealthTab() {
   }
 
   const handleAttendanceSave = () => {
-    markAttendance(attendanceDate, attendanceForm)
-    setAttendanceForm({ worked: true, hours: 7.5, note: '' })
+    const computedRange = computeWorkedHoursFromRange(
+      attendanceForm.startTime,
+      attendanceForm.endTime,
+      attendanceForm.breakMinutes
+    )
+    const nextHours = attendanceForm.useTimeRange
+      ? (computedRange ?? attendanceForm.hours)
+      : attendanceForm.hours
+
+    const payload = {
+      ...attendanceForm,
+      hours: attendanceForm.worked ? Math.max(0, Number(nextHours) || 0) : 0,
+      breakMinutes: normalizeBreakMinutes(attendanceForm.breakMinutes),
+    }
+    markAttendance(attendanceDate, payload)
+    setAttendanceForm(createDefaultAttendanceForm())
   }
 
   const updateLocationDraft = (patch) => {
@@ -862,6 +942,7 @@ export default function HealthTab() {
                       max="12"
                       step="1"
                       value={autoDurationParts.hours}
+                      onFocus={e => e.target.select()}
                       onChange={e => updateAutoDurationDraft('hours', e.target.value)}
                     />
                     <span className="work-duration-sep">h</span>
@@ -871,6 +952,7 @@ export default function HealthTab() {
                       max="59"
                       step="5"
                       value={autoDurationParts.minutes}
+                      onFocus={e => e.target.select()}
                       onChange={e => updateAutoDurationDraft('minutes', e.target.value)}
                     />
                     <span className="work-duration-sep">m</span>
@@ -941,7 +1023,7 @@ export default function HealthTab() {
                   selectedDate={attendanceDate}
                   onDayClick={(d) => {
                     setAttendanceDate(d)
-                    setAttendanceForm(attendance[d] || { worked: true, hours: 7.5, note: '' })
+                    setAttendanceForm(toAttendanceForm(attendance[d]))
                   }}
                   renderDay={(dateISO) => {
                     const att = attendance[dateISO]
@@ -965,29 +1047,90 @@ export default function HealthTab() {
                 >Absent</button>
               </div>
               {attendanceForm.worked && (
-                <div className="form-row">
-                  <label>Worked duration</label>
-                  <div className="work-duration-row">
-                    <input
-                      type="number"
-                      min="0"
-                      max="24"
-                      step="1"
-                      value={attendanceDurationParts.hours}
-                      onChange={e => updateAttendanceDuration('hours', e.target.value)}
-                    />
-                    <span className="work-duration-sep">h</span>
-                    <input
-                      type="number"
-                      min="0"
-                      max="59"
-                      step="5"
-                      value={attendanceDurationParts.minutes}
-                      onChange={e => updateAttendanceDuration('minutes', e.target.value)}
-                    />
-                    <span className="work-duration-sep">m</span>
+                <>
+                  <div className="attendance-mode-row">
+                    <button
+                      type="button"
+                      className={`att-btn ${!attendanceForm.useTimeRange ? 'active worked' : ''}`}
+                      onClick={() => setAttendanceForm(p => ({ ...p, useTimeRange: false }))}
+                    >
+                      Manual Duration
+                    </button>
+                    <button
+                      type="button"
+                      className={`att-btn ${attendanceForm.useTimeRange ? 'active worked' : ''}`}
+                      onClick={() => setAttendanceForm(p => ({ ...p, useTimeRange: true }))}
+                    >
+                      Time In / Out
+                    </button>
                   </div>
-                </div>
+                  {!attendanceForm.useTimeRange && (
+                    <div className="form-row">
+                      <label>Worked duration</label>
+                      <div className="work-duration-row">
+                        <input
+                          type="number"
+                          min="0"
+                          max="24"
+                          step="1"
+                          value={attendanceDurationParts.hours}
+                          onFocus={e => e.target.select()}
+                          onChange={e => updateAttendanceDuration('hours', e.target.value)}
+                        />
+                        <span className="work-duration-sep">h</span>
+                        <input
+                          type="number"
+                          min="0"
+                          max="59"
+                          step="5"
+                          value={attendanceDurationParts.minutes}
+                          onFocus={e => e.target.select()}
+                          onChange={e => updateAttendanceDuration('minutes', e.target.value)}
+                        />
+                        <span className="work-duration-sep">m</span>
+                      </div>
+                    </div>
+                  )}
+                  {attendanceForm.useTimeRange && (
+                    <>
+                      <div className="attendance-time-range-grid">
+                        <div className="form-row">
+                          <label>Start</label>
+                          <input
+                            type="time"
+                            value={attendanceForm.startTime}
+                            onChange={e => updateAttendanceTimeRange('startTime', e.target.value)}
+                          />
+                        </div>
+                        <span className="work-duration-sep time-range-sep">to</span>
+                        <div className="form-row">
+                          <label>End</label>
+                          <input
+                            type="time"
+                            value={attendanceForm.endTime}
+                            onChange={e => updateAttendanceTimeRange('endTime', e.target.value)}
+                          />
+                        </div>
+                      </div>
+                      <div className="form-row">
+                        <label>Total break (minutes)</label>
+                        <input
+                          type="number"
+                          min="0"
+                          max="720"
+                          step="5"
+                          value={attendanceForm.breakMinutes}
+                          onFocus={e => e.target.select()}
+                          onChange={e => updateAttendanceTimeRange('breakMinutes', e.target.value)}
+                          placeholder="e.g. 75"
+                        />
+                      </div>
+                      <p className="section-note attendance-computed">
+                        Paid work time: {computedRangeHours === null ? 'Set start and end time' : formatHoursAndMinutes(computedRangeHours)}
+                      </p>
+                    </>
+                  )}
+                </>
               )}
               <div className="form-row">
                 <label>Note (optional)</label>
@@ -1029,11 +1172,16 @@ export default function HealthTab() {
                     className={`att-log-item glass-inner ${a.worked ? 'worked' : 'absent'}`}
                     onClick={() => {
                       setAttendanceDate(a.date)
-                      setAttendanceForm(a)
+                      setAttendanceForm(toAttendanceForm(a))
                     }}
                     >
                     <span className="att-log-date">{a.date}</span>
                     <span className="att-log-status">{a.worked ? `Worked ${formatHoursAndMinutes(a.hours)}` : 'Absent'}</span>
+                    {a.worked && a.useTimeRange && a.startTime && a.endTime && (
+                      <span className="att-log-note">
+                        {a.startTime} - {a.endTime} (break {formatHoursAndMinutes((Number(a.breakMinutes) || 0) / 60)})
+                      </span>
+                    )}
                     {a.note && <span className="att-log-note">{a.note}</span>}
                   </li>
                 ))}
