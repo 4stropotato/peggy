@@ -278,6 +278,8 @@ export default function MoneyTab() {
   const [summaryMonthKey, setSummaryMonthKey] = useState(() => toMonthKey(new Date()))
   const [expandedItem, setExpandedItem] = useState(null)
   const [taxStepIndex, setTaxStepIndex] = useState(0)
+  const [salarySetupOpen, setSalarySetupOpen] = useState(false)
+  const [salarySetupTab, setSalarySetupTab] = useState('rates')
   const [rateForm, setRateForm] = useState(() => ({
     person: 'naomi',
     basis: 'hourly',
@@ -485,7 +487,7 @@ export default function MoneyTab() {
   return (
     <div className="content">
       <div className="sub-tabs glass-tabs">
-        {['benefits', 'work', 'salary', 'tax'].map(tabId => (
+        {['benefits', 'work', 'salary', 'tax', 'expenses'].map(tabId => (
           <button
             key={tabId}
             className={`glass-tab ${subTab === tabId ? 'active' : ''}`}
@@ -499,7 +501,9 @@ export default function MoneyTab() {
                     ? APP_ICONS.work
                     : tabId === 'salary'
                       ? APP_ICONS.salary
-                      : APP_ICONS.tax
+                      : tabId === 'tax'
+                        ? APP_ICONS.tax
+                        : APP_ICONS.benefits
               } />
               <span>
                 {tabId === 'benefits'
@@ -508,7 +512,9 @@ export default function MoneyTab() {
                     ? 'Work'
                     : tabId === 'salary'
                       ? 'Salary'
-                      : 'Tax Calc'}
+                      : tabId === 'tax'
+                        ? 'Tax Calc'
+                        : 'Expenses'}
               </span>
             </span>
           </button>
@@ -643,131 +649,6 @@ export default function MoneyTab() {
         <>
           <section className="glass-section">
             <div className="section-header">
-              <span className="section-icon"><UiIcon icon={APP_ICONS.activity} /></span>
-              <div>
-                <h2>Payroll Rules</h2>
-                <span className="section-count">Payout delay and manual payroll adjustments</span>
-              </div>
-            </div>
-
-            <div className="salary-summary-grid">
-              <div className="glass-card payroll-card">
-                <h3>{PERSON_LABELS.naomi} Payroll</h3>
-                <div className="salary-rate-grid">
-                  <div className="form-row">
-                    <label>Work Month Delay</label>
-                    <input
-                      type="number"
-                      min="0"
-                      max="3"
-                      value={naomiPayrollProfile.delayMonths}
-                      onChange={e => updatePayrollProfile('naomi', { delayMonths: Math.min(3, Math.max(0, Number(e.target.value) || 0)) })}
-                    />
-                  </div>
-                  <div className="form-row">
-                    <label>Monthly Adjustment ({YEN})</label>
-                    <input
-                      type="number"
-                      value={naomiPayrollProfile.monthlyAdjustment}
-                      onChange={e => updatePayrollProfile('naomi', { monthlyAdjustment: Number(e.target.value) || 0 })}
-                      placeholder="Use negative for advances/bale deductions"
-                    />
-                  </div>
-                </div>
-                <p className="section-note">Income remains attendance-based. Delay just shifts payout month.</p>
-              </div>
-
-              {includeHusband && (
-                <div className="glass-card payroll-card husband-summary">
-                  <h3>{PERSON_LABELS.husband} Payroll</h3>
-                  <div className="salary-rate-grid">
-                    <div className="form-row">
-                      <label>Work Month Delay</label>
-                      <input
-                        type="number"
-                        min="0"
-                        max="3"
-                        value={husbandPayrollProfile.delayMonths}
-                        onChange={e => updatePayrollProfile('husband', { delayMonths: Math.min(3, Math.max(0, Number(e.target.value) || 0)) })}
-                      />
-                    </div>
-                    <div className="form-row">
-                      <label>Monthly Adjustment ({YEN})</label>
-                      <input
-                        type="number"
-                        value={husbandPayrollProfile.monthlyAdjustment}
-                        onChange={e => updatePayrollProfile('husband', { monthlyAdjustment: Number(e.target.value) || 0 })}
-                        placeholder="Use negative for deductions"
-                      />
-                    </div>
-                  </div>
-                  <p className="section-note">Separate profile and logs from {PERSON_LABELS.naomi}.</p>
-                </div>
-              )}
-            </div>
-          </section>
-
-          <section className="glass-section">
-            <div className="section-header">
-              <span className="section-icon"><UiIcon icon={APP_ICONS.salary} /></span>
-              <div>
-                <h2>Pay Rate Profiles</h2>
-                <span className="section-count">Set once per change. Attendance drives totals.</span>
-              </div>
-            </div>
-
-            <form className="salary-rate-form glass-card" onSubmit={handleAddPayRate}>
-              <div className="salary-rate-grid">
-                <div className="form-row">
-                  <label>Side</label>
-                  <select value={rateForm.person} onChange={e => updateRateForm('person', e.target.value)}>
-                    <option value="naomi">{PERSON_LABELS.naomi}</option>
-                    <option value="husband">{PERSON_LABELS.husband}</option>
-                  </select>
-                </div>
-                <div className="form-row">
-                  <label>Basis</label>
-                  <select value={rateForm.basis} onChange={e => updateRateForm('basis', e.target.value)}>
-                    <option value="hourly">Hourly</option>
-                    <option value="daily">Daily</option>
-                    <option value="monthly">Monthly</option>
-                  </select>
-                </div>
-                <div className="form-row">
-                  <label>Rate ({YEN})</label>
-                  <input
-                    type="number"
-                    value={rateForm.rate}
-                    onChange={e => updateRateForm('rate', e.target.value)}
-                    placeholder={rateForm.basis === 'hourly' ? 'e.g. 1350' : rateForm.basis === 'daily' ? 'e.g. 16000' : 'e.g. 350000'}
-                    required
-                  />
-                </div>
-                <div className="form-row">
-                  <label>Effective From</label>
-                  <input
-                    type="date"
-                    value={rateForm.effectiveFrom}
-                    onChange={e => updateRateForm('effectiveFrom', e.target.value)}
-                    required
-                  />
-                </div>
-              </div>
-              <div className="form-row">
-                <label>Note (optional)</label>
-                <input
-                  type="text"
-                  value={rateForm.note}
-                  onChange={e => updateRateForm('note', e.target.value)}
-                  placeholder="e.g. rate increase in April"
-                />
-              </div>
-              <button type="submit" className="btn-glass-primary">Save Rate</button>
-            </form>
-          </section>
-
-          <section className="glass-section">
-            <div className="section-header">
               <span className="section-icon"><UiIcon icon={APP_ICONS.overview} /></span>
               <div>
                 <h2>Family Income Summary</h2>
@@ -853,101 +734,6 @@ export default function MoneyTab() {
 
           <section className="glass-section">
             <div className="section-header">
-              <span className="section-icon"><UiIcon icon={APP_ICONS.benefits} /></span>
-              <div>
-                <h2>Expense Tracker</h2>
-                <span className="section-count">Bills, loans, groceries, credit card, extras</span>
-              </div>
-            </div>
-            <form className="salary-rate-form glass-card" onSubmit={handleAddExpense}>
-              <div className="salary-rate-grid">
-                <div className="form-row">
-                  <label>Date</label>
-                  <input
-                    type="date"
-                    value={expenseForm.date}
-                    onChange={e => updateExpenseForm('date', e.target.value)}
-                    required
-                  />
-                </div>
-                <div className="form-row">
-                  <label>Category</label>
-                  <select value={expenseForm.category} onChange={e => updateExpenseForm('category', e.target.value)}>
-                    {EXPENSE_CATEGORIES.map(item => (
-                      <option key={item.id} value={item.id}>{item.label}</option>
-                    ))}
-                  </select>
-                </div>
-                <div className="form-row">
-                  <label>Amount ({YEN})</label>
-                  <input
-                    type="number"
-                    value={expenseForm.amount}
-                    onChange={e => updateExpenseForm('amount', e.target.value)}
-                    placeholder="e.g. 58000"
-                    required
-                  />
-                </div>
-              </div>
-              <div className="form-row">
-                <label>Note (optional)</label>
-                <input
-                  type="text"
-                  value={expenseForm.note}
-                  onChange={e => updateExpenseForm('note', e.target.value)}
-                  placeholder="e.g. rent, electric, grocery run"
-                />
-              </div>
-              <div className="attendance-toggle">
-                <button
-                  type="button"
-                  className={`att-btn ${expenseForm.addToCalendar ? 'active worked' : ''}`}
-                  onClick={() => updateExpenseForm('addToCalendar', true)}
-                >
-                  Add to Calendar
-                </button>
-                <button
-                  type="button"
-                  className={`att-btn ${!expenseForm.addToCalendar ? 'active absent' : ''}`}
-                  onClick={() => updateExpenseForm('addToCalendar', false)}
-                >
-                  Expense Only
-                </button>
-              </div>
-              {expenseForm.addToCalendar && (
-                <div className="form-row">
-                  <label>Planner time (optional)</label>
-                  <input
-                    type="time"
-                    value={expenseForm.planTime}
-                    onChange={e => updateExpenseForm('planTime', e.target.value)}
-                  />
-                </div>
-              )}
-              <button type="submit" className="btn-glass-primary">Add Expense</button>
-            </form>
-
-            {expenseItemsSorted.length > 0 ? (
-              <ul className="salary-rate-list">
-                {expenseItemsSorted.slice(0, 20).map(item => (
-                  <li key={item.id} className="glass-card salary-rate-item expense-item">
-                    <div className="salary-rate-top">
-                      <span className="salary-rate-person">{item.date}</span>
-                      <span className="salary-rate-basis">{getExpenseCategoryLabel(item.category)}</span>
-                    </div>
-                    <div className="salary-rate-main">- {formatYen(item.amount)}</div>
-                    {item.note && <div className="salary-rate-note">{item.note}</div>}
-                    <button type="button" className="btn-delete" onClick={() => removeExpense(item.id)}>Delete</button>
-                  </li>
-                ))}
-              </ul>
-            ) : (
-              <p className="empty-state">No expenses yet. Add your first bill or grocery expense above.</p>
-            )}
-          </section>
-
-          <section className="glass-section">
-            <div className="section-header">
               <span className="section-icon"><UiIcon icon={APP_ICONS.activity} /></span>
               <div>
                 <h2>Recent Monthly Income</h2>
@@ -973,34 +759,274 @@ export default function MoneyTab() {
 
           <section className="glass-section">
             <div className="section-header">
-              <span className="section-icon"><UiIcon icon={APP_ICONS.activity} /></span>
-              <div><h2>Rate History</h2></div>
+              <span className="section-icon"><UiIcon icon={APP_ICONS.salary} /></span>
+              <div>
+                <h2>Salary Setup</h2>
+                <span className="section-count">Tap to manage payout rules and rates</span>
+              </div>
+              <button
+                type="button"
+                className="cal-collapse-btn"
+                onClick={() => setSalarySetupOpen(prev => !prev)}
+                aria-expanded={salarySetupOpen}
+              >
+                {salarySetupOpen ? 'Hide setup' : 'Show setup'}
+              </button>
             </div>
-            {sortedRates.length > 0 ? (
-              <ul className="salary-rate-list">
-                {sortedRates.map((item) => {
-                  return (
-                    <li key={item.id} className="glass-card salary-rate-item">
-                      <div className="salary-rate-top">
-                        <span className="salary-rate-person">{formatPerson(item.person)}</span>
-                        <span className="salary-rate-basis">{getBasisLabel(normalizeBasis(item.basis))}</span>
+            {salarySetupOpen && (
+              <>
+                <div className="glass-tabs salary-mini-tabs">
+                  {[
+                    { id: 'rates', label: 'Pay Rate Profiles' },
+                    { id: 'payroll', label: 'Payroll Rules' },
+                    { id: 'history', label: 'Rate History' },
+                  ].map(tab => (
+                    <button
+                      key={tab.id}
+                      type="button"
+                      className={`glass-tab ${salarySetupTab === tab.id ? 'active' : ''}`}
+                      onClick={() => setSalarySetupTab(tab.id)}
+                    >
+                      {tab.label}
+                    </button>
+                  ))}
+                </div>
+
+                {salarySetupTab === 'rates' && (
+                  <form className="salary-rate-form glass-card" onSubmit={handleAddPayRate}>
+                    <div className="salary-rate-grid">
+                      <div className="form-row">
+                        <label>Side</label>
+                        <select value={rateForm.person} onChange={e => updateRateForm('person', e.target.value)}>
+                          <option value="naomi">{PERSON_LABELS.naomi}</option>
+                          <option value="husband">{PERSON_LABELS.husband}</option>
+                        </select>
                       </div>
-                      <div className="salary-rate-main">{formatRateLabel(item)}</div>
-                      <div className="salary-rate-meta">
-                        <span>From {item.effectiveFrom}</span>
-                        <span>{formatAssumption(item)}</span>
+                      <div className="form-row">
+                        <label>Basis</label>
+                        <select value={rateForm.basis} onChange={e => updateRateForm('basis', e.target.value)}>
+                          <option value="hourly">Hourly</option>
+                          <option value="daily">Daily</option>
+                          <option value="monthly">Monthly</option>
+                        </select>
                       </div>
-                      {item.note && <div className="salary-rate-note">{item.note}</div>}
-                      <button type="button" className="btn-delete" onClick={() => removePayRate(item.id)}>Delete</button>
-                    </li>
-                  )
-                })}
-              </ul>
-            ) : (
-              <p className="empty-state">No salary rates yet. Add one above.</p>
+                      <div className="form-row">
+                        <label>Rate ({YEN})</label>
+                        <input
+                          type="number"
+                          value={rateForm.rate}
+                          onChange={e => updateRateForm('rate', e.target.value)}
+                          placeholder={rateForm.basis === 'hourly' ? 'e.g. 1350' : rateForm.basis === 'daily' ? 'e.g. 16000' : 'e.g. 350000'}
+                          required
+                        />
+                      </div>
+                      <div className="form-row">
+                        <label>Effective From</label>
+                        <input
+                          type="date"
+                          value={rateForm.effectiveFrom}
+                          onChange={e => updateRateForm('effectiveFrom', e.target.value)}
+                          required
+                        />
+                      </div>
+                    </div>
+                    <div className="form-row">
+                      <label>Note (optional)</label>
+                      <input
+                        type="text"
+                        value={rateForm.note}
+                        onChange={e => updateRateForm('note', e.target.value)}
+                        placeholder="e.g. rate increase in April"
+                      />
+                    </div>
+                    <button type="submit" className="btn-glass-primary">Save Rate</button>
+                  </form>
+                )}
+
+                {salarySetupTab === 'payroll' && (
+                  <div className="salary-rate-list">
+                    {includeHusband && (
+                      <div className="glass-card payroll-card husband-summary">
+                        <h3>{PERSON_LABELS.husband} Payroll</h3>
+                        <div className="salary-rate-grid">
+                          <div className="form-row">
+                            <label>Work Month Delay</label>
+                            <input
+                              type="number"
+                              min="0"
+                              max="3"
+                              value={husbandPayrollProfile.delayMonths}
+                              onChange={e => updatePayrollProfile('husband', { delayMonths: Math.min(3, Math.max(0, Number(e.target.value) || 0)) })}
+                            />
+                          </div>
+                          <div className="form-row">
+                            <label>Monthly Adjustment ({YEN})</label>
+                            <input
+                              type="number"
+                              value={husbandPayrollProfile.monthlyAdjustment}
+                              onChange={e => updatePayrollProfile('husband', { monthlyAdjustment: Number(e.target.value) || 0 })}
+                              placeholder="Use negative for deductions"
+                            />
+                          </div>
+                        </div>
+                        <p className="section-note">Separate profile and logs from {PERSON_LABELS.naomi}.</p>
+                      </div>
+                    )}
+
+                    <div className="glass-card payroll-card">
+                      <h3>{PERSON_LABELS.naomi} Payroll</h3>
+                      <div className="salary-rate-grid">
+                        <div className="form-row">
+                          <label>Work Month Delay</label>
+                          <input
+                            type="number"
+                            min="0"
+                            max="3"
+                            value={naomiPayrollProfile.delayMonths}
+                            onChange={e => updatePayrollProfile('naomi', { delayMonths: Math.min(3, Math.max(0, Number(e.target.value) || 0)) })}
+                          />
+                        </div>
+                        <div className="form-row">
+                          <label>Monthly Adjustment ({YEN})</label>
+                          <input
+                            type="number"
+                            value={naomiPayrollProfile.monthlyAdjustment}
+                            onChange={e => updatePayrollProfile('naomi', { monthlyAdjustment: Number(e.target.value) || 0 })}
+                            placeholder="Use negative for advances/bale deductions"
+                          />
+                        </div>
+                      </div>
+                      <p className="section-note">Income remains attendance-based. Delay just shifts payout month.</p>
+                    </div>
+                  </div>
+                )}
+
+                {salarySetupTab === 'history' && (
+                  <>
+                    {sortedRates.length > 0 ? (
+                      <ul className="salary-rate-list">
+                        {sortedRates.map((item) => (
+                          <li key={item.id} className="glass-card salary-rate-item">
+                            <div className="salary-rate-top">
+                              <span className="salary-rate-person">{formatPerson(item.person)}</span>
+                              <span className="salary-rate-basis">{getBasisLabel(normalizeBasis(item.basis))}</span>
+                            </div>
+                            <div className="salary-rate-main">{formatRateLabel(item)}</div>
+                            <div className="salary-rate-meta">
+                              <span>From {item.effectiveFrom}</span>
+                              <span>{formatAssumption(item)}</span>
+                            </div>
+                            {item.note && <div className="salary-rate-note">{item.note}</div>}
+                            <button type="button" className="btn-delete" onClick={() => removePayRate(item.id)}>Delete</button>
+                          </li>
+                        ))}
+                      </ul>
+                    ) : (
+                      <p className="empty-state">No salary rates yet. Add one above.</p>
+                    )}
+                  </>
+                )}
+              </>
             )}
           </section>
         </>
+      )}
+
+      {subTab === 'expenses' && (
+        <section className="glass-section">
+          <div className="section-header">
+            <span className="section-icon"><UiIcon icon={APP_ICONS.benefits} /></span>
+            <div>
+              <h2>Expense Tracker</h2>
+              <span className="section-count">Bills, loans, groceries, credit card, extras</span>
+            </div>
+          </div>
+          <form className="salary-rate-form glass-card" onSubmit={handleAddExpense}>
+            <div className="salary-rate-grid">
+              <div className="form-row">
+                <label>Date</label>
+                <input
+                  type="date"
+                  value={expenseForm.date}
+                  onChange={e => updateExpenseForm('date', e.target.value)}
+                  required
+                />
+              </div>
+              <div className="form-row">
+                <label>Category</label>
+                <select value={expenseForm.category} onChange={e => updateExpenseForm('category', e.target.value)}>
+                  {EXPENSE_CATEGORIES.map(item => (
+                    <option key={item.id} value={item.id}>{item.label}</option>
+                  ))}
+                </select>
+              </div>
+              <div className="form-row">
+                <label>Amount ({YEN})</label>
+                <input
+                  type="number"
+                  value={expenseForm.amount}
+                  onChange={e => updateExpenseForm('amount', e.target.value)}
+                  placeholder="e.g. 58000"
+                  required
+                />
+              </div>
+            </div>
+            <div className="form-row">
+              <label>Note (optional)</label>
+              <input
+                type="text"
+                value={expenseForm.note}
+                onChange={e => updateExpenseForm('note', e.target.value)}
+                placeholder="e.g. rent, electric, grocery run"
+              />
+            </div>
+            <div className="attendance-toggle">
+              <button
+                type="button"
+                className={`att-btn ${expenseForm.addToCalendar ? 'active worked' : ''}`}
+                onClick={() => updateExpenseForm('addToCalendar', true)}
+              >
+                Add to Calendar
+              </button>
+              <button
+                type="button"
+                className={`att-btn ${!expenseForm.addToCalendar ? 'active absent' : ''}`}
+                onClick={() => updateExpenseForm('addToCalendar', false)}
+              >
+                Expense Only
+              </button>
+            </div>
+            {expenseForm.addToCalendar && (
+              <div className="form-row">
+                <label>Planner time (optional)</label>
+                <input
+                  type="time"
+                  value={expenseForm.planTime}
+                  onChange={e => updateExpenseForm('planTime', e.target.value)}
+                />
+              </div>
+            )}
+            <button type="submit" className="btn-glass-primary">Add Expense</button>
+          </form>
+
+          {expenseItemsSorted.length > 0 ? (
+            <ul className="salary-rate-list">
+              {expenseItemsSorted.slice(0, 20).map(item => (
+                <li key={item.id} className="glass-card salary-rate-item expense-item">
+                  <div className="salary-rate-top">
+                    <span className="salary-rate-person">{item.date}</span>
+                    <span className="salary-rate-basis">{getExpenseCategoryLabel(item.category)}</span>
+                  </div>
+                  <div className="salary-rate-main">- {formatYen(item.amount)}</div>
+                  {item.note && <div className="salary-rate-note">{item.note}</div>}
+                  <button type="button" className="btn-delete" onClick={() => removeExpense(item.id)}>Delete</button>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className="empty-state">No expenses yet. Add your first bill or grocery expense above.</p>
+          )}
+        </section>
       )}
 
       {subTab === 'tax' && (
