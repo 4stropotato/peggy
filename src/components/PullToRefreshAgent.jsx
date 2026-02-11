@@ -60,10 +60,6 @@ function forceReloadNavigation() {
   const onPageHide = () => { leftPage = true }
   window.addEventListener('pagehide', onPageHide, { once: true })
 
-  try {
-    window.dispatchEvent(new CustomEvent('peggy-refresh-started', { detail: { source: 'pull' } }))
-  } catch {}
-
   const stamp = Date.now()
   try {
     const url = new URL(window.location.href)
