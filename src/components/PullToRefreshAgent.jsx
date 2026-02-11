@@ -243,8 +243,9 @@ export default function PullToRefreshAgent() {
       stateRef.current.currentY = touch.clientY
       const dy = touch.clientY - stateRef.current.startY
       const positiveDy = Math.max(0, dy)
-      const progress = Math.min(1, positiveDy / MAX_PULL_PX)
-      const armed = positiveDy >= PULL_THRESHOLD_PX
+      // iOS-like behavior: one full spin (360deg) is required before refresh can arm.
+      const progress = Math.min(1, positiveDy / PULL_THRESHOLD_PX)
+      const armed = progress >= 1
       setUi(prev => {
         const same = prev.visible && Math.abs(prev.progress - progress) < 0.02 && prev.armed === armed && !prev.refreshing
         if (same) return prev
@@ -255,7 +256,7 @@ export default function PullToRefreshAgent() {
           refreshing: false,
         }
       })
-      if (dy >= PULL_THRESHOLD_PX) {
+      if (armed) {
         stateRef.current.triggered = true
       }
     }

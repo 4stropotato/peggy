@@ -97,7 +97,7 @@ body {
   border-radius: 999px;
   border: 2px solid rgba(255, 255, 255, 0.26);
   border-top-color: var(--pink);
-  transform: rotate(calc(var(--pull-progress, 0) * 240deg));
+  transform: rotate(calc(var(--pull-progress, 0) * 360deg));
   transition: transform 0.12s linear, border-color 0.16s ease;
 }
 .pull-refresh-indicator.refreshing .pull-refresh-spinner {
