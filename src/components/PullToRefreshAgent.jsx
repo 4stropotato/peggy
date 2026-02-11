@@ -4,6 +4,8 @@ const PULL_THRESHOLD_PX = 110
 const MAX_PULL_PX = 170
 const TRIGGER_COOLDOWN_MS = 12000
 const TOP_EPSILON_PX = 2
+const UPDATE_CHECK_TIMEOUT_MS = 2200
+const REFRESH_UI_TIMEOUT_MS = 4500
 
 function isUserEditing() {
   if (typeof document === 'undefined') return false
@@ -16,9 +18,35 @@ function isUserEditing() {
 async function checkForUpdate() {
   if (typeof navigator === 'undefined') return
   if (!('serviceWorker' in navigator)) return
+
+  const withTimeout = (promise, timeoutMs) => new Promise((resolve) => {
+    let settled = false
+    const timer = window.setTimeout(() => {
+      if (!settled) {
+        settled = true
+        resolve(false)
+      }
+    }, timeoutMs)
+
+    Promise.resolve(promise)
+      .then((value) => {
+        if (settled) return
+        settled = true
+        window.clearTimeout(timer)
+        resolve(value)
+      })
+      .catch(() => {
+        if (settled) return
+        settled = true
+        window.clearTimeout(timer)
+        resolve(false)
+      })
+  })
+
   try {
-    const reg = await navigator.serviceWorker.ready
-    await reg.update()
+    const reg = await withTimeout(navigator.serviceWorker.ready, UPDATE_CHECK_TIMEOUT_MS)
+    if (!reg) return false
+    await withTimeout(reg.update(), UPDATE_CHECK_TIMEOUT_MS)
     // If a new worker is installing/waiting, main.jsx will handle the update reload.
     return Boolean(reg.installing || reg.waiting)
   } catch {
@@ -89,6 +117,7 @@ export default function PullToRefreshAgent() {
     armed: false,
     refreshing: false,
   })
+  const refreshingRef = useRef(false)
   const stateRef = useRef({
     active: false,
     startY: 0,
@@ -100,6 +129,11 @@ export default function PullToRefreshAgent() {
   })
   const lastTriggerRef = useRef(0)
   const hideTimerRef = useRef(null)
+  const refreshTimeoutRef = useRef(null)
+
+  useEffect(() => {
+    refreshingRef.current = ui.refreshing
+  }, [ui.refreshing])
 
   useEffect(() => {
     if (typeof window === 'undefined' || typeof document === 'undefined') return undefined
@@ -108,6 +142,13 @@ export default function PullToRefreshAgent() {
       if (hideTimerRef.current) {
         window.clearTimeout(hideTimerRef.current)
         hideTimerRef.current = null
+      }
+    }
+
+    const clearRefreshTimeout = () => {
+      if (refreshTimeoutRef.current) {
+        window.clearTimeout(refreshTimeoutRef.current)
+        refreshTimeoutRef.current = null
       }
     }
 
@@ -135,6 +176,7 @@ export default function PullToRefreshAgent() {
     }
 
     const onTouchStart = (event) => {
+      if (refreshingRef.current) return
       if (event.touches?.length !== 1) {
         reset()
         return
@@ -216,6 +258,12 @@ export default function PullToRefreshAgent() {
         armed: true,
         refreshing: true,
       })
+      clearRefreshTimeout()
+      refreshTimeoutRef.current = window.setTimeout(() => {
+        // Fail-safe: never keep spinner forever if iOS blocks navigation/reload.
+        setUi(prev => ({ ...prev, refreshing: false, armed: false }))
+        hideUiSoon(220)
+      }, REFRESH_UI_TIMEOUT_MS)
 
       // Ask main.jsx to run the "version.json" check + cache-busting reload.
       try {
@@ -239,6 +287,7 @@ export default function PullToRefreshAgent() {
 
     return () => {
       clearHideTimer()
+      clearRefreshTimeout()
       document.removeEventListener('touchstart', onTouchStart, { capture: true })
       document.removeEventListener('touchmove', onTouchMove, { capture: true })
       document.removeEventListener('touchend', onTouchEnd, { capture: true })
