@@ -12,7 +12,7 @@ import WidgetSyncAgent from './components/WidgetSyncAgent'
 import LocationAttendanceAgent from './components/LocationAttendanceAgent'
 import PullToRefreshAgent from './components/PullToRefreshAgent'
 import { THEME_ICONS, UiIcon, getNavIcons, resolveIconStyle } from './uiIcons'
-import { resolveQuickMoodEmoji } from './reminderContent'
+import { appendSmartNotifInbox, resolveQuickMoodEmoji } from './reminderContent'
 import './App.css'
 
 const FLOATING_TOGGLE_MARGIN = 8
@@ -249,6 +249,49 @@ function AppInner() {
     const nextUrl = `${parsed.pathname}${nextQuery ? `?${nextQuery}` : ''}${parsed.hash || ''}`
     window.history.replaceState({}, '', nextUrl)
   }, [addMood, moods])
+
+  useEffect(() => {
+    if (typeof navigator === 'undefined' || !('serviceWorker' in navigator)) return undefined
+
+    const handleSwMessage = (event) => {
+      const kind = String(event?.data?.type || '').trim()
+      const payload = event?.data?.payload && typeof event.data.payload === 'object'
+        ? event.data.payload
+        : {}
+      if (kind === 'peggy-sw-push') {
+        appendSmartNotifInbox({
+          title: String(payload.title || 'Peggy push').trim(),
+          body: String(payload.body || '').trim(),
+          type: 'push',
+          level: 'gentle',
+          status: 'delivered',
+          source: 'push',
+          slotKey: String(payload.tag || payload.url || '').trim(),
+          dedupeKey: `${String(payload.tag || 'push')}|${String(payload.createdAt || '').slice(0, 13)}`,
+          createdAt: payload.createdAt || new Date().toISOString(),
+          read: false,
+        })
+        return
+      }
+      if (kind === 'peggy-sw-notification-click') {
+        appendSmartNotifInbox({
+          title: 'Notification opened',
+          body: String(payload.targetUrl || '').trim(),
+          type: 'push',
+          level: 'gentle',
+          status: 'opened',
+          source: 'push',
+          slotKey: String(payload.targetUrl || '').trim(),
+          dedupeKey: `${String(payload.targetUrl || 'opened')}|opened|${String(payload.createdAt || '').slice(0, 16)}`,
+          createdAt: payload.createdAt || new Date().toISOString(),
+          read: true,
+        })
+      }
+    }
+
+    navigator.serviceWorker.addEventListener('message', handleSwMessage)
+    return () => navigator.serviceWorker.removeEventListener('message', handleSwMessage)
+  }, [])
 
   return (
     <div className={`app ${theme} icon-${normalizedIconStyle}`}>

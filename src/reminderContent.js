@@ -1277,6 +1277,8 @@ export const SMART_NOTIF_PREF_KEY = 'peggy-smart-notifs-enabled'
 const DEPRECATED_SMART_NOTIF_PREF_KEY = 'baby-prep-smart-notifs-enabled'
 export const SMART_NOTIF_PREF_EVENT = 'peggy-smart-notif-pref-changed'
 export const SMART_NOTIF_LOG_KEY = 'peggy-smart-notifs-log-v1'
+export const SMART_NOTIF_INBOX_KEY = 'peggy-smart-notif-inbox-v1'
+export const SMART_NOTIF_INBOX_EVENT = 'peggy-smart-notif-inbox-changed'
 export const SMART_NOTIF_QUIET_HOURS_KEY = 'peggy-smart-notif-quiet-hours'
 const DEPRECATED_SMART_NOTIF_QUIET_HOURS_KEY = 'baby-prep-smart-notif-quiet-hours'
 export const SMART_NOTIF_QUIET_HOURS_EVENT = 'peggy-smart-notif-quiet-hours-changed'
@@ -1459,4 +1461,99 @@ export function markNotificationSlotSent(slotKey, now = new Date()) {
   const pruned = pruneNotifLog(readNotifLog(), now)
   pruned[slotKey] = now.getTime()
   writeNotifLog(pruned)
+}
+
+function sanitizeInboxEntry(entry = {}) {
+  const nowIso = new Date().toISOString()
+  const createdAt = String(entry.createdAt || nowIso).trim() || nowIso
+  const title = String(entry.title || '').trim() || 'Peggy notification'
+  const body = String(entry.body || '').trim()
+  const type = String(entry.type || 'general').trim() || 'general'
+  const level = String(entry.level || 'gentle').trim() || 'gentle'
+  const status = String(entry.status || 'sent').trim() || 'sent'
+  const reason = String(entry.reason || '').trim()
+  const slotKey = String(entry.slotKey || '').trim()
+  const source = String(entry.source || 'local').trim() || 'local'
+  const dedupeKey = String(entry.dedupeKey || `${slotKey}|${status}|${reason}`).trim()
+  const id = String(entry.id || `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`).trim()
+  return {
+    id,
+    createdAt,
+    title,
+    body,
+    type,
+    level,
+    status,
+    reason,
+    slotKey,
+    source,
+    dedupeKey,
+    read: Boolean(entry.read),
+  }
+}
+
+export function readSmartNotifInbox() {
+  if (typeof window === 'undefined') return []
+  try {
+    const raw = window.localStorage.getItem(SMART_NOTIF_INBOX_KEY)
+    if (!raw) return []
+    const parsed = JSON.parse(raw)
+    if (!Array.isArray(parsed)) return []
+    return parsed
+      .map(item => sanitizeInboxEntry(item))
+      .sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt)))
+      .slice(0, 240)
+  } catch {
+    return []
+  }
+}
+
+function writeSmartNotifInbox(nextItems) {
+  if (typeof window === 'undefined') return
+  const safe = Array.isArray(nextItems) ? nextItems.map(item => sanitizeInboxEntry(item)) : []
+  const trimmed = safe
+    .sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt)))
+    .slice(0, 240)
+  window.localStorage.setItem(SMART_NOTIF_INBOX_KEY, JSON.stringify(trimmed))
+  window.dispatchEvent(new CustomEvent(SMART_NOTIF_INBOX_EVENT, { detail: { items: trimmed } }))
+}
+
+export function appendSmartNotifInbox(entry = {}) {
+  if (typeof window === 'undefined') return
+  const item = sanitizeInboxEntry(entry)
+  const current = readSmartNotifInbox()
+  const nowMs = Date.now()
+  const duplicate = current.find(existing => {
+    if (!existing?.dedupeKey || !item.dedupeKey) return false
+    if (existing.dedupeKey !== item.dedupeKey) return false
+    const existingMs = Number(new Date(existing.createdAt).getTime())
+    if (!Number.isFinite(existingMs)) return false
+    // Dedupe same slot/status bursts for 12 hours.
+    return Math.abs(nowMs - existingMs) <= (12 * 60 * 60 * 1000)
+  })
+  if (duplicate) return
+  writeSmartNotifInbox([item, ...current])
+}
+
+export function markSmartNotifInboxRead(entryId) {
+  if (typeof window === 'undefined') return
+  const target = String(entryId || '').trim()
+  if (!target) return
+  const current = readSmartNotifInbox()
+  const next = current.map(item => item.id === target ? { ...item, read: true } : item)
+  writeSmartNotifInbox(next)
+}
+
+export function markAllSmartNotifInboxRead() {
+  if (typeof window === 'undefined') return
+  const current = readSmartNotifInbox()
+  if (!current.length) return
+  const next = current.map(item => ({ ...item, read: true }))
+  writeSmartNotifInbox(next)
+}
+
+export function clearSmartNotifInbox() {
+  if (typeof window === 'undefined') return
+  window.localStorage.removeItem(SMART_NOTIF_INBOX_KEY)
+  window.dispatchEvent(new CustomEvent(SMART_NOTIF_INBOX_EVENT, { detail: { items: [] } }))
 }

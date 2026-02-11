@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useMemo, useRef } from 'react'
 import { useApp } from '../AppContext'
 import {
   savePhoto, getPhotos, deletePhoto, exportBackup, importBackup,
@@ -13,11 +13,24 @@ import {
   cloudValidateSession, cloudUploadBackup, cloudDownloadBackup, cloudSendPushTest
 } from '../cloudSync'
 import {
+  buildMoodReminder,
+  buildPlannerReminder,
+  buildSupplementReminder,
+  buildWorkReminder,
+  clearSmartNotifInbox,
   formatSmartNotifQuietHoursLabel,
+  getMoodReminderContext,
+  getPlannerReminderContext,
+  getSupplementReminderContext,
+  getWorkReminderContext,
   isNowInSmartNotifQuietHours,
   isSmartNotifChannelEnabled,
+  markAllSmartNotifInboxRead,
+  markSmartNotifInboxRead,
+  readSmartNotifInbox,
   readSmartNotifChannels,
   readSmartNotifEnabled,
+  SMART_NOTIF_INBOX_EVENT,
   SMART_NOTIF_CHANNEL_EVENT,
   readSmartNotifQuietHours,
   writeSmartNotifChannels,
@@ -44,6 +57,26 @@ const INFO_SECTIONS = [
   { id: 'kawasaki', label: 'Kawasaki Info', icon: '🏢' },
   { id: 'money-summary', label: 'Total Benefits', icon: '💰' },
 ]
+
+function formatNotificationTime(value) {
+  const dt = new Date(value)
+  if (Number.isNaN(dt.getTime())) return String(value || '')
+  return dt.toLocaleString([], {
+    month: 'short',
+    day: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+  })
+}
+
+function formatNotifReason(reason) {
+  const value = String(reason || '').trim()
+  if (!value) return ''
+  if (value === 'quiet-hours') return 'Quiet hours'
+  if (value === 'permission-not-granted') return 'Permission not granted'
+  if (value === 'foreground-suppressed') return 'Foreground suppressed'
+  return value
+}
 
 function InfoPanel({ section }) {
   const [expandedPhase, setExpandedPhase] = useState(null)
@@ -419,6 +452,7 @@ export default function MoreTab() {
     doctor, setDoctor, contacts, addContact, removeContact, updateContact,
     familyConfig, setFamilyConfig,
     iconStyle, setIconStyle,
+    dailySupp, suppSchedule, attendance, planner, moods,
   } = useApp()
   const includeHusband = familyConfig?.includeHusband !== false
   const [subTab, setSubTab] = useState('info')
@@ -445,11 +479,14 @@ export default function MoreTab() {
   const [notifEnabled, setNotifEnabled] = useState(() => readSmartNotifEnabled())
   const [notifChannels, setNotifChannels] = useState(() => readSmartNotifChannels())
   const [quietHours, setQuietHours] = useState(() => readSmartNotifQuietHours())
+  const [notifInbox, setNotifInbox] = useState(() => readSmartNotifInbox())
+  const [notifNowTick, setNotifNowTick] = useState(() => Date.now())
   const [notifStatus, setNotifStatus] = useState('')
   const [notifPermission, setNotifPermission] = useState(() => (
     typeof Notification === 'undefined' ? 'unsupported' : Notification.permission
   ))
   const quietHoursActiveNow = isNowInSmartNotifQuietHours(new Date(), quietHours)
+  const notifNow = useMemo(() => new Date(notifNowTick), [notifNowTick])
 
   useEffect(() => {
     if (subTab === 'photos') loadPhotos()
@@ -460,6 +497,12 @@ export default function MoreTab() {
     const id = setTimeout(() => setNotifStatus(''), 4000)
     return () => clearTimeout(id)
   }, [notifStatus])
+
+  useEffect(() => {
+    if (subTab !== 'notifications') return undefined
+    const id = window.setInterval(() => setNotifNowTick(Date.now()), 60 * 1000)
+    return () => window.clearInterval(id)
+  }, [subTab])
 
   const refreshNotifPermission = () => {
     if (typeof Notification === 'undefined') {
@@ -475,16 +518,19 @@ export default function MoreTab() {
     const syncNotifEnabled = () => setNotifEnabled(readSmartNotifEnabled())
     const syncNotifChannels = () => setNotifChannels(readSmartNotifChannels())
     const syncQuietHours = () => setQuietHours(readSmartNotifQuietHours())
+    const syncNotifInbox = () => setNotifInbox(readSmartNotifInbox())
     const syncAll = () => {
       syncNotifEnabled()
       syncNotifChannels()
       syncQuietHours()
+      syncNotifInbox()
       refreshNotifPermission()
     }
 
     window.addEventListener(SMART_NOTIF_PREF_EVENT, syncNotifEnabled)
     window.addEventListener(SMART_NOTIF_CHANNEL_EVENT, syncNotifChannels)
     window.addEventListener(SMART_NOTIF_QUIET_HOURS_EVENT, syncQuietHours)
+    window.addEventListener(SMART_NOTIF_INBOX_EVENT, syncNotifInbox)
     window.addEventListener('peggy-backup-restored', syncAll)
     window.addEventListener('storage', syncAll)
     window.addEventListener('focus', refreshNotifPermission)
@@ -494,6 +540,7 @@ export default function MoreTab() {
       window.removeEventListener(SMART_NOTIF_PREF_EVENT, syncNotifEnabled)
       window.removeEventListener(SMART_NOTIF_CHANNEL_EVENT, syncNotifChannels)
       window.removeEventListener(SMART_NOTIF_QUIET_HOURS_EVENT, syncQuietHours)
+      window.removeEventListener(SMART_NOTIF_INBOX_EVENT, syncNotifInbox)
       window.removeEventListener('peggy-backup-restored', syncAll)
       window.removeEventListener('storage', syncAll)
       window.removeEventListener('focus', refreshNotifPermission)
@@ -881,14 +928,80 @@ export default function MoreTab() {
     }
   }
 
+  const suppReminderCtx = useMemo(
+    () => getSupplementReminderContext({ dailySupp, suppSchedule, now: notifNow }),
+    [dailySupp, suppSchedule, notifNowTick],
+  )
+  const workReminderCtx = useMemo(
+    () => getWorkReminderContext({ attendance, now: notifNow }),
+    [attendance, notifNowTick],
+  )
+  const moodReminderCtx = useMemo(
+    () => getMoodReminderContext({ moods, now: notifNow }),
+    [moods, notifNowTick],
+  )
+  const plannerReminderCtx = useMemo(
+    () => getPlannerReminderContext({ planner, now: notifNow }),
+    [planner, notifNowTick],
+  )
+  const unreadNotifCount = useMemo(
+    () => (Array.isArray(notifInbox) ? notifInbox.filter(item => !item?.read).length : 0),
+    [notifInbox],
+  )
+  const livePendingNotifications = useMemo(() => {
+    const out = []
+    if (suppReminderCtx.remainingDoses > 0 && isSmartNotifChannelEnabled('reminders', notifChannels)) {
+      const next = buildSupplementReminder(suppReminderCtx, notifNow, 'notifications-preview')
+      if (next) out.push(next)
+    }
+    if (workReminderCtx.needsReminder && isSmartNotifChannelEnabled('reminders', notifChannels)) {
+      const next = buildWorkReminder(workReminderCtx, notifNow, 'notifications-preview')
+      if (next) out.push(next)
+    }
+    if (moodReminderCtx.needsReminder && isSmartNotifChannelEnabled('reminders', notifChannels)) {
+      const next = buildMoodReminder(moodReminderCtx, notifNow, 'notifications-preview')
+      if (next) out.push(next)
+    }
+    if (plannerReminderCtx?.candidate?.planId && isSmartNotifChannelEnabled('calendar', notifChannels)) {
+      const next = buildPlannerReminder(plannerReminderCtx, notifNow, 'notifications-preview')
+      if (next) out.push(next)
+    }
+    return out
+  }, [
+    suppReminderCtx.remainingDoses,
+    suppReminderCtx.overdueDoses,
+    workReminderCtx.needsReminder,
+    moodReminderCtx.needsReminder,
+    plannerReminderCtx?.candidate?.planId,
+    plannerReminderCtx?.pendingOverdueCount,
+    plannerReminderCtx?.pendingTodayCount,
+    notifChannels,
+    notifNowTick,
+  ])
+
+  const handleMarkNotifRead = (id) => {
+    markSmartNotifInboxRead(id)
+    setNotifInbox(readSmartNotifInbox())
+  }
+
+  const handleMarkAllNotifRead = () => {
+    markAllSmartNotifInboxRead()
+    setNotifInbox(readSmartNotifInbox())
+  }
+
+  const handleClearNotifInbox = () => {
+    clearSmartNotifInbox()
+    setNotifInbox([])
+  }
+
   return (
     <div className="content">
       <div className="sub-tabs glass-tabs">
-        {['info', 'photos', 'doctor', 'contacts', 'settings'].map(t => (
+        {['info', 'notifications', 'photos', 'doctor', 'contacts', 'settings'].map(t => (
           <button key={t} className={`glass-tab ${subTab === t ? 'active' : ''}`} onClick={() => setSubTab(t)}>
             <span className="tab-icon-label">
-              <UiIcon icon={t === 'info' ? APP_ICONS.info : t === 'photos' ? APP_ICONS.photos : t === 'doctor' ? APP_ICONS.doctor : t === 'contacts' ? APP_ICONS.contacts : APP_ICONS.backup} />
-              <span>{t === 'info' ? 'Info' : t === 'photos' ? 'Photos' : t === 'doctor' ? 'Doctor' : t === 'contacts' ? 'Contacts' : 'Settings'}</span>
+              <UiIcon icon={t === 'info' ? APP_ICONS.info : t === 'notifications' ? APP_ICONS.reminders : t === 'photos' ? APP_ICONS.photos : t === 'doctor' ? APP_ICONS.doctor : t === 'contacts' ? APP_ICONS.contacts : APP_ICONS.backup} />
+              <span>{t === 'info' ? 'Info' : t === 'notifications' ? 'Notifications' : t === 'photos' ? 'Photos' : t === 'doctor' ? 'Doctor' : t === 'contacts' ? 'Contacts' : 'Settings'}</span>
             </span>
           </button>
         ))}
@@ -919,6 +1032,79 @@ export default function MoreTab() {
           </div>
 
           <InfoPanel section={infoSection} />
+        </section>
+      )}
+
+      {subTab === 'notifications' && (
+        <section className="glass-section">
+          <div className="section-header">
+            <span className="section-icon"><UiIcon icon={APP_ICONS.reminders} /></span>
+            <div>
+              <h2>Notifications</h2>
+              <span className="section-count">{unreadNotifCount} unread</span>
+            </div>
+          </div>
+          <p className="section-note">
+            Inbox of sent, missed, and opened notifications. Use this to review anything Naomi missed.
+          </p>
+
+          <div className="backup-cloud-actions">
+            <button type="button" className="btn-glass-secondary" onClick={handleMarkAllNotifRead}>
+              Mark all read
+            </button>
+            <button type="button" className="btn-glass-secondary" onClick={handleClearNotifInbox}>
+              Clear history
+            </button>
+          </div>
+
+          <div className="glass-card backup-card">
+            <h3>Live Pending</h3>
+            {livePendingNotifications.length ? (
+              <ul className="notif-inbox-list">
+                {livePendingNotifications.map((item) => (
+                  <li key={`live-${item.slotKey}`} className="notif-inbox-item glass-inner unread">
+                    <div className="notif-inbox-top">
+                      <span className={`notif-chip ${item.level}`}>Pending</span>
+                      <span className="notif-time">now</span>
+                    </div>
+                    <div className="notif-title">{item.notificationTitle}</div>
+                    <div className="notif-body">{item.notificationBody}</div>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="section-note">No pending notification candidates right now.</p>
+            )}
+          </div>
+
+          <div className="glass-card backup-card">
+            <h3>History</h3>
+            {notifInbox.length ? (
+              <ul className="notif-inbox-list">
+                {notifInbox.map((item) => (
+                  <li
+                    key={item.id}
+                    className={`notif-inbox-item glass-inner ${item.read ? '' : 'unread'}`}
+                    onClick={() => handleMarkNotifRead(item.id)}
+                  >
+                    <div className="notif-inbox-top">
+                      <span className={`notif-chip ${item.status || 'sent'}`}>{item.status || 'sent'}</span>
+                      <span className="notif-time">{formatNotificationTime(item.createdAt)}</span>
+                    </div>
+                    <div className="notif-title">{item.title}</div>
+                    <div className="notif-body">{item.body}</div>
+                    <div className="notif-meta">
+                      <span>{String(item.type || 'general')}</span>
+                      {item.reason ? <span>{formatNotifReason(item.reason)}</span> : null}
+                      <span>{String(item.source || 'local')}</span>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="section-note">No notification history yet.</p>
+            )}
+          </div>
         </section>
       )}
 

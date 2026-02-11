@@ -95,13 +95,26 @@ Deno.serve(async (req) => {
       updated_at: nowIso,
     }
 
-    const { data, error } = await client
+    let { data, error } = await client
       .from('push_subscriptions')
-      .upsert(row, { onConflict: 'endpoint' })
+      .upsert(row, { onConflict: 'user_id,device_id' })
       .select('id, endpoint, enabled, notif_enabled, updated_at')
       .single()
 
-    if (error) return jsonResponse(400, { error: error.message })
+    const endpointConflict = Boolean(error?.message && /endpoint/i.test(error.message))
+    if (endpointConflict) {
+      const fallback = await client
+        .from('push_subscriptions')
+        .update(row)
+        .eq('user_id', user.id)
+        .eq('endpoint', endpoint)
+        .select('id, endpoint, enabled, notif_enabled, updated_at')
+        .single()
+      data = fallback.data as typeof data
+      error = fallback.error as typeof error
+    }
+
+    if (error) return jsonResponse(400, { error: error.message, code: error.code || null })
     return jsonResponse(200, { ok: true, subscription: data })
   }
 

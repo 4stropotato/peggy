@@ -2,6 +2,7 @@ import { useEffect } from 'react'
 import { useApp } from '../AppContext'
 import { babyNamesInfo } from '../infoData'
 import {
+  appendSmartNotifInbox,
   buildDailyTip,
   buildDailyTipReminder,
   buildMoodReminder,
@@ -207,10 +208,6 @@ export default function SmartReminderAgent() {
       const badgeCount = reminderBadgeCount + calendarBadgeCount
       void syncAppBadge(badgeCount)
 
-      if (isNowInSmartNotifQuietHours(now, readSmartNotifQuietHours())) return
-      if (Notification.permission !== 'granted') return
-      if (!canNotifyNow()) return
-
       const actionableCandidates = []
       if (remindersChannelOn && suppCtx.remainingDoses > 0) {
         actionableCandidates.push(buildSupplementReminder(suppCtx, now, 'notify'))
@@ -230,6 +227,31 @@ export default function SmartReminderAgent() {
       const actionable = actionableCandidates
         .filter(item => !hasSentNotificationSlot(item.slotKey, now))
         .sort((a, b) => b.priorityScore - a.priorityScore)[0] || null
+
+      const quietHoursOnNow = isNowInSmartNotifQuietHours(now, readSmartNotifQuietHours())
+      const permissionGranted = Notification.permission === 'granted'
+      const canNotify = canNotifyNow() && !quietHoursOnNow && permissionGranted
+
+      if (!canNotify && actionable) {
+        const reason = quietHoursOnNow
+          ? 'quiet-hours'
+          : (permissionGranted ? 'foreground-suppressed' : 'permission-not-granted')
+        appendSmartNotifInbox({
+          title: actionable.notificationTitle,
+          body: actionable.notificationBody,
+          type: actionable.type,
+          level: actionable.level,
+          status: 'missed',
+          reason,
+          source: 'local',
+          slotKey: actionable.slotKey,
+          dedupeKey: `${actionable.slotKey}|missed|${reason}`,
+          createdAt: now.toISOString(),
+          read: false,
+        })
+      }
+
+      if (!canNotify) return
 
       if (actionable) {
         const isMoodReminder = actionable.type === 'mood'
@@ -261,6 +283,19 @@ export default function SmartReminderAgent() {
           actionUrls: isMoodReminder ? actionUrls : {},
         })
         markNotificationSlotSent(actionable.slotKey, now)
+        appendSmartNotifInbox({
+          title: actionable.notificationTitle,
+          body: actionable.notificationBody,
+          type: actionable.type,
+          level: actionable.level,
+          status: 'sent',
+          reason: '',
+          source: 'local',
+          slotKey: actionable.slotKey,
+          dedupeKey: `${actionable.slotKey}|sent`,
+          createdAt: now.toISOString(),
+          read: false,
+        })
         return
       }
 
@@ -277,6 +312,18 @@ export default function SmartReminderAgent() {
             urgent: false,
           })
           markNotificationSlotSent(tipReminder.slotKey, now)
+          appendSmartNotifInbox({
+            title: tipReminder.notificationTitle,
+            body: tipReminder.notificationBody,
+            type: tipReminder.type,
+            level: tipReminder.level,
+            status: 'sent',
+            source: 'local',
+            slotKey: tipReminder.slotKey,
+            dedupeKey: `${tipReminder.slotKey}|sent`,
+            createdAt: now.toISOString(),
+            read: false,
+          })
           return
         }
       }
@@ -295,6 +342,18 @@ export default function SmartReminderAgent() {
             urgent: false,
           })
           markNotificationSlotSent(nameSlotKey, now)
+          appendSmartNotifInbox({
+            title: nameSpotlight.notificationTitle,
+            body: nameSpotlight.notificationBody,
+            type: 'name',
+            level: 'gentle',
+            status: 'sent',
+            source: 'local',
+            slotKey: nameSlotKey,
+            dedupeKey: `${nameSlotKey}|sent`,
+            createdAt: now.toISOString(),
+            read: false,
+          })
         }
       }
     }
