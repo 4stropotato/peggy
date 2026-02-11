@@ -3208,24 +3208,43 @@ input[type="range"]:focus {
 .task-item-wrap:last-child { border-bottom: none; }
 .task-item-wrap .item {
   border-left: 3px solid transparent;
-  column-gap: 0.45rem;
-  row-gap: 0.28rem;
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+  flex-wrap: nowrap;
 }
 .task-item-wrap .item .checkbox {
-  order: 1;
+  flex: 0 0 22px;
+  margin-top: 0.1rem;
+}
+.task-item-wrap .item .item-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.28rem;
+}
+.task-item-wrap .item .item-top-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.35rem;
+}
+.task-item-wrap .item .item-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.24rem;
+  min-width: 0;
 }
 .task-item-wrap .item .item-text {
-  order: 2;
-  flex: 1 1 calc(100% - 70px);
-  min-width: 180px;
+  overflow-wrap: anywhere;
 }
 .task-item-wrap .item .info-btn {
-  order: 3;
-  margin-left: auto;
   margin-top: 0;
+  margin-left: 0.2rem;
+  flex-shrink: 0;
 }
 .task-item-wrap .item .badge {
-  order: 4;
   margin-top: 0;
 }
 .task-item-wrap.bundle-ward .item {
@@ -3936,9 +3955,11 @@ input[type="range"]:focus {
 }
 
 @media (max-width: 430px) {
-  .task-item-wrap .item .item-text {
-    min-width: 135px;
-    flex-basis: calc(100% - 66px);
+  .task-item-wrap .item .item-top-row {
+    gap: 0.28rem;
+  }
+  .task-item-wrap .item .item-tags {
+    gap: 0.2rem;
   }
 
   .money-card-top .item-text {

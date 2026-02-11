@@ -333,40 +333,54 @@ export default function TasksTab() {
                 const schedule = taskScheduleMap[item.id]
                 const scheduleLabel = schedule ? formatShortDate(schedule.dateISO) : ''
                 const scheduleIsOverdue = Boolean(schedule && schedule.dateISO < todayISO)
+                const showUrgentBadge = item.priority === 'urgent' && !checked[item.id]
+                const showAskBadge = isAskRequiredTask(item) && !checked[item.id]
+                const showMoneyBadge = moneyIds.length > 0 && !checked[item.id]
+                const showScheduleBadge = Boolean(schedule) && !checked[item.id]
+                const showBundleBadges = !checked[item.id] && bundles.length > 0
+                const hasMetaRow = showUrgentBadge || showAskBadge || showMoneyBadge || showScheduleBadge || showBundleBadges || hasDetails
                 return (
                   <li key={item.id} className={`task-item-wrap ${checked[item.id] ? 'done' : ''} ${primaryBundleTone ? `bundle-${primaryBundleTone}` : ''}`}>
                     <div
                       className={`item ${checked[item.id] ? 'done' : ''} ${item.priority}`}
                       onClick={() => toggle(item.id)}
                     >
-                      <span className="checkbox glass-inner">{checked[item.id] ? '✓' : ''}</span>
-                      <span className="item-text">{item.text}</span>
-                      {item.priority === 'urgent' && !checked[item.id] && (
-                        <span className="badge urgent-badge">URGENT</span>
-                      )}
-                      {isAskRequiredTask(item) && !checked[item.id] && (
-                        <span className="badge ask-badge">ASK</span>
-                      )}
-                      {moneyIds.length > 0 && !checked[item.id] && (
-                        <span className="badge money-badge">
-                          {moneyTotal > 0 ? `+¥${moneyTotal.toLocaleString()}` : 'BENEFIT'}
-                        </span>
-                      )}
-                      {schedule && !checked[item.id] && (
-                        <span className={`badge schedule-badge ${scheduleIsOverdue ? 'overdue' : ''}`}>
-                          {scheduleLabel}{schedule.time ? ` ${schedule.time}` : ''}
-                        </span>
-                      )}
-                      {!checked[item.id] && bundles.length > 0 && bundles.map((bundle) => (
-                        <span key={`${item.id}-${bundle.id}`} className={`badge bundle-badge bundle-${bundle.tone}`}>
-                          {bundle.shortLabel}
-                        </span>
-                      ))}
-                      {hasDetails && (
-                        <button className="info-btn glass-inner" onClick={(e) => toggleExpand(item.id, e)}>
-                          {isExpanded ? '▲' : 'i'}
-                        </button>
-                      )}
+                      <span className="checkbox glass-inner">{checked[item.id] ? '\u2713' : ''}</span>
+                      <div className="item-main">
+                        {hasMetaRow && (
+                          <div className="item-top-row">
+                            <span className="item-tags">
+                              {showUrgentBadge && (
+                                <span className="badge urgent-badge">URGENT</span>
+                              )}
+                              {showAskBadge && (
+                                <span className="badge ask-badge">ASK</span>
+                              )}
+                              {showMoneyBadge && (
+                                <span className="badge money-badge">
+                                  {moneyTotal > 0 ? `+\u00A5${moneyTotal.toLocaleString()}` : 'BENEFIT'}
+                                </span>
+                              )}
+                              {showScheduleBadge && (
+                                <span className={`badge schedule-badge ${scheduleIsOverdue ? 'overdue' : ''}`}>
+                                  {scheduleLabel}{schedule.time ? ` ${schedule.time}` : ''}
+                                </span>
+                              )}
+                              {showBundleBadges && bundles.map((bundle) => (
+                                <span key={`${item.id}-${bundle.id}`} className={`badge bundle-badge bundle-${bundle.tone}`}>
+                                  {bundle.shortLabel}
+                                </span>
+                              ))}
+                            </span>
+                            {hasDetails && (
+                              <button className="info-btn glass-inner" onClick={(e) => toggleExpand(item.id, e)}>
+                                {isExpanded ? '\u25B2' : 'i'}
+                              </button>
+                            )}
+                          </div>
+                        )}
+                        <span className="item-text">{item.text}</span>
+                      </div>
                     </div>
 
                     {isExpanded && hasDetails && (
