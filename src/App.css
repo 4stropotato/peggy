@@ -944,6 +944,15 @@ ul { list-style: none; }
   border-color: rgba(255, 71, 87, 0.35);
   color: var(--red);
 }
+.bundle-badge {
+  color: #ffffff;
+  text-transform: uppercase;
+  letter-spacing: 0.25px;
+}
+.bundle-badge.bundle-ward { background: #138f86; }
+.bundle-badge.bundle-employer { background: #3f51b5; }
+.bundle-badge.bundle-birth { background: #d63384; }
+.bundle-badge.bundle-tax { background: #b7791f; }
 
 .task-schedule-row {
   display: flex;
@@ -3174,6 +3183,25 @@ input[type="range"]:focus {
   border-bottom: 1px solid var(--glass-border);
 }
 .task-item-wrap:last-child { border-bottom: none; }
+.task-item-wrap .item {
+  border-left: 3px solid transparent;
+}
+.task-item-wrap.bundle-ward .item {
+  border-left-color: #138f86;
+  background: rgba(19, 143, 134, 0.08);
+}
+.task-item-wrap.bundle-employer .item {
+  border-left-color: #3f51b5;
+  background: rgba(63, 81, 181, 0.08);
+}
+.task-item-wrap.bundle-birth .item {
+  border-left-color: #d63384;
+  background: rgba(214, 51, 132, 0.08);
+}
+.task-item-wrap.bundle-tax .item {
+  border-left-color: #b7791f;
+  background: rgba(183, 121, 31, 0.1);
+}
 .task-detail {
   padding: 0.6rem 0.5rem 0.8rem 2rem;
   border-left: 3px solid var(--purple);
@@ -3202,6 +3230,34 @@ input[type="range"]:focus {
   color: var(--text);
   margin-bottom: 0.25rem;
 }
+.task-bundle-guide {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+  margin-top: 0.1rem;
+  margin-bottom: 0.55rem;
+}
+.task-bundle-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin: 0.12rem 0 0.5rem;
+}
+.bundle-pill {
+  display: inline-flex;
+  align-items: center;
+  font-size: 0.63rem;
+  font-weight: 700;
+  color: #ffffff;
+  border-radius: 999px;
+  padding: 0.22rem 0.5rem;
+  letter-spacing: 0.2px;
+  border: 1px solid rgba(255, 255, 255, 0.22);
+}
+.bundle-pill.bundle-ward { background: #138f86; }
+.bundle-pill.bundle-employer { background: #3f51b5; }
+.bundle-pill.bundle-birth { background: #d63384; }
+.bundle-pill.bundle-tax { background: #b7791f; }
 
 /* ===== Phone Links ===== */
 .task-phones {
@@ -4293,6 +4349,18 @@ input[type="range"]:focus {
 }
 .app.light .cal-day.cal-era-tax-window {
   outline-color: rgba(194, 133, 0, 0.9);
+}
+.app.light .task-item-wrap.bundle-ward .item {
+  background: rgba(19, 143, 134, 0.1);
+}
+.app.light .task-item-wrap.bundle-employer .item {
+  background: rgba(63, 81, 181, 0.11);
+}
+.app.light .task-item-wrap.bundle-birth .item {
+  background: rgba(214, 51, 132, 0.12);
+}
+.app.light .task-item-wrap.bundle-tax .item {
+  background: rgba(183, 121, 31, 0.14);
 }
 .app.light .day-detail-backdrop {
   background: rgba(255, 245, 248, 0.7);

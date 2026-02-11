@@ -4,6 +4,48 @@ import { phases, moneyTracker } from '../data'
 import { buildTaskScripts } from '../scriptScenarios'
 import { APP_ICONS, ExpandIcon, TokenIcon, UiIcon } from '../uiIcons'
 
+const TASK_BUNDLES = [
+  {
+    id: 'ward-preg',
+    tone: 'ward',
+    shortLabel: 'WARD (PREG)',
+    fullLabel: 'Ward Office bundle (pregnancy visit)',
+    taskIds: ['p2', 'p3', 'p4', 'p5', 'p6', 'p7', 'p8', 'p13', 'p14', 'o7'],
+  },
+  {
+    id: 'employer',
+    tone: 'employer',
+    shortLabel: 'HR / EMPLOYER',
+    fullLabel: 'Employer and HR paperwork bundle',
+    taskIds: ['p10', 'd6', 'b7'],
+  },
+  {
+    id: 'ward-birth',
+    tone: 'birth',
+    shortLabel: 'WARD (BIRTH)',
+    fullLabel: 'Post-birth ward office bundle',
+    taskIds: ['b1', 'b2', 'b3', 'b4', 'b5'],
+  },
+  {
+    id: 'tax',
+    tone: 'tax',
+    shortLabel: 'TAX / RECEIPTS',
+    fullLabel: 'Tax and receipt workflow bundle',
+    taskIds: ['p11', 'p12', 'o1', 'o2', 'o4'],
+  },
+]
+
+const TASK_BUNDLES_BY_ID = (() => {
+  const out = {}
+  TASK_BUNDLES.forEach((bundle) => {
+    bundle.taskIds.forEach((taskId) => {
+      if (!out[taskId]) out[taskId] = []
+      out[taskId].push(bundle)
+    })
+  })
+  return out
+})()
+
 function getFlowCursor(flow, saved) {
   const startNodeId = flow?.startNodeId || 'start'
   if (!saved || typeof saved !== 'object') return { nodeId: startNodeId, history: [] }
@@ -176,10 +218,18 @@ export default function TasksTab() {
             <span className="section-count">Do these together to save trips</span>
           </div>
         </div>
+        <div className="task-bundle-guide">
+          {TASK_BUNDLES.map((bundle) => (
+            <span key={bundle.id} className={`bundle-pill bundle-${bundle.tone}`}>
+              {bundle.shortLabel}
+            </span>
+          ))}
+        </div>
         <ul className="task-steps">
-          <li><strong>Pregnancy ward visit:</strong> Boshi Techo + pregnancy support consultation + prenatal vouchers + ask municipal programs + ask kokuho reduction.</li>
-          <li><strong>Employer packet:</strong> Maternity leave paperwork + childcare leave benefit + social insurance exemption + extra employer benefit.</li>
-          <li><strong>Post-birth ward visit:</strong> Birth registration + second support payment + child allowance + baby insurance + child medical subsidy.</li>
+          <li><strong>Ward (pregnancy):</strong> Boshi Techo + pregnancy support consultation + prenatal vouchers + ask municipal programs + ask kokuho reduction.</li>
+          <li><strong>HR / employer:</strong> Maternity leave paperwork + childcare leave benefit + social insurance exemption + extra employer benefit.</li>
+          <li><strong>Ward (after birth):</strong> Birth registration + second support payment + child allowance + baby insurance + child medical subsidy.</li>
+          <li><strong>Tax / receipts flow:</strong> save receipts + transport logs, then file Kakutei Shinkoku in Feb-March.</li>
         </ul>
       </section>
       {phases.map(phase => {
@@ -205,11 +255,13 @@ export default function TasksTab() {
                 )
                 const moneyIds = Array.isArray(item.moneyIds) ? item.moneyIds : []
                 const moneyTotal = moneyIds.reduce((acc, id) => acc + (moneyById[id]?.amount || 0), 0)
+                const bundles = Array.isArray(TASK_BUNDLES_BY_ID[item.id]) ? TASK_BUNDLES_BY_ID[item.id] : []
+                const primaryBundleTone = bundles[0]?.tone || ''
                 const schedule = taskScheduleMap[item.id]
                 const scheduleLabel = schedule ? formatShortDate(schedule.dateISO) : ''
                 const scheduleIsOverdue = Boolean(schedule && schedule.dateISO < todayISO)
                 return (
-                  <li key={item.id} className={`task-item-wrap ${checked[item.id] ? 'done' : ''}`}>
+                  <li key={item.id} className={`task-item-wrap ${checked[item.id] ? 'done' : ''} ${primaryBundleTone ? `bundle-${primaryBundleTone}` : ''}`}>
                     <div
                       className={`item ${checked[item.id] ? 'done' : ''} ${item.priority}`}
                       onClick={() => toggle(item.id)}
@@ -229,6 +281,11 @@ export default function TasksTab() {
                           {scheduleLabel}{schedule.time ? ` ${schedule.time}` : ''}
                         </span>
                       )}
+                      {!checked[item.id] && bundles.length > 0 && bundles.map((bundle) => (
+                        <span key={`${item.id}-${bundle.id}`} className={`badge bundle-badge bundle-${bundle.tone}`}>
+                          {bundle.shortLabel}
+                        </span>
+                      ))}
                       {hasDetails && (
                         <button className="info-btn glass-inner" onClick={(e) => toggleExpand(item.id, e)}>
                           {isExpanded ? '▲' : 'i'}
@@ -240,6 +297,15 @@ export default function TasksTab() {
                       <div className="task-detail">
                         <div className="task-detail-section">
                           <div className="task-detail-label">Schedule (adds to Home → Calendar):</div>
+                          {bundles.length > 0 && (
+                            <div className="task-bundle-row">
+                              {bundles.map((bundle) => (
+                                <span key={`detail-${item.id}-${bundle.id}`} className={`bundle-pill bundle-${bundle.tone}`}>
+                                  {bundle.fullLabel}
+                                </span>
+                              ))}
+                            </div>
+                          )}
                           <div className="task-schedule-row">
                             <input
                               type="date"
