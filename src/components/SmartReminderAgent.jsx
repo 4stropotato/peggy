@@ -189,6 +189,10 @@ export default function SmartReminderAgent() {
         return
       }
 
+      // Keep iOS home-screen badge clean and avoid stale stuck counts.
+      // Notification history is shown inside the app inbox instead.
+      void syncAppBadge(0)
+
       const now = new Date()
       const suppCtx = getSupplementReminderContext({ dailySupp, suppSchedule, now })
       const workCtx = getWorkReminderContext({ attendance, now })
@@ -199,14 +203,6 @@ export default function SmartReminderAgent() {
       const calendarChannelOn = isSmartNotifChannelEnabled('calendar', channelPrefs)
       const dailyTipChannelOn = isSmartNotifChannelEnabled('dailyTip', channelPrefs)
       const namesChannelOn = isSmartNotifChannelEnabled('names', channelPrefs)
-
-      const planBadgeCount = Math.max(0, Number(planCtx.pendingTodayCount) || 0) + Math.max(0, Number(planCtx.pendingOverdueCount) || 0)
-      const reminderBadgeCount = remindersChannelOn
-        ? (Math.max(0, suppCtx.remainingDoses) + (workCtx.needsReminder ? 1 : 0) + (moodCtx.needsReminder ? 1 : 0))
-        : 0
-      const calendarBadgeCount = calendarChannelOn ? planBadgeCount : 0
-      const badgeCount = reminderBadgeCount + calendarBadgeCount
-      void syncAppBadge(badgeCount)
 
       const actionableCandidates = []
       if (remindersChannelOn && suppCtx.remainingDoses > 0) {

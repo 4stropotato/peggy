@@ -81,6 +81,9 @@ export default function PushSyncAgent() {
     window.addEventListener(SMART_NOTIF_PREF_EVENT, syncFromPrefEvent)
     window.addEventListener('peggy-backup-restored', syncFromPrefEvent)
     document.addEventListener('visibilitychange', syncWhenVisible)
+    window.addEventListener('focus', syncWhenVisible)
+    window.addEventListener('pageshow', syncWhenVisible)
+    window.addEventListener('online', syncWhenVisible)
 
     let cancelled = false
     void cloudTryRecoverSession().then((recovered) => {
@@ -93,7 +96,7 @@ export default function PushSyncAgent() {
     })
 
     void syncState()
-    const id = window.setInterval(() => { void syncState() }, 5 * 60 * 1000)
+    const id = window.setInterval(() => { void syncState() }, 2 * 60 * 1000)
 
     return () => {
       cancelled = true
@@ -101,6 +104,9 @@ export default function PushSyncAgent() {
       window.removeEventListener(SMART_NOTIF_PREF_EVENT, syncFromPrefEvent)
       window.removeEventListener('peggy-backup-restored', syncFromPrefEvent)
       document.removeEventListener('visibilitychange', syncWhenVisible)
+      window.removeEventListener('focus', syncWhenVisible)
+      window.removeEventListener('pageshow', syncWhenVisible)
+      window.removeEventListener('online', syncWhenVisible)
       window.clearInterval(id)
     }
   }, [])

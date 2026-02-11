@@ -1332,11 +1332,20 @@ function sanitizeQuietHours(value) {
 export function readSmartNotifQuietHours() {
   if (typeof window === 'undefined') return { ...DEFAULT_SMART_QUIET_HOURS }
   try {
+    const raw = window.localStorage.getItem(SMART_NOTIF_QUIET_HOURS_KEY)
+    if (!raw) {
+      const legacyRaw = window.localStorage.getItem(DEPRECATED_SMART_NOTIF_QUIET_HOURS_KEY)
+      if (legacyRaw) {
+        const migrated = sanitizeQuietHours(JSON.parse(legacyRaw))
+        window.localStorage.setItem(SMART_NOTIF_QUIET_HOURS_KEY, JSON.stringify(migrated))
+        window.localStorage.removeItem(DEPRECATED_SMART_NOTIF_QUIET_HOURS_KEY)
+        return migrated
+      }
+      return { ...DEFAULT_SMART_QUIET_HOURS }
+    }
     if (window.localStorage.getItem(DEPRECATED_SMART_NOTIF_QUIET_HOURS_KEY) !== null) {
       window.localStorage.removeItem(DEPRECATED_SMART_NOTIF_QUIET_HOURS_KEY)
     }
-    const raw = window.localStorage.getItem(SMART_NOTIF_QUIET_HOURS_KEY)
-    if (!raw) return { ...DEFAULT_SMART_QUIET_HOURS }
     return sanitizeQuietHours(JSON.parse(raw))
   } catch {
     return { ...DEFAULT_SMART_QUIET_HOURS }
@@ -1371,25 +1380,48 @@ export function formatSmartNotifQuietHoursLabel(quietHours = null) {
 
 export function readSmartNotifEnabled() {
   if (typeof window === 'undefined') return false
-  if (window.localStorage.getItem(DEPRECATED_SMART_NOTIF_PREF_KEY) !== null) {
-    window.localStorage.removeItem(DEPRECATED_SMART_NOTIF_PREF_KEY)
-  }
   const value = window.localStorage.getItem(SMART_NOTIF_PREF_KEY)
   if (value === '1' || value === '0') return value === '1'
 
+  // Migrate legacy value so existing devices keep their current behavior.
+  const legacyValue = window.localStorage.getItem(DEPRECATED_SMART_NOTIF_PREF_KEY)
+  if (legacyValue === '1' || legacyValue === '0') {
+    window.localStorage.setItem(SMART_NOTIF_PREF_KEY, legacyValue)
+    window.localStorage.removeItem(DEPRECATED_SMART_NOTIF_PREF_KEY)
+    return legacyValue === '1'
+  }
+  if (legacyValue !== null) {
+    window.localStorage.removeItem(DEPRECATED_SMART_NOTIF_PREF_KEY)
+  }
+
+  // Self-heal for existing installs that already granted permission but lost local storage.
+  // New installs still stay OFF because permission is not granted yet.
+  if (typeof Notification !== 'undefined' && Notification.permission === 'granted') {
+    window.localStorage.setItem(SMART_NOTIF_PREF_KEY, '1')
+    return true
+  }
+
   // Force manual opt-in on newly installed devices.
-  // If only deprecated cloud-synced key exists, ignore it.
   return false
 }
 
 export function readSmartNotifChannels() {
   if (typeof window === 'undefined') return { ...DEFAULT_SMART_NOTIF_CHANNELS }
   try {
+    const raw = window.localStorage.getItem(SMART_NOTIF_CHANNEL_PREF_KEY)
+    if (!raw) {
+      const legacyRaw = window.localStorage.getItem(DEPRECATED_SMART_NOTIF_CHANNEL_PREF_KEY)
+      if (legacyRaw) {
+        const migrated = sanitizeSmartNotifChannels(JSON.parse(legacyRaw))
+        window.localStorage.setItem(SMART_NOTIF_CHANNEL_PREF_KEY, JSON.stringify(migrated))
+        window.localStorage.removeItem(DEPRECATED_SMART_NOTIF_CHANNEL_PREF_KEY)
+        return migrated
+      }
+      return { ...DEFAULT_SMART_NOTIF_CHANNELS }
+    }
     if (window.localStorage.getItem(DEPRECATED_SMART_NOTIF_CHANNEL_PREF_KEY) !== null) {
       window.localStorage.removeItem(DEPRECATED_SMART_NOTIF_CHANNEL_PREF_KEY)
     }
-    const raw = window.localStorage.getItem(SMART_NOTIF_CHANNEL_PREF_KEY)
-    if (!raw) return { ...DEFAULT_SMART_NOTIF_CHANNELS }
     return sanitizeSmartNotifChannels(JSON.parse(raw))
   } catch {
     return { ...DEFAULT_SMART_NOTIF_CHANNELS }

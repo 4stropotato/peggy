@@ -293,6 +293,46 @@ function AppInner() {
     return () => navigator.serviceWorker.removeEventListener('message', handleSwMessage)
   }, [])
 
+  useEffect(() => {
+    if (typeof navigator === 'undefined') return undefined
+    const hasSet = typeof navigator.setAppBadge === 'function'
+    const hasClear = typeof navigator.clearAppBadge === 'function'
+    if (!hasSet && !hasClear) return undefined
+
+    const clearBadge = async () => {
+      try {
+        if (hasClear) {
+          await navigator.clearAppBadge()
+          return
+        }
+        if (hasSet) {
+          await navigator.setAppBadge(0)
+        }
+      } catch {
+        // Ignore badge API errors.
+      }
+    }
+
+    const handleVisible = () => {
+      if (typeof document === 'undefined' || document.visibilityState === 'visible') {
+        void clearBadge()
+      }
+    }
+
+    void clearBadge()
+    if (typeof document !== 'undefined') {
+      document.addEventListener('visibilitychange', handleVisible)
+    }
+    window.addEventListener('focus', handleVisible)
+
+    return () => {
+      if (typeof document !== 'undefined') {
+        document.removeEventListener('visibilitychange', handleVisible)
+      }
+      window.removeEventListener('focus', handleVisible)
+    }
+  }, [])
+
   return (
     <div className={`app ${theme} icon-${normalizedIconStyle}`}>
       <button
