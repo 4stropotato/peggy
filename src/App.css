@@ -3237,6 +3237,47 @@ input[type="range"]:focus {
   margin-top: 0.1rem;
   margin-bottom: 0.55rem;
 }
+.task-bundle-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin-bottom: 0.55rem;
+}
+.bundle-filter-btn {
+  border: 1px solid var(--glass-border);
+  color: var(--text);
+  background: var(--surface2);
+  border-radius: 999px;
+  font-size: 0.62rem;
+  font-weight: 700;
+  padding: 0.28rem 0.56rem;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.bundle-filter-btn.active {
+  border-color: var(--purple);
+  box-shadow: 0 0 0 1px rgba(108, 92, 231, 0.22) inset;
+}
+.bundle-filter-btn.bundle-ward.active,
+.bundle-filter-btn.bundle-ward {
+  border-color: rgba(19, 143, 134, 0.5);
+}
+.bundle-filter-btn.bundle-employer.active,
+.bundle-filter-btn.bundle-employer {
+  border-color: rgba(63, 81, 181, 0.5);
+}
+.bundle-filter-btn.bundle-birth.active,
+.bundle-filter-btn.bundle-birth {
+  border-color: rgba(214, 51, 132, 0.55);
+}
+.bundle-filter-btn.bundle-tax.active,
+.bundle-filter-btn.bundle-tax {
+  border-color: rgba(183, 121, 31, 0.55);
+}
+.bundle-filter-btn.bundle-ward.active { background: rgba(19, 143, 134, 0.16); }
+.bundle-filter-btn.bundle-employer.active { background: rgba(63, 81, 181, 0.16); }
+.bundle-filter-btn.bundle-birth.active { background: rgba(214, 51, 132, 0.16); }
+.bundle-filter-btn.bundle-tax.active { background: rgba(183, 121, 31, 0.18); }
 .task-bundle-row {
   display: flex;
   flex-wrap: wrap;

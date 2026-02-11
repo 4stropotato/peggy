@@ -61,6 +61,7 @@ export default function TasksTab() {
   const [expandedScript, setExpandedScript] = useState(null)
   const [flowState, setFlowState] = useState({})
   const [scheduleDraft, setScheduleDraft] = useState({})
+  const [bundleFilter, setBundleFilter] = useState('all')
 
   const moneyById = useMemo(() => {
     const out = {}
@@ -110,8 +111,27 @@ export default function TasksTab() {
     return map
   }, [planner])
 
-  const totalItems = phases.reduce((acc, p) => acc + p.items.length, 0)
-  const doneItems = phases.reduce((acc, p) => acc + p.items.filter(i => checked[i.id]).length, 0)
+  const visiblePhases = useMemo(() => {
+    return phases
+      .map((phase) => {
+        const visibleItems = phase.items.filter((item) => {
+          if (bundleFilter === 'all') return true
+          const bundles = Array.isArray(TASK_BUNDLES_BY_ID[item.id]) ? TASK_BUNDLES_BY_ID[item.id] : []
+          return bundles.some((bundle) => bundle.id === bundleFilter)
+        })
+        return { ...phase, items: visibleItems }
+      })
+      .filter((phase) => phase.items.length > 0)
+  }, [bundleFilter])
+
+  const totalItems = useMemo(
+    () => visiblePhases.reduce((acc, p) => acc + p.items.length, 0),
+    [visiblePhases],
+  )
+  const doneItems = useMemo(
+    () => visiblePhases.reduce((acc, p) => acc + p.items.filter(i => checked[i.id]).length, 0),
+    [visiblePhases, checked],
+  )
 
   const formatShortDate = (iso) => {
     try {
@@ -225,6 +245,25 @@ export default function TasksTab() {
             </span>
           ))}
         </div>
+        <div className="task-bundle-filters">
+          <button
+            type="button"
+            className={`bundle-filter-btn glass-inner ${bundleFilter === 'all' ? 'active' : ''}`}
+            onClick={() => setBundleFilter('all')}
+          >
+            All tasks
+          </button>
+          {TASK_BUNDLES.map((bundle) => (
+            <button
+              key={`filter-${bundle.id}`}
+              type="button"
+              className={`bundle-filter-btn glass-inner bundle-${bundle.tone} ${bundleFilter === bundle.id ? 'active' : ''}`}
+              onClick={() => setBundleFilter(bundle.id)}
+            >
+              {bundle.shortLabel}
+            </button>
+          ))}
+        </div>
         <ul className="task-steps">
           <li><strong>Ward (pregnancy):</strong> Boshi Techo + pregnancy support consultation + prenatal vouchers + ask municipal programs + ask kokuho reduction.</li>
           <li><strong>HR / employer:</strong> Maternity leave paperwork + childcare leave benefit + social insurance exemption + extra employer benefit.</li>
@@ -232,7 +271,7 @@ export default function TasksTab() {
           <li><strong>Tax / receipts flow:</strong> save receipts + transport logs, then file Kakutei Shinkoku in Feb-March.</li>
         </ul>
       </section>
-      {phases.map(phase => {
+      {visiblePhases.map(phase => {
         const done = phase.items.filter(i => checked[i.id]).length
         const total = phase.items.length
         return (
@@ -479,6 +518,11 @@ export default function TasksTab() {
           </section>
         )
       })}
+      {visiblePhases.length === 0 && (
+        <section className="glass-section">
+          <p className="section-note">No tasks for this bundle yet.</p>
+        </section>
+      )}
     </div>
   )
 }
