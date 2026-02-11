@@ -42,6 +42,16 @@ function toAbsoluteUrl(url) {
   }
 }
 
+function notifyClients(message) {
+  return clients.matchAll({ type: 'window', includeUncontrolled: true }).then((windowClients) => {
+    for (const client of windowClients) {
+      try {
+        client.postMessage(message);
+      } catch {}
+    }
+  }).catch(() => {});
+}
+
 self.addEventListener('install', (event) => {
   event.waitUntil(
     caches.open(CACHE_NAME)
@@ -123,19 +133,31 @@ self.addEventListener('push', (event) => {
   const actions = Array.isArray(payload.actions) ? payload.actions.slice(0, 8) : [];
 
   event.waitUntil(
-    self.registration.showNotification(title, {
-      body,
-      icon: payload.icon || icon,
-      badge: payload.badge || icon,
-      tag: payload.tag || 'peggy-push',
-      renotify: Boolean(payload.renotify),
-      requireInteraction: Boolean(payload.requireInteraction),
-      data: {
-        url: targetUrl,
-        actionUrls,
-      },
-      actions,
-    })
+    Promise.all([
+      self.registration.showNotification(title, {
+        body,
+        icon: payload.icon || icon,
+        badge: payload.badge || icon,
+        tag: payload.tag || 'peggy-push',
+        renotify: Boolean(payload.renotify),
+        requireInteraction: Boolean(payload.requireInteraction),
+        data: {
+          url: targetUrl,
+          actionUrls,
+        },
+        actions,
+      }),
+      notifyClients({
+        type: 'peggy-sw-push',
+        payload: {
+          title,
+          body,
+          tag: payload.tag || 'peggy-push',
+          url: targetUrl,
+          createdAt: new Date().toISOString(),
+        },
+      }),
+    ])
   );
 });
 
@@ -149,20 +171,30 @@ self.addEventListener('notificationclick', (event) => {
   const targetUrl = toAbsoluteUrl(actionUrl || event.notification?.data?.url || BASE);
 
   event.waitUntil(
-    clients.matchAll({ type: 'window', includeUncontrolled: true }).then((windowClients) => {
-      for (const client of windowClients) {
-        if ('focus' in client) {
-          const clientUrl = toAbsoluteUrl(client.url || BASE);
-          const samePath = clientUrl === targetUrl || clientUrl.startsWith(toAbsoluteUrl(BASE));
-          if (samePath) {
-            return client.focus();
+    Promise.all([
+      notifyClients({
+        type: 'peggy-sw-notification-click',
+        payload: {
+          targetUrl,
+          action,
+          createdAt: new Date().toISOString(),
+        },
+      }),
+      clients.matchAll({ type: 'window', includeUncontrolled: true }).then((windowClients) => {
+        for (const client of windowClients) {
+          if ('focus' in client) {
+            const clientUrl = toAbsoluteUrl(client.url || BASE);
+            const samePath = clientUrl === targetUrl || clientUrl.startsWith(toAbsoluteUrl(BASE));
+            if (samePath) {
+              return client.focus();
+            }
           }
         }
-      }
-      if (clients.openWindow) {
-        return clients.openWindow(targetUrl);
-      }
-      return undefined;
-    })
+        if (clients.openWindow) {
+          return clients.openWindow(targetUrl);
+        }
+        return undefined;
+      }),
+    ])
   );
 });
