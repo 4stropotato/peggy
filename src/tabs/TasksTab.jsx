@@ -350,25 +350,33 @@ export default function TasksTab() {
                         {hasMetaRow && (
                           <div className="item-top-row">
                             <span className="item-tags">
-                              {showAskBadge && (
-                                <span className="badge ask-badge">ASK</span>
-                              )}
-                              {showUrgentBadge && (
-                                <span className="badge urgent-badge">URGENT</span>
-                              )}
-                              {showMoneyBadge && (
-                                <span className="badge money-badge">
-                                  {moneyTotal > 0 ? `+\u00A5${moneyTotal.toLocaleString()}` : 'BENEFIT'}
+                              {(showAskBadge || showUrgentBadge || showMoneyBadge) && (
+                                <span className="item-tags-primary">
+                                  {showAskBadge && (
+                                    <span className="badge ask-badge">ASK</span>
+                                  )}
+                                  {showUrgentBadge && (
+                                    <span className="badge urgent-badge">URGENT</span>
+                                  )}
+                                  {showMoneyBadge && (
+                                    <span className="badge money-badge">
+                                      {moneyTotal > 0 ? `+\u00A5${moneyTotal.toLocaleString()}` : 'BENEFIT'}
+                                    </span>
+                                  )}
                                 </span>
                               )}
-                              {showBundleBadges && bundles.map((bundle) => (
-                                <span key={`${item.id}-${bundle.id}`} className={`badge bundle-badge bundle-${bundle.tone}`}>
-                                  {bundle.shortLabel}
-                                </span>
-                              ))}
-                              {showScheduleBadge && (
-                                <span className={`badge schedule-badge ${scheduleIsOverdue ? 'overdue' : ''}`}>
-                                  {scheduleLabel}{schedule.time ? ` ${schedule.time}` : ''}
+                              {(showBundleBadges || showScheduleBadge) && (
+                                <span className="item-tags-secondary">
+                                  {showBundleBadges && bundles.map((bundle) => (
+                                    <span key={`${item.id}-${bundle.id}`} className={`badge bundle-badge bundle-${bundle.tone}`}>
+                                      {bundle.shortLabel}
+                                    </span>
+                                  ))}
+                                  {showScheduleBadge && (
+                                    <span className={`badge schedule-badge ${scheduleIsOverdue ? 'overdue' : ''}`}>
+                                      {scheduleLabel}{schedule.time ? ` ${schedule.time}` : ''}
+                                    </span>
+                                  )}
                                 </span>
                               )}
                             </span>
