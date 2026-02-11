@@ -3,7 +3,13 @@ const DB_VERSION = 2;
 const PHOTO_STORE = 'photos';
 const STATE_STORE = 'appState';
 const STORAGE_PREFIX = 'baby-prep-';
-const RESERVED_STORAGE_KEYS = new Set(['baby-prep-cloud-session']);
+const RESERVED_STORAGE_KEYS = new Set([
+  'baby-prep-cloud-session',
+  // Notification preferences are device-local, not account backup data.
+  'baby-prep-smart-notifs-enabled',
+  'baby-prep-smart-notif-quiet-hours',
+  'baby-prep-smart-notif-channels',
+]);
 
 function isAppStorageKey(key) {
   return Boolean(key && key.startsWith(STORAGE_PREFIX) && !RESERVED_STORAGE_KEYS.has(key));

@@ -1273,13 +1273,15 @@ export function buildNameSpotlight({ now = new Date(), babyNamesInfo, seedSalt =
   }
 }
 
-export const SMART_NOTIF_PREF_KEY = 'baby-prep-smart-notifs-enabled'
-export const LEGACY_SMART_NOTIF_PREF_KEY = 'peggy-smart-notifs-enabled'
+export const SMART_NOTIF_PREF_KEY = 'peggy-smart-notifs-enabled'
+const DEPRECATED_SMART_NOTIF_PREF_KEY = 'baby-prep-smart-notifs-enabled'
 export const SMART_NOTIF_PREF_EVENT = 'peggy-smart-notif-pref-changed'
 export const SMART_NOTIF_LOG_KEY = 'peggy-smart-notifs-log-v1'
-export const SMART_NOTIF_QUIET_HOURS_KEY = 'baby-prep-smart-notif-quiet-hours'
+export const SMART_NOTIF_QUIET_HOURS_KEY = 'peggy-smart-notif-quiet-hours'
+const DEPRECATED_SMART_NOTIF_QUIET_HOURS_KEY = 'baby-prep-smart-notif-quiet-hours'
 export const SMART_NOTIF_QUIET_HOURS_EVENT = 'peggy-smart-notif-quiet-hours-changed'
-export const SMART_NOTIF_CHANNEL_PREF_KEY = 'baby-prep-smart-notif-channels'
+export const SMART_NOTIF_CHANNEL_PREF_KEY = 'peggy-smart-notif-channels'
+const DEPRECATED_SMART_NOTIF_CHANNEL_PREF_KEY = 'baby-prep-smart-notif-channels'
 export const SMART_NOTIF_CHANNEL_EVENT = 'peggy-smart-notif-channels-changed'
 export const SMART_NOTIF_CHANNEL_KEYS = Object.freeze(['reminders', 'calendar', 'dailyTip', 'names'])
 
@@ -1328,6 +1330,9 @@ function sanitizeQuietHours(value) {
 export function readSmartNotifQuietHours() {
   if (typeof window === 'undefined') return { ...DEFAULT_SMART_QUIET_HOURS }
   try {
+    if (window.localStorage.getItem(DEPRECATED_SMART_NOTIF_QUIET_HOURS_KEY) !== null) {
+      window.localStorage.removeItem(DEPRECATED_SMART_NOTIF_QUIET_HOURS_KEY)
+    }
     const raw = window.localStorage.getItem(SMART_NOTIF_QUIET_HOURS_KEY)
     if (!raw) return { ...DEFAULT_SMART_QUIET_HOURS }
     return sanitizeQuietHours(JSON.parse(raw))
@@ -1340,6 +1345,7 @@ export function writeSmartNotifQuietHours(nextValue) {
   if (typeof window === 'undefined') return
   const safe = sanitizeQuietHours(nextValue)
   window.localStorage.setItem(SMART_NOTIF_QUIET_HOURS_KEY, JSON.stringify(safe))
+  window.localStorage.removeItem(DEPRECATED_SMART_NOTIF_QUIET_HOURS_KEY)
   window.dispatchEvent(new CustomEvent(SMART_NOTIF_QUIET_HOURS_EVENT, { detail: safe }))
   window.dispatchEvent(new CustomEvent('peggy-local-changed', { detail: { key: SMART_NOTIF_QUIET_HOURS_KEY } }))
 }
@@ -1363,22 +1369,23 @@ export function formatSmartNotifQuietHoursLabel(quietHours = null) {
 
 export function readSmartNotifEnabled() {
   if (typeof window === 'undefined') return false
+  if (window.localStorage.getItem(DEPRECATED_SMART_NOTIF_PREF_KEY) !== null) {
+    window.localStorage.removeItem(DEPRECATED_SMART_NOTIF_PREF_KEY)
+  }
   const value = window.localStorage.getItem(SMART_NOTIF_PREF_KEY)
   if (value === '1' || value === '0') return value === '1'
 
-  // One-time migration for older builds that stored this outside backup scope.
-  const legacy = window.localStorage.getItem(LEGACY_SMART_NOTIF_PREF_KEY)
-  if (legacy === '1' || legacy === '0') {
-    window.localStorage.setItem(SMART_NOTIF_PREF_KEY, legacy)
-    return legacy === '1'
-  }
-
+  // Force manual opt-in on newly installed devices.
+  // If only deprecated cloud-synced key exists, ignore it.
   return false
 }
 
 export function readSmartNotifChannels() {
   if (typeof window === 'undefined') return { ...DEFAULT_SMART_NOTIF_CHANNELS }
   try {
+    if (window.localStorage.getItem(DEPRECATED_SMART_NOTIF_CHANNEL_PREF_KEY) !== null) {
+      window.localStorage.removeItem(DEPRECATED_SMART_NOTIF_CHANNEL_PREF_KEY)
+    }
     const raw = window.localStorage.getItem(SMART_NOTIF_CHANNEL_PREF_KEY)
     if (!raw) return { ...DEFAULT_SMART_NOTIF_CHANNELS }
     return sanitizeSmartNotifChannels(JSON.parse(raw))
@@ -1391,6 +1398,7 @@ export function writeSmartNotifChannels(nextValue) {
   if (typeof window === 'undefined') return
   const safe = sanitizeSmartNotifChannels(nextValue)
   window.localStorage.setItem(SMART_NOTIF_CHANNEL_PREF_KEY, JSON.stringify(safe))
+  window.localStorage.removeItem(DEPRECATED_SMART_NOTIF_CHANNEL_PREF_KEY)
   window.dispatchEvent(new CustomEvent(SMART_NOTIF_CHANNEL_EVENT, { detail: safe }))
   window.dispatchEvent(new CustomEvent('peggy-local-changed', { detail: { key: SMART_NOTIF_CHANNEL_PREF_KEY } }))
 }
@@ -1406,8 +1414,7 @@ export function writeSmartNotifEnabled(enabled) {
   if (typeof window === 'undefined') return
   const value = enabled ? '1' : '0'
   window.localStorage.setItem(SMART_NOTIF_PREF_KEY, value)
-  // Keep legacy key mirrored so existing local-only flows remain stable.
-  window.localStorage.setItem(LEGACY_SMART_NOTIF_PREF_KEY, value)
+  window.localStorage.removeItem(DEPRECATED_SMART_NOTIF_PREF_KEY)
   window.dispatchEvent(new CustomEvent(SMART_NOTIF_PREF_EVENT, { detail: { enabled: Boolean(enabled) } }))
   window.dispatchEvent(new CustomEvent('peggy-local-changed', { detail: { key: SMART_NOTIF_PREF_KEY } }))
 }

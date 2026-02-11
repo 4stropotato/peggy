@@ -26,9 +26,6 @@ const APP_BASE = import.meta.env.BASE_URL || '/'
 const NOTIF_ICON = `${APP_BASE.replace(/\/+$/, '/')}icon-192.png`
 
 function canNotifyNow() {
-  if (typeof document === 'undefined') return true
-  if (document.visibilityState === 'hidden') return true
-  if (typeof document.hasFocus === 'function') return !document.hasFocus()
   return true
 }
 

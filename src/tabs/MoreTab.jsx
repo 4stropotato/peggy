@@ -591,7 +591,14 @@ export default function MoreTab() {
     if (notifEnabled) {
       writeSmartNotifEnabled(false)
       setNotifEnabled(false)
-      setNotifStatus('Reminders paused.')
+      setNotifStatus('Reminders paused on this device.')
+      if (cloudSession && pushSupported) {
+        try {
+          await disableCurrentPushSubscription(cloudSession, { unsubscribeLocal: true })
+        } catch {
+          // Keep UX responsive even if network is down.
+        }
+      }
       return
     }
 
@@ -608,7 +615,23 @@ export default function MoreTab() {
     if (permission === 'granted') {
       writeSmartNotifEnabled(true)
       setNotifEnabled(true)
-      setNotifStatus('Smart reminders enabled.')
+      if (cloudSession && pushSupported && pushVapidReady) {
+        try {
+          const sync = await upsertCurrentPushSubscription(cloudSession, { notifEnabled: true })
+          if (sync?.status === 'ok') {
+            setNotifStatus('Notifications enabled and push connected on this device.')
+          } else {
+            const reason = String(sync?.reason || 'subscription-sync-skipped')
+            setNotifStatus(`Notifications enabled, but push sync skipped (${reason}).`)
+          }
+        } catch (err) {
+          setNotifStatus(`Notifications enabled, but push sync failed (${err?.message || 'unknown error'}).`)
+        }
+      } else if (!cloudSession) {
+        setNotifStatus('Notifications enabled locally. Sign in to cloud for lock-screen push.')
+      } else {
+        setNotifStatus('Notifications enabled on this device.')
+      }
       return
     }
 
@@ -799,7 +822,12 @@ export default function MoreTab() {
     try {
       setCloudBusy(true)
       setPushStatus('Registering this device and sending test push...')
-      await upsertCurrentPushSubscription(cloudSession, { notifEnabled: readSmartNotifEnabled() })
+      const sync = await upsertCurrentPushSubscription(cloudSession, { notifEnabled: readSmartNotifEnabled() })
+      if (sync?.status !== 'ok') {
+        const reason = String(sync?.reason || 'subscription-sync-skipped')
+        setPushStatus(`Push registration skipped (${reason}).`)
+        return
+      }
       const result = await cloudSendPushTest(cloudSession)
       const sent = Number(result?.sent || 0)
       const total = Number(result?.total || sent)
@@ -1052,7 +1080,7 @@ export default function MoreTab() {
                 <span className="section-icon"><UiIcon icon={APP_ICONS.reminders} /></span>
                 <div>
                   <h3>Notification Settings</h3>
-                  <span className="section-count">Per-account settings</span>
+                  <span className="section-count">Per-device settings</span>
                 </div>
                 <button
                   type="button"
@@ -1125,6 +1153,9 @@ export default function MoreTab() {
               <p className="section-note">
                 Permission: {notifPermission === 'unsupported' ? 'unsupported' : notifPermission}.
                 {' '}Quiet hours active now: {quietHoursActiveNow ? 'yes' : 'no'}.
+              </p>
+              <p className="section-note">
+                New installs start with Notifications OFF by default. Enable manually per device.
               </p>
               <p className="section-note">
                 Mood reminder slots: 12:00, 17:00, 20:00 (only if today has no mood log yet).
