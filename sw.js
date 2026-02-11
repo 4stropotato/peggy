@@ -1,6 +1,6 @@
 // Cache version bump: change this whenever static assets (icons, CSS, JS) change
 // so installed PWAs pick up updates reliably.
-const CACHE_NAME = 'peggy-v14';
+const CACHE_NAME = 'peggy-v15';
 const CACHE_PREFIXES = ['peggy-', 'baby-prep-'];
 
 function resolveBasePath() {
@@ -117,6 +117,10 @@ self.addEventListener('push', (event) => {
   const title = payload.title || 'Peggy reminder';
   const body = payload.body || 'Open Peggy to check your latest reminders.';
   const targetUrl = toAbsoluteUrl(payload.url || BASE);
+  const actionUrls = (payload?.data && typeof payload.data === 'object' && payload.data.actionUrls && typeof payload.data.actionUrls === 'object')
+    ? payload.data.actionUrls
+    : {};
+  const actions = Array.isArray(payload.actions) ? payload.actions.slice(0, 8) : [];
 
   event.waitUntil(
     self.registration.showNotification(title, {
@@ -128,14 +132,21 @@ self.addEventListener('push', (event) => {
       requireInteraction: Boolean(payload.requireInteraction),
       data: {
         url: targetUrl,
+        actionUrls,
       },
+      actions,
     })
   );
 });
 
 self.addEventListener('notificationclick', (event) => {
   event.notification.close();
-  const targetUrl = toAbsoluteUrl(event.notification?.data?.url || BASE);
+  const action = String(event.action || '').trim();
+  const actionUrls = event.notification?.data?.actionUrls;
+  const actionUrl = (action && actionUrls && typeof actionUrls === 'object')
+    ? actionUrls[action]
+    : '';
+  const targetUrl = toAbsoluteUrl(actionUrl || event.notification?.data?.url || BASE);
 
   event.waitUntil(
     clients.matchAll({ type: 'window', includeUncontrolled: true }).then((windowClients) => {
