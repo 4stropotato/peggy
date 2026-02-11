@@ -170,28 +170,23 @@ function getCountdown(scheduledTime, lastTaken) {
   const scheduled = new Date(now)
   scheduled.setHours(h, m, 0, 0)
 
-  if (now > scheduled) {
-    if (lastTaken) {
-      const takenDate = new Date(lastTaken)
-      if (takenDate.toDateString() === today) {
-        return { text: 'Done!', status: 'done', minutes: 0 }
-      }
+  if (lastTaken) {
+    const takenDate = new Date(lastTaken)
+    if (takenDate.toDateString() === today) {
+      return { text: 'Done!', status: 'done', minutes: 0 }
     }
+  }
+
+  if (now > scheduled) {
     return { text: 'Take now!', status: 'overdue', minutes: 0 }
   }
 
   const diff = scheduled - now
   const mins = Math.floor(diff / 60000)
-  const hrs = Math.floor(mins / 60)
-  const remainMins = mins % 60
-
-  if (hrs > 0) {
-    return { text: `${hrs}h ${remainMins}m`, status: 'waiting', minutes: mins }
-  }
   if (mins <= 15) {
-    return { text: `${mins}m`, status: 'soon', minutes: mins }
+    return { text: 'Take now!', status: 'soon', minutes: mins }
   }
-  return { text: `${mins}m`, status: 'waiting', minutes: mins }
+  return { text: 'Take now!', status: 'waiting', minutes: mins }
 }
 
 function SuppCountdownCard({ supp, schedule, isTaken, toggleSupp, undoSupp, resetBottle, lastTaken, bottle, showExplanation, onToggleExplanation }) {
@@ -274,10 +269,10 @@ function SuppCountdownCard({ supp, schedule, isTaken, toggleSupp, undoSupp, rese
               >
                 <div className="dose-time">{cd.time}</div>
                 <div className={`dose-countdown ${taken ? 'done' : cd.status}`}>
-                  {taken ? '✓' : cd.text}
+                  {taken ? '\u2713' : cd.text}
                 </div>
                 <div className="dose-label">
-                  {taken ? 'Taken!' : cd.status === 'overdue' ? 'Overdue' : cd.status === 'soon' ? 'Almost time' : 'Upcoming'}
+                  {taken ? 'Taken!' : 'Take now'}
                 </div>
               </div>
               {taken && (
