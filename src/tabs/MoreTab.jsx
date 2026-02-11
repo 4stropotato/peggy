@@ -17,6 +17,7 @@ import {
   buildPlannerReminder,
   buildSupplementReminder,
   buildWorkReminder,
+  appendSmartNotifInbox,
   clearSmartNotifInbox,
   formatSmartNotifQuietHoursLabel,
   getMoodReminderContext,
@@ -485,6 +486,7 @@ export default function MoreTab() {
   const [notifPermission, setNotifPermission] = useState(() => (
     typeof Notification === 'undefined' ? 'unsupported' : Notification.permission
   ))
+  const [notifLastTestAt, setNotifLastTestAt] = useState('')
   const quietHoursActiveNow = isNowInSmartNotifQuietHours(new Date(), quietHours)
   const notifNow = useMemo(() => new Date(notifNowTick), [notifNowTick])
 
@@ -891,17 +893,52 @@ export default function MoreTab() {
   }
 
   const handleLocalNotifTest = async () => {
+    setNotifStatus('Running local notification test...')
+
+    const isStandalone = (() => {
+      if (typeof window === 'undefined') return false
+      return window.matchMedia?.('(display-mode: standalone)')?.matches
+        || window.navigator?.standalone === true
+    })()
+
     if (typeof Notification === 'undefined') {
       setNotifStatus('Notifications are not supported on this browser/device.')
       return
     }
-    if (Notification.permission !== 'granted') {
-      setNotifStatus('Enable notifications first, then run local test.')
+
+    let permission = Notification.permission
+    if (permission === 'default') {
+      try {
+        permission = await Notification.requestPermission()
+      } catch {
+        permission = Notification.permission
+      }
+      setNotifPermission(permission)
+    }
+
+    if (permission !== 'granted') {
+      setNotifStatus('Notification permission is not granted. Enable it first for this device.')
+      appendSmartNotifInbox({
+        title: 'Local notification test blocked',
+        body: `Permission is ${permission}.`,
+        type: 'test',
+        level: 'nudge',
+        status: 'missed',
+        reason: `permission-${permission}`,
+        source: 'local',
+        slotKey: `local-test|permission|${permission}`,
+        dedupeKey: `local-test|permission|${permission}`,
+        createdAt: new Date().toISOString(),
+        read: false,
+      })
+      setNotifInbox(readSmartNotifInbox())
       return
     }
 
     const title = 'Peggy local test'
-    const body = 'Notification pipeline is active on this device.'
+    const body = isStandalone
+      ? 'Notification pipeline is active on this installed app.'
+      : 'Notification test from browser mode. For iPhone lock-screen push, use Home Screen app.'
     const options = {
       body,
       icon: `${import.meta.env.BASE_URL || '/'}icon-192.png`,
@@ -913,18 +950,54 @@ export default function MoreTab() {
     }
 
     try {
+      let route = 'notification-api'
       if ('serviceWorker' in navigator) {
         const registration = await navigator.serviceWorker.ready
         if (registration?.showNotification) {
           await registration.showNotification(title, options)
-          setNotifStatus('Local test sent via Service Worker.')
-          return
+          route = 'service-worker'
+        } else {
+          new Notification(title, options)
         }
+      } else {
+        new Notification(title, options)
       }
-      new Notification(title, options)
-      setNotifStatus('Local test sent.')
+      const testAt = new Date().toISOString()
+      setNotifLastTestAt(testAt)
+      appendSmartNotifInbox({
+        title: 'Local test sent',
+        body: `Route: ${route}. Standalone: ${isStandalone ? 'yes' : 'no'}.`,
+        type: 'test',
+        level: 'gentle',
+        status: 'sent',
+        source: 'local',
+        slotKey: `local-test|${route}|${testAt.slice(0, 16)}`,
+        dedupeKey: `local-test|${route}|${testAt.slice(0, 16)}`,
+        createdAt: testAt,
+        read: false,
+      })
+      setNotifInbox(readSmartNotifInbox())
+      setNotifStatus(
+        `Local test sent via ${route}. ` +
+        `${isStandalone ? '' : 'Open Peggy from Home Screen for iPhone lock-screen behavior. '}` +
+        'If no banner appears, check iOS Notification settings + Focus mode.'
+      )
     } catch (err) {
       setNotifStatus(`Local test failed: ${err.message}`)
+      appendSmartNotifInbox({
+        title: 'Local test failed',
+        body: String(err?.message || 'unknown error'),
+        type: 'test',
+        level: 'nudge',
+        status: 'missed',
+        reason: 'local-test-failed',
+        source: 'local',
+        slotKey: 'local-test|failed',
+        dedupeKey: `local-test|failed|${new Date().toISOString().slice(0, 16)}`,
+        createdAt: new Date().toISOString(),
+        read: false,
+      })
+      setNotifInbox(readSmartNotifInbox())
     }
   }
 
@@ -1339,6 +1412,12 @@ export default function MoreTab() {
                 {' '}Quiet hours active now: {quietHoursActiveNow ? 'yes' : 'no'}.
               </p>
               <p className="section-note">
+                Mode: {(typeof window !== 'undefined' && (window.matchMedia?.('(display-mode: standalone)')?.matches || window.navigator?.standalone === true))
+                  ? 'Home Screen App'
+                  : 'Browser tab'}.
+                {notifLastTestAt ? ` Last local test: ${new Date(notifLastTestAt).toLocaleString()}.` : ''}
+              </p>
+              <p className="section-note">
                 New installs start with Notifications OFF by default. Enable manually per device.
               </p>
               <p className="section-note">
@@ -1349,7 +1428,6 @@ export default function MoreTab() {
                   type="button"
                   className="btn-glass-secondary"
                   onClick={handleLocalNotifTest}
-                  disabled={!notifEnabled}
                 >
                   Send Local Test
                 </button>
