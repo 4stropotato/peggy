@@ -82,17 +82,27 @@ function getMonthKeyFromISO(dateISO) {
   return raw.slice(0, 7)
 }
 
-function buildMonthlyIncomeMap(attendanceMap, payRates, person) {
+function buildMonthlyIncomeDetails(attendanceMap, payRates, person) {
   const monthly = {}
   const monthlyFixed = {}
+  const missingRateDates = []
+  const countedWorkedDates = []
   for (const [dateISO, record] of Object.entries(attendanceMap || {})) {
     if (!record?.worked) continue
     const monthKey = getMonthKeyFromISO(dateISO)
     if (!monthKey) continue
     const rate = getRateForDate(payRates, person, dateISO)
-    if (!rate) continue
+    if (!rate) {
+      missingRateDates.push(dateISO)
+      continue
+    }
     const basis = normalizeBasis(rate.basis)
     const amount = Math.max(0, Number(rate.rate) || 0)
+    if (amount <= 0) {
+      missingRateDates.push(dateISO)
+      continue
+    }
+    countedWorkedDates.push(dateISO)
 
     if (basis === 'hourly') {
       const hours = Math.max(0, Number(record.hours) || 0)
@@ -114,7 +124,12 @@ function buildMonthlyIncomeMap(attendanceMap, payRates, person) {
   for (const [monthKey, meta] of Object.entries(monthlyFixed)) {
     monthly[monthKey] = (monthly[monthKey] || 0) + (Number(meta.value) || 0)
   }
-  return monthly
+  return {
+    monthly,
+    missingRateDates,
+    missingRateDays: missingRateDates.length,
+    countedWorkedDays: countedWorkedDates.length,
+  }
 }
 
 function toMonthKey(dateLike) {
@@ -193,6 +208,15 @@ function summarizeAttendanceForMonths(attendanceMap, monthKeys) {
     daysWorked,
     hoursWorked: Math.round(hoursWorked * 100) / 100,
   }
+}
+
+function countDatesInMonths(dateList, monthKeys) {
+  const targets = new Set(Array.isArray(monthKeys) ? monthKeys : [])
+  return (Array.isArray(dateList) ? dateList : []).reduce((acc, dateISO) => {
+    const monthKey = getMonthKeyFromISO(dateISO)
+    if (!targets.has(monthKey)) return acc
+    return acc + 1
+  }, 0)
 }
 
 function sumExpensesForMonths(expenseList, monthKeys) {
@@ -316,14 +340,16 @@ export default function MoneyTab() {
     [financeConfig]
   )
 
-  const naomiWorkMonthlyIncomeMap = useMemo(
-    () => buildMonthlyIncomeMap(attendance, safePayRates, 'naomi'),
+  const naomiIncomeDetails = useMemo(
+    () => buildMonthlyIncomeDetails(attendance, safePayRates, 'naomi'),
     [attendance, safePayRates]
   )
-  const husbandWorkMonthlyIncomeMap = useMemo(
-    () => buildMonthlyIncomeMap(husbandAttendance, safePayRates, 'husband'),
+  const husbandIncomeDetails = useMemo(
+    () => buildMonthlyIncomeDetails(husbandAttendance, safePayRates, 'husband'),
     [husbandAttendance, safePayRates]
   )
+  const naomiWorkMonthlyIncomeMap = naomiIncomeDetails.monthly
+  const husbandWorkMonthlyIncomeMap = husbandIncomeDetails.monthly
   const naomiMonthlyIncomeMap = useMemo(
     () => applyPayrollProfileToMonthlyMap(naomiWorkMonthlyIncomeMap, naomiPayrollProfile, recentYearMonthKeys),
     [naomiWorkMonthlyIncomeMap, naomiPayrollProfile, recentYearMonthKeys]
@@ -332,15 +358,15 @@ export default function MoneyTab() {
     () => applyPayrollProfileToMonthlyMap(husbandWorkMonthlyIncomeMap, husbandPayrollProfile, recentYearMonthKeys),
     [husbandWorkMonthlyIncomeMap, husbandPayrollProfile, recentYearMonthKeys]
   )
-  const naomiAnnualFromWork = useMemo(() => sumLastMonths(naomiMonthlyIncomeMap, 12), [naomiMonthlyIncomeMap])
-  const husbandAnnualFromWork = useMemo(() => sumLastMonths(husbandMonthlyIncomeMap, 12), [husbandMonthlyIncomeMap])
+  const naomiAnnualFromWork = useMemo(() => sumLastMonths(naomiWorkMonthlyIncomeMap, 12), [naomiWorkMonthlyIncomeMap])
+  const husbandAnnualFromWork = useMemo(() => sumLastMonths(husbandWorkMonthlyIncomeMap, 12), [husbandWorkMonthlyIncomeMap])
   const selectedMonth = String(summaryMonthKey || '').trim() || toMonthKey(new Date())
   const selectedPeriodMonthKeys = summaryPeriod === 'monthly' ? [selectedMonth] : recentYearMonthKeys
   const selectedNaomiIncome = summaryPeriod === 'monthly'
-    ? Math.round(Number(naomiMonthlyIncomeMap[selectedMonth] || 0))
+    ? Math.round(Number(naomiWorkMonthlyIncomeMap[selectedMonth] || 0))
     : naomiAnnualFromWork
   const selectedHusbandIncome = summaryPeriod === 'monthly'
-    ? Math.round(Number(husbandMonthlyIncomeMap[selectedMonth] || 0))
+    ? Math.round(Number(husbandWorkMonthlyIncomeMap[selectedMonth] || 0))
     : husbandAnnualFromWork
   const selectedFamilyIncome = selectedNaomiIncome + (includeHusband ? selectedHusbandIncome : 0)
   const selectedNaomiAttendanceSummary = useMemo(
@@ -350,6 +376,14 @@ export default function MoneyTab() {
   const selectedHusbandAttendanceSummary = useMemo(
     () => summarizeAttendanceForMonths(husbandAttendance, selectedPeriodMonthKeys),
     [husbandAttendance, selectedPeriodMonthKeys]
+  )
+  const selectedNaomiMissingRateDays = useMemo(
+    () => countDatesInMonths(naomiIncomeDetails.missingRateDates, selectedPeriodMonthKeys),
+    [naomiIncomeDetails.missingRateDates, selectedPeriodMonthKeys]
+  )
+  const selectedHusbandMissingRateDays = useMemo(
+    () => countDatesInMonths(husbandIncomeDetails.missingRateDates, selectedPeriodMonthKeys),
+    [husbandIncomeDetails.missingRateDates, selectedPeriodMonthKeys]
   )
   const selectedExpensesTotal = useMemo(
     () => sumExpensesForMonths(safeExpenses, selectedPeriodMonthKeys),
@@ -653,7 +687,7 @@ export default function MoneyTab() {
               <div>
                 <h2>Family Income Summary</h2>
                 <span className="section-count">
-                  {summaryPeriod === 'monthly' ? `Payout month: ${selectedMonth}` : 'Last 12 months'}
+                  {summaryPeriod === 'monthly' ? `Work month: ${selectedMonth}` : 'Last 12 work months'}
                 </span>
               </div>
             </div>
@@ -694,12 +728,17 @@ export default function MoneyTab() {
                 </div>
                 <div className="salary-assume">
                   {summaryPeriod === 'monthly'
-                    ? 'Received amount in selected payout month'
+                    ? 'Computed from worked days/hours in selected month'
                     : 'Last 12 months from attendance logs'}
                 </div>
                 <div className="salary-assume">
                   Worked: {selectedNaomiAttendanceSummary.daysWorked} day(s), {formatHoursAndMinutes(selectedNaomiAttendanceSummary.hoursWorked)}
                 </div>
+                {selectedNaomiMissingRateDays > 0 && (
+                  <div className="salary-assume">
+                    Not counted yet: {selectedNaomiMissingRateDays} day(s) without pay rate.
+                  </div>
+                )}
               </div>
               {includeHusband && (
                 <div className="glass-inner salary-summary-card husband-summary">
@@ -709,12 +748,17 @@ export default function MoneyTab() {
                   </div>
                   <div className="salary-assume">
                     {summaryPeriod === 'monthly'
-                      ? 'Received amount in selected payout month'
+                      ? 'Computed from worked days/hours in selected month'
                       : 'Last 12 months from attendance logs'}
                   </div>
                   <div className="salary-assume">
                     Worked: {selectedHusbandAttendanceSummary.daysWorked} day(s), {formatHoursAndMinutes(selectedHusbandAttendanceSummary.hoursWorked)}
                   </div>
+                  {selectedHusbandMissingRateDays > 0 && (
+                    <div className="salary-assume">
+                      Not counted yet: {selectedHusbandMissingRateDays} day(s) without pay rate.
+                    </div>
+                  )}
                 </div>
               )}
             </div>
