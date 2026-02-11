@@ -12,8 +12,10 @@ import {
   getSupplementReminderContext,
   getWorkReminderContext,
   hasSentNotificationSlot,
+  isSmartNotifChannelEnabled,
   isNowInSmartNotifQuietHours,
   markNotificationSlotSent,
+  readSmartNotifChannels,
   readSmartNotifEnabled,
   readSmartNotifQuietHours,
 } from '../reminderContent'
@@ -132,9 +134,16 @@ export default function SmartReminderAgent() {
       const suppCtx = getSupplementReminderContext({ dailySupp, suppSchedule, now })
       const workCtx = getWorkReminderContext({ attendance, now })
       const planCtx = getPlannerReminderContext({ planner, now })
+      const channelPrefs = readSmartNotifChannels()
+      const remindersChannelOn = isSmartNotifChannelEnabled('reminders', channelPrefs)
+      const calendarChannelOn = isSmartNotifChannelEnabled('calendar', channelPrefs)
+      const dailyTipChannelOn = isSmartNotifChannelEnabled('dailyTip', channelPrefs)
+      const namesChannelOn = isSmartNotifChannelEnabled('names', channelPrefs)
 
       const planBadgeCount = Math.max(0, Number(planCtx.pendingTodayCount) || 0) + Math.max(0, Number(planCtx.pendingOverdueCount) || 0)
-      const badgeCount = Math.max(0, suppCtx.remainingDoses) + (workCtx.needsReminder ? 1 : 0) + planBadgeCount
+      const reminderBadgeCount = remindersChannelOn ? (Math.max(0, suppCtx.remainingDoses) + (workCtx.needsReminder ? 1 : 0)) : 0
+      const calendarBadgeCount = calendarChannelOn ? planBadgeCount : 0
+      const badgeCount = reminderBadgeCount + calendarBadgeCount
       void syncAppBadge(badgeCount)
 
       if (isNowInSmartNotifQuietHours(now, readSmartNotifQuietHours())) return
@@ -142,13 +151,13 @@ export default function SmartReminderAgent() {
       if (!canNotifyNow()) return
 
       const actionableCandidates = []
-      if (suppCtx.remainingDoses > 0) {
+      if (remindersChannelOn && suppCtx.remainingDoses > 0) {
         actionableCandidates.push(buildSupplementReminder(suppCtx, now, 'notify'))
       }
-      if (workCtx.needsReminder) {
+      if (remindersChannelOn && workCtx.needsReminder) {
         actionableCandidates.push(buildWorkReminder(workCtx, now, 'notify'))
       }
-      if (planCtx?.candidate?.planId) {
+      if (calendarChannelOn && planCtx?.candidate?.planId) {
         const planReminder = buildPlannerReminder(planCtx, now, 'notify')
         if (planReminder) actionableCandidates.push(planReminder)
       }
@@ -170,34 +179,38 @@ export default function SmartReminderAgent() {
         return
       }
 
-      const dailyTip = buildDailyTip({ now, suppCtx })
-      const tipReminder = buildDailyTipReminder({ now, dailyTip, seedSalt: 'notify' })
-      if (!hasSentNotificationSlot(tipReminder.slotKey, now)) {
-        fireNotification({
-          title: tipReminder.notificationTitle,
-          body: tipReminder.notificationBody,
-          slotKey: tipReminder.slotKey,
-          type: tipReminder.type,
-          level: tipReminder.level,
-          urgent: false,
-        })
-        markNotificationSlotSent(tipReminder.slotKey, now)
-        return
+      if (dailyTipChannelOn) {
+        const dailyTip = buildDailyTip({ now, suppCtx })
+        const tipReminder = buildDailyTipReminder({ now, dailyTip, seedSalt: 'notify' })
+        if (!hasSentNotificationSlot(tipReminder.slotKey, now)) {
+          fireNotification({
+            title: tipReminder.notificationTitle,
+            body: tipReminder.notificationBody,
+            slotKey: tipReminder.slotKey,
+            type: tipReminder.type,
+            level: tipReminder.level,
+            urgent: false,
+          })
+          markNotificationSlotSent(tipReminder.slotKey, now)
+          return
+        }
       }
 
-      const nameSpotlight = buildNameSpotlight({ now, babyNamesInfo, seedSalt: 'notify' })
-      const nameSlotKey = `${nameSpotlight.slotKey}|name-notif`
-      const nameUnsent = !hasSentNotificationSlot(nameSlotKey, now)
-      if (nameUnsent && now.getMinutes() % 2 === 0) {
-        fireNotification({
-          title: nameSpotlight.notificationTitle,
-          body: nameSpotlight.notificationBody,
-          slotKey: nameSlotKey,
-          type: 'name',
-          level: 'gentle',
-          urgent: false,
-        })
-        markNotificationSlotSent(nameSlotKey, now)
+      if (namesChannelOn) {
+        const nameSpotlight = buildNameSpotlight({ now, babyNamesInfo, seedSalt: 'notify' })
+        const nameSlotKey = `${nameSpotlight.slotKey}|name-notif`
+        const nameUnsent = !hasSentNotificationSlot(nameSlotKey, now)
+        if (nameUnsent && now.getMinutes() % 2 === 0) {
+          fireNotification({
+            title: nameSpotlight.notificationTitle,
+            body: nameSpotlight.notificationBody,
+            slotKey: nameSlotKey,
+            type: 'name',
+            level: 'gentle',
+            urgent: false,
+          })
+          markNotificationSlotSent(nameSlotKey, now)
+        }
       }
     }
 
@@ -206,7 +219,7 @@ export default function SmartReminderAgent() {
     return () => {
       window.clearInterval(id)
     }
-  }, [dailySupp, suppSchedule, attendance])
+  }, [dailySupp, suppSchedule, attendance, planner])
 
   return null
 }

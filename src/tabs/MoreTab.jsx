@@ -14,8 +14,12 @@ import {
 } from '../cloudSync'
 import {
   formatSmartNotifQuietHoursLabel,
+  isSmartNotifChannelEnabled,
+  readSmartNotifChannels,
   readSmartNotifEnabled,
+  SMART_NOTIF_CHANNEL_EVENT,
   readSmartNotifQuietHours,
+  writeSmartNotifChannels,
   SMART_NOTIF_PREF_EVENT,
   SMART_NOTIF_QUIET_HOURS_EVENT,
   writeSmartNotifEnabled,
@@ -436,6 +440,7 @@ export default function MoreTab() {
   const pushVapidReady = Boolean(String(import.meta.env.VITE_WEB_PUSH_PUBLIC_KEY || '').trim())
   const activeIconStyle = resolveIconStyle(iconStyle)
   const [notifEnabled, setNotifEnabled] = useState(() => readSmartNotifEnabled())
+  const [notifChannels, setNotifChannels] = useState(() => readSmartNotifChannels())
   const [quietHours, setQuietHours] = useState(() => readSmartNotifQuietHours())
   const [notifStatus, setNotifStatus] = useState('')
 
@@ -453,18 +458,22 @@ export default function MoreTab() {
     if (typeof window === 'undefined') return undefined
 
     const syncNotifEnabled = () => setNotifEnabled(readSmartNotifEnabled())
+    const syncNotifChannels = () => setNotifChannels(readSmartNotifChannels())
     const syncQuietHours = () => setQuietHours(readSmartNotifQuietHours())
     const syncAll = () => {
       syncNotifEnabled()
+      syncNotifChannels()
       syncQuietHours()
     }
 
     window.addEventListener(SMART_NOTIF_PREF_EVENT, syncNotifEnabled)
+    window.addEventListener(SMART_NOTIF_CHANNEL_EVENT, syncNotifChannels)
     window.addEventListener(SMART_NOTIF_QUIET_HOURS_EVENT, syncQuietHours)
     window.addEventListener('peggy-backup-restored', syncAll)
     window.addEventListener('storage', syncAll)
     return () => {
       window.removeEventListener(SMART_NOTIF_PREF_EVENT, syncNotifEnabled)
+      window.removeEventListener(SMART_NOTIF_CHANNEL_EVENT, syncNotifChannels)
       window.removeEventListener(SMART_NOTIF_QUIET_HOURS_EVENT, syncQuietHours)
       window.removeEventListener('peggy-backup-restored', syncAll)
       window.removeEventListener('storage', syncAll)
@@ -599,6 +608,23 @@ export default function MoreTab() {
     if (next.enabled) {
       setNotifStatus(`Quiet hours updated (${formatSmartNotifQuietHoursLabel(next)}).`)
     }
+  }
+
+  const handleNotifChannelToggle = (channelKey) => {
+    const next = {
+      ...notifChannels,
+      [channelKey]: !isSmartNotifChannelEnabled(channelKey, notifChannels),
+    }
+    setNotifChannels(next)
+    writeSmartNotifChannels(next)
+    const pretty = channelKey === 'dailyTip'
+      ? 'Daily Tip'
+      : channelKey === 'calendar'
+        ? 'Calendar'
+        : channelKey === 'names'
+          ? 'Names'
+          : 'Reminders'
+    setNotifStatus(`${pretty} notifications ${next[channelKey] ? 'enabled' : 'paused'}.`)
   }
 
   const handleExport = async () => {
@@ -771,11 +797,11 @@ export default function MoreTab() {
   return (
     <div className="content">
       <div className="sub-tabs glass-tabs">
-        {['info', 'photos', 'doctor', 'contacts', 'backup'].map(t => (
+        {['info', 'photos', 'doctor', 'contacts', 'settings'].map(t => (
           <button key={t} className={`glass-tab ${subTab === t ? 'active' : ''}`} onClick={() => setSubTab(t)}>
             <span className="tab-icon-label">
               <UiIcon icon={t === 'info' ? APP_ICONS.info : t === 'photos' ? APP_ICONS.photos : t === 'doctor' ? APP_ICONS.doctor : t === 'contacts' ? APP_ICONS.contacts : APP_ICONS.backup} />
-              <span>{t === 'info' ? 'Info' : t === 'photos' ? 'Photos' : t === 'doctor' ? 'Doctor' : t === 'contacts' ? 'Contacts' : 'Backup'}</span>
+              <span>{t === 'info' ? 'Info' : t === 'photos' ? 'Photos' : t === 'doctor' ? 'Doctor' : t === 'contacts' ? 'Contacts' : 'Settings'}</span>
             </span>
           </button>
         ))}
@@ -950,11 +976,11 @@ export default function MoreTab() {
         </section>
       )}
 
-      {subTab === 'backup' && (
+      {subTab === 'settings' && (
         <section className="glass-section">
           <div className="section-header">
             <span className="section-icon"><UiIcon icon={APP_ICONS.backup} /></span>
-            <div><h2>Data Backup & Restore</h2></div>
+            <div><h2>Settings & Backup</h2></div>
           </div>
 
           <div className="backup-section">
@@ -978,6 +1004,36 @@ export default function MoreTab() {
                 </button>
               </div>
               <div className="notif-settings-grid">
+                <div className="notif-channel-grid">
+                  <button
+                    type="button"
+                    className={`notif-channel-btn glass-inner ${isSmartNotifChannelEnabled('reminders', notifChannels) ? 'on' : ''}`}
+                    onClick={() => handleNotifChannelToggle('reminders')}
+                  >
+                    Reminders {isSmartNotifChannelEnabled('reminders', notifChannels) ? 'ON' : 'OFF'}
+                  </button>
+                  <button
+                    type="button"
+                    className={`notif-channel-btn glass-inner ${isSmartNotifChannelEnabled('calendar', notifChannels) ? 'on' : ''}`}
+                    onClick={() => handleNotifChannelToggle('calendar')}
+                  >
+                    Calendar {isSmartNotifChannelEnabled('calendar', notifChannels) ? 'ON' : 'OFF'}
+                  </button>
+                  <button
+                    type="button"
+                    className={`notif-channel-btn glass-inner ${isSmartNotifChannelEnabled('dailyTip', notifChannels) ? 'on' : ''}`}
+                    onClick={() => handleNotifChannelToggle('dailyTip')}
+                  >
+                    Daily Tip {isSmartNotifChannelEnabled('dailyTip', notifChannels) ? 'ON' : 'OFF'}
+                  </button>
+                  <button
+                    type="button"
+                    className={`notif-channel-btn glass-inner ${isSmartNotifChannelEnabled('names', notifChannels) ? 'on' : ''}`}
+                    onClick={() => handleNotifChannelToggle('names')}
+                  >
+                    Names {isSmartNotifChannelEnabled('names', notifChannels) ? 'ON' : 'OFF'}
+                  </button>
+                </div>
                 <button
                   type="button"
                   className={`notif-pill-btn glass-inner ${quietHours.enabled ? 'on' : ''}`}

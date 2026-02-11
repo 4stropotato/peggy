@@ -15,6 +15,10 @@ import {
   getPlannerReminderContext,
   getSupplementReminderContext,
   getWorkReminderContext,
+  isSmartNotifChannelEnabled,
+  readSmartNotifChannels,
+  SMART_NOTIF_CHANNEL_EVENT,
+  writeSmartNotifChannels,
 } from '../reminderContent'
 
 // Find earliest date any supplement was tracked
@@ -83,6 +87,7 @@ export default function HomeTab() {
   const [showDueInput, setShowDueInput] = useState(!dueDate)
   const [nowTick, setNowTick] = useState(() => Date.now())
   const [subtitleTick, setSubtitleTick] = useState(() => Date.now())
+  const [notifChannels, setNotifChannels] = useState(() => readSmartNotifChannels())
   const now = useMemo(() => new Date(nowTick), [nowTick])
   const [calState, setCalState] = useState({ y: now.getFullYear(), m: now.getMonth() + 1 })
   const [selectedDay, setSelectedDay] = useState(null)
@@ -96,6 +101,33 @@ export default function HomeTab() {
     const id = setInterval(() => setSubtitleTick(Date.now()), 6 * 1000)
     return () => clearInterval(id)
   }, [])
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return undefined
+    const syncChannels = (event) => {
+      if (event?.detail && typeof event.detail === 'object') {
+        setNotifChannels(event.detail)
+        return
+      }
+      setNotifChannels(readSmartNotifChannels())
+    }
+    window.addEventListener(SMART_NOTIF_CHANNEL_EVENT, syncChannels)
+    window.addEventListener('peggy-backup-restored', syncChannels)
+    return () => {
+      window.removeEventListener(SMART_NOTIF_CHANNEL_EVENT, syncChannels)
+      window.removeEventListener('peggy-backup-restored', syncChannels)
+    }
+  }, [])
+
+  const isChannelOn = (channelKey) => isSmartNotifChannelEnabled(channelKey, notifChannels)
+  const toggleNotifChannel = (channelKey) => {
+    const next = {
+      ...notifChannels,
+      [channelKey]: !isChannelOn(channelKey),
+    }
+    setNotifChannels(next)
+    writeSmartNotifChannels(next)
+  }
 
   const totalItems = phases.reduce((acc, p) => acc + p.items.length, 0)
   const doneItems = phases.reduce((acc, p) => acc + p.items.filter(i => checked[i.id]).length, 0)
@@ -269,6 +301,15 @@ export default function HomeTab() {
         <div className="section-header">
           <span className="section-icon"><UiIcon icon={APP_ICONS.tip} /></span>
           <div><h2>Daily Tip</h2></div>
+          <button
+            type="button"
+            className={`notif-card-toggle glass-inner ${isChannelOn('dailyTip') ? 'on' : ''}`}
+            onClick={() => toggleNotifChannel('dailyTip')}
+            aria-pressed={isChannelOn('dailyTip')}
+            title="Toggle Daily Tip notifications"
+          >
+            {isChannelOn('dailyTip') ? 'Notif ON' : 'Notif OFF'}
+          </button>
         </div>
         <div className={`tip-mode ${dailyTip.tone}`}>{dailyTip.modeLabel} - {dailyTip.category}</div>
         <p className="tip-text">{dailyTip.text}</p>
@@ -278,6 +319,15 @@ export default function HomeTab() {
         <div className="section-header">
           <span className="section-icon"><UiIcon icon={APP_ICONS.reminders} /></span>
           <div><h2>Reminders for Today</h2></div>
+          <button
+            type="button"
+            className={`notif-card-toggle glass-inner ${isChannelOn('reminders') ? 'on' : ''}`}
+            onClick={() => toggleNotifChannel('reminders')}
+            aria-pressed={isChannelOn('reminders')}
+            title="Toggle reminder notifications"
+          >
+            {isChannelOn('reminders') ? 'Notif ON' : 'Notif OFF'}
+          </button>
         </div>
         {(planReminder || suppReminder || workReminder) ? (
           <div className="reminder-cards">
@@ -335,6 +385,15 @@ export default function HomeTab() {
             <h2>Calendar</h2>
             <span className="section-count">Tap a date to add plans</span>
           </div>
+          <button
+            type="button"
+            className={`notif-card-toggle glass-inner ${isChannelOn('calendar') ? 'on' : ''}`}
+            onClick={() => toggleNotifChannel('calendar')}
+            aria-pressed={isChannelOn('calendar')}
+            title="Toggle calendar plan notifications"
+          >
+            {isChannelOn('calendar') ? 'Notif ON' : 'Notif OFF'}
+          </button>
         </div>
         <Calendar
           year={calState.y}
@@ -436,6 +495,15 @@ export default function HomeTab() {
             <h2>Name Spotlight</h2>
             <span className="section-count">{nameSpotlight.gender === 'boy' ? 'Boy names' : 'Girl names'} - updates every few hours</span>
           </div>
+          <button
+            type="button"
+            className={`notif-card-toggle glass-inner ${isChannelOn('names') ? 'on' : ''}`}
+            onClick={() => toggleNotifChannel('names')}
+            aria-pressed={isChannelOn('names')}
+            title="Toggle baby names notifications"
+          >
+            {isChannelOn('names') ? 'Notif ON' : 'Notif OFF'}
+          </button>
         </div>
         <div className="name-spotlight-main glass-inner">
           <div className="name-spotlight-title">{nameSpotlight.spotlight.name} {nameSpotlight.spotlight.kanji}</div>

@@ -1163,12 +1163,31 @@ export const SMART_NOTIF_PREF_EVENT = 'peggy-smart-notif-pref-changed'
 export const SMART_NOTIF_LOG_KEY = 'peggy-smart-notifs-log-v1'
 export const SMART_NOTIF_QUIET_HOURS_KEY = 'baby-prep-smart-notif-quiet-hours'
 export const SMART_NOTIF_QUIET_HOURS_EVENT = 'peggy-smart-notif-quiet-hours-changed'
+export const SMART_NOTIF_CHANNEL_PREF_KEY = 'baby-prep-smart-notif-channels'
+export const SMART_NOTIF_CHANNEL_EVENT = 'peggy-smart-notif-channels-changed'
+export const SMART_NOTIF_CHANNEL_KEYS = Object.freeze(['reminders', 'calendar', 'dailyTip', 'names'])
 
 const DEFAULT_SMART_QUIET_HOURS = Object.freeze({
   enabled: true,
   start: '22:00',
   end: '07:00',
 })
+
+const DEFAULT_SMART_NOTIF_CHANNELS = Object.freeze({
+  reminders: true,
+  calendar: true,
+  dailyTip: true,
+  names: true,
+})
+
+function sanitizeSmartNotifChannels(value) {
+  const source = value && typeof value === 'object' ? value : {}
+  const out = {}
+  for (const key of SMART_NOTIF_CHANNEL_KEYS) {
+    out[key] = source[key] !== false
+  }
+  return out
+}
 
 function normalizeClockValue(value, fallback = '00:00') {
   const raw = String(value || '').trim()
@@ -1239,6 +1258,32 @@ export function readSmartNotifEnabled() {
   }
 
   return false
+}
+
+export function readSmartNotifChannels() {
+  if (typeof window === 'undefined') return { ...DEFAULT_SMART_NOTIF_CHANNELS }
+  try {
+    const raw = window.localStorage.getItem(SMART_NOTIF_CHANNEL_PREF_KEY)
+    if (!raw) return { ...DEFAULT_SMART_NOTIF_CHANNELS }
+    return sanitizeSmartNotifChannels(JSON.parse(raw))
+  } catch {
+    return { ...DEFAULT_SMART_NOTIF_CHANNELS }
+  }
+}
+
+export function writeSmartNotifChannels(nextValue) {
+  if (typeof window === 'undefined') return
+  const safe = sanitizeSmartNotifChannels(nextValue)
+  window.localStorage.setItem(SMART_NOTIF_CHANNEL_PREF_KEY, JSON.stringify(safe))
+  window.dispatchEvent(new CustomEvent(SMART_NOTIF_CHANNEL_EVENT, { detail: safe }))
+  window.dispatchEvent(new CustomEvent('peggy-local-changed', { detail: { key: SMART_NOTIF_CHANNEL_PREF_KEY } }))
+}
+
+export function isSmartNotifChannelEnabled(channelKey, channels = null) {
+  const safeChannels = channels ? sanitizeSmartNotifChannels(channels) : readSmartNotifChannels()
+  const key = String(channelKey || '').trim()
+  if (!key || !Object.prototype.hasOwnProperty.call(safeChannels, key)) return false
+  return Boolean(safeChannels[key])
 }
 
 export function writeSmartNotifEnabled(enabled) {
