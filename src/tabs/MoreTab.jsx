@@ -997,11 +997,11 @@ export default function MoreTab() {
   return (
     <div className="content">
       <div className="sub-tabs glass-tabs">
-        {['info', 'notifications', 'photos', 'doctor', 'contacts', 'settings'].map(t => (
+        {['info', 'notifications', 'photos', 'contacts', 'settings'].map(t => (
           <button key={t} className={`glass-tab ${subTab === t ? 'active' : ''}`} onClick={() => setSubTab(t)}>
             <span className="tab-icon-label">
-              <UiIcon icon={t === 'info' ? APP_ICONS.info : t === 'notifications' ? APP_ICONS.reminders : t === 'photos' ? APP_ICONS.photos : t === 'doctor' ? APP_ICONS.doctor : t === 'contacts' ? APP_ICONS.contacts : APP_ICONS.backup} />
-              <span>{t === 'info' ? 'Info' : t === 'notifications' ? 'Notifications' : t === 'photos' ? 'Photos' : t === 'doctor' ? 'Doctor' : t === 'contacts' ? 'Contacts' : 'Settings'}</span>
+              <UiIcon icon={t === 'info' ? APP_ICONS.info : t === 'notifications' ? APP_ICONS.reminders : t === 'photos' ? APP_ICONS.photos : t === 'contacts' ? APP_ICONS.contacts : APP_ICONS.backup} />
+              <span>{t === 'info' ? 'Info' : t === 'notifications' ? 'Notifications' : t === 'photos' ? 'Photos' : t === 'contacts' ? 'Contacts' : 'Settings'}</span>
             </span>
           </button>
         ))}
@@ -1167,37 +1167,6 @@ export default function MoreTab() {
         </section>
       )}
 
-      {subTab === 'doctor' && (
-        <section className="glass-section">
-          <div className="section-header">
-            <span className="section-icon"><UiIcon icon={APP_ICONS.doctor} /></span>
-            <div><h2>Doctor / Hospital Info</h2></div>
-          </div>
-          <p className="section-note">Save your OB-GYN and hospital details for quick access.</p>
-
-          <div className="doctor-form">
-            <div className="form-row"><label>OB-GYN Name</label>
-              <input type="text" value={doctor.name} onChange={e => setDoctor(p => ({ ...p, name: e.target.value }))} placeholder="Dr. ..." />
-            </div>
-            <div className="form-row"><label>Hospital / Clinic</label>
-              <input type="text" value={doctor.hospital} onChange={e => setDoctor(p => ({ ...p, hospital: e.target.value }))} placeholder="Hospital name" />
-            </div>
-            <div className="form-row"><label>Phone</label>
-              <div className="input-with-action">
-                <input type="tel" value={doctor.phone} onChange={e => setDoctor(p => ({ ...p, phone: e.target.value }))} placeholder="0XX-XXXX-XXXX" />
-                {doctor.phone && <a href={`tel:${doctor.phone}`} className="btn-call">Call</a>}
-              </div>
-            </div>
-            <div className="form-row"><label>Address</label>
-              <input type="text" value={doctor.address} onChange={e => setDoctor(p => ({ ...p, address: e.target.value }))} placeholder="Hospital address" />
-            </div>
-            <div className="form-row"><label>Notes</label>
-              <textarea value={doctor.notes} onChange={e => setDoctor(p => ({ ...p, notes: e.target.value }))} placeholder="Visiting hours, special instructions, etc." />
-            </div>
-          </div>
-        </section>
-      )}
-
       {subTab === 'contacts' && (
         <section className="glass-section">
           <div className="section-header">
@@ -1246,6 +1215,35 @@ export default function MoreTab() {
             <input type="text" value={editContact ? '' : contactForm.relationship} onChange={e => setContactForm(p => ({ ...p, relationship: e.target.value }))} placeholder="Relationship" disabled={!!editContact} />
             <button type="submit" className="btn-glass-primary" disabled={!!editContact}>Add Contact</button>
           </form>
+
+          <div className="glass-card backup-card">
+            <div className="section-header">
+              <span className="section-icon"><UiIcon icon={APP_ICONS.doctor} /></span>
+              <div><h3>Doctor / Hospital Info</h3></div>
+            </div>
+            <p className="section-note">Save your OB-GYN and hospital details for quick access.</p>
+
+            <div className="doctor-form">
+              <div className="form-row"><label>OB-GYN Name</label>
+                <input type="text" value={doctor.name} onChange={e => setDoctor(p => ({ ...p, name: e.target.value }))} placeholder="Dr. ..." />
+              </div>
+              <div className="form-row"><label>Hospital / Clinic</label>
+                <input type="text" value={doctor.hospital} onChange={e => setDoctor(p => ({ ...p, hospital: e.target.value }))} placeholder="Hospital name" />
+              </div>
+              <div className="form-row"><label>Phone</label>
+                <div className="input-with-action">
+                  <input type="tel" value={doctor.phone} onChange={e => setDoctor(p => ({ ...p, phone: e.target.value }))} placeholder="0XX-XXXX-XXXX" />
+                  {doctor.phone && <a href={`tel:${doctor.phone}`} className="btn-call">Call</a>}
+                </div>
+              </div>
+              <div className="form-row"><label>Address</label>
+                <input type="text" value={doctor.address} onChange={e => setDoctor(p => ({ ...p, address: e.target.value }))} placeholder="Hospital address" />
+              </div>
+              <div className="form-row"><label>Notes</label>
+                <textarea value={doctor.notes} onChange={e => setDoctor(p => ({ ...p, notes: e.target.value }))} placeholder="Visiting hours, special instructions, etc." />
+              </div>
+            </div>
+          </div>
         </section>
       )}
 
