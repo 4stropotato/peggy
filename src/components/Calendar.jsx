@@ -20,6 +20,7 @@ export default function Calendar({
   month,
   onMonthChange,
   renderDay,
+  getDayClassName,
   selectedDate,
   onDayClick,
   onDayDoubleTap,
@@ -126,10 +127,11 @@ export default function Calendar({
         {days.map((cell, i) => {
           const isToday = cell.date === todayISO
           const isSelected = cell.date === selectedDate
+          const dayExtraClass = cell.overflow ? '' : (getDayClassName?.(cell.date) || '')
           return (
             <div
               key={i}
-              className={`cal-day ${cell.overflow ? 'overflow' : ''} ${isToday ? 'today' : ''} ${isSelected ? 'selected' : ''}`}
+              className={`cal-day ${cell.overflow ? 'overflow' : ''} ${isToday ? 'today' : ''} ${isSelected ? 'selected' : ''} ${dayExtraClass}`}
               onClick={() => handleDayTap(cell)}
               onPointerDown={() => handleLongPressStart(cell)}
               onPointerUp={handleLongPressEnd}

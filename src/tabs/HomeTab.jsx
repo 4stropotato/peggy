@@ -65,6 +65,32 @@ function getSuppDayStatus(dailySupp, suppSchedule, dateISO, firstTrackDate) {
   return 'missed'
 }
 
+function parseISODate(iso) {
+  const raw = String(iso || '').trim()
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(raw)) return null
+  const [y, m, d] = raw.split('-').map(Number)
+  const dt = new Date(y, m - 1, d)
+  if (Number.isNaN(dt.getTime())) return null
+  return dt
+}
+
+function toISODate(date) {
+  if (!(date instanceof Date) || Number.isNaN(date.getTime())) return ''
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
+}
+
+function addDays(base, days) {
+  const out = new Date(base)
+  out.setDate(out.getDate() + days)
+  return out
+}
+
+function addYears(base, years) {
+  const out = new Date(base)
+  out.setFullYear(out.getFullYear() + years)
+  return out
+}
+
 export default function HomeTab() {
   const {
     checked,
@@ -162,6 +188,49 @@ export default function HomeTab() {
 
   const completedCheckups = checkupSchedule.filter(v => checkups[v.id]?.completed).length
   const latestMood = moods.length > 0 ? moods[0] : null
+
+  const supportTimeline = useMemo(() => {
+    const due = parseISODate(dueDate)
+    if (!due) return null
+
+    const pregnancyStart = addDays(due, -280) // 40 weeks before due date
+    const preDeliveryStart = addDays(due, -56) // final ~8 weeks prep
+    const urgentStart = addDays(due, -3) // labor-proximate + immediate paperwork
+    const urgentEnd = addDays(due, 15) // birth registration + child allowance deadlines
+    const yearOneEnd = addDays(due, 365)
+    const longSupportEnd = addYears(due, 18) // child allowance age range
+
+    return {
+      startISO: toISODate(pregnancyStart),
+      preDeliveryStartISO: toISODate(preDeliveryStart),
+      urgentStartISO: toISODate(urgentStart),
+      urgentEndISO: toISODate(urgentEnd),
+      yearOneEndISO: toISODate(yearOneEnd),
+      longSupportEndISO: toISODate(longSupportEnd),
+    }
+  }, [dueDate])
+
+  const getSupportEraClass = (dateISO) => {
+    if (!supportTimeline) return ''
+    if (dateISO < supportTimeline.startISO || dateISO > supportTimeline.longSupportEndISO) return ''
+
+    let eraClass = ''
+    if (dateISO < supportTimeline.preDeliveryStartISO) {
+      eraClass = 'cal-era-pregnancy'
+    } else if (dateISO < supportTimeline.urgentStartISO) {
+      eraClass = 'cal-era-prep'
+    } else if (dateISO <= supportTimeline.urgentEndISO) {
+      eraClass = 'cal-era-urgent'
+    } else if (dateISO <= supportTimeline.yearOneEndISO) {
+      eraClass = 'cal-era-year1'
+    } else {
+      eraClass = 'cal-era-long'
+    }
+
+    const month = dateISO.slice(5, 7)
+    const isTaxWindow = month === '02' || month === '03'
+    return isTaxWindow ? `${eraClass} cal-era-tax-window` : eraClass
+  }
 
   const checkupDates = useMemo(() => {
     const map = {}
@@ -401,6 +470,7 @@ export default function HomeTab() {
           onMonthChange={(y, m) => setCalState({ y, m })}
           selectedDate={selectedDay}
           onDayClick={d => setSelectedDay(d)}
+          getDayClassName={getSupportEraClass}
           renderDay={dateISO => {
             const suppSt = getSuppDayStatus(dailySupp, suppSchedule, dateISO, firstTrackDate)
             const att = attendance[dateISO]
@@ -426,6 +496,16 @@ export default function HomeTab() {
           <span className="cal-legend-item"><span className="cal-micro mood-dot" /> Mood</span>
           <span className="cal-legend-item"><span className="cal-micro planner-dot" /> Plans</span>
         </div>
+        {supportTimeline && (
+          <div className="cal-era-legend">
+            <span className="cal-era-item"><span className="cal-era-swatch cal-era-pregnancy-swatch" /> Pregnancy setup</span>
+            <span className="cal-era-item"><span className="cal-era-swatch cal-era-prep-swatch" /> Pre-delivery prep</span>
+            <span className="cal-era-item"><span className="cal-era-swatch cal-era-urgent-swatch" /> Birth urgent window</span>
+            <span className="cal-era-item"><span className="cal-era-swatch cal-era-year1-swatch" /> Year 1 supports</span>
+            <span className="cal-era-item"><span className="cal-era-swatch cal-era-long-swatch" /> Long-term child support</span>
+            <span className="cal-era-item"><span className="cal-era-swatch cal-era-tax-swatch" /> Feb-Mar tax filing window</span>
+          </div>
+        )}
       </section>
 
       {selectedDay && (

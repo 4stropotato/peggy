@@ -3878,6 +3878,32 @@ input[type="range"]:focus {
   box-shadow: 0 0 0 2px var(--purple);
 }
 
+/* Calendar support timeline eras (Home main calendar) */
+.cal-day.cal-era-pregnancy {
+  background: rgba(233, 30, 139, 0.08);
+  border-bottom: 2px solid rgba(233, 30, 139, 0.42);
+}
+.cal-day.cal-era-prep {
+  background: rgba(255, 184, 0, 0.12);
+  border-bottom: 2px solid rgba(255, 184, 0, 0.5);
+}
+.cal-day.cal-era-urgent {
+  background: rgba(255, 71, 87, 0.14);
+  border-bottom: 2px solid rgba(255, 71, 87, 0.62);
+}
+.cal-day.cal-era-year1 {
+  background: rgba(0, 184, 148, 0.1);
+  border-bottom: 2px solid rgba(0, 184, 148, 0.52);
+}
+.cal-day.cal-era-long {
+  background: rgba(108, 92, 231, 0.09);
+  border-bottom: 2px solid rgba(108, 92, 231, 0.48);
+}
+.cal-day.cal-era-tax-window {
+  outline: 1px dashed rgba(255, 184, 0, 0.8);
+  outline-offset: -2px;
+}
+
 /* Calendar dots (single indicator per sub-tab) */
 .cal-dot {
   display: inline-block;
@@ -3941,6 +3967,36 @@ input[type="range"]:focus {
   gap: 0.25rem;
   font-size: 0.6rem;
   color: var(--text2);
+}
+
+.cal-era-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+  justify-content: center;
+  margin-top: 0.3rem;
+}
+.cal-era-item {
+  display: flex;
+  align-items: center;
+  gap: 0.24rem;
+  font-size: 0.56rem;
+  color: var(--text2);
+}
+.cal-era-swatch {
+  width: 10px;
+  height: 6px;
+  border-radius: 999px;
+  display: inline-block;
+}
+.cal-era-pregnancy-swatch { background: rgba(233, 30, 139, 0.78); }
+.cal-era-prep-swatch { background: rgba(255, 184, 0, 0.86); }
+.cal-era-urgent-swatch { background: rgba(255, 71, 87, 0.9); }
+.cal-era-year1-swatch { background: rgba(0, 184, 148, 0.86); }
+.cal-era-long-swatch { background: rgba(108, 92, 231, 0.8); }
+.cal-era-tax-swatch {
+  background: transparent;
+  border: 1px dashed rgba(255, 184, 0, 0.95);
 }
 
 /* ===== DayDetail Bottom Sheet ===== */
@@ -4214,6 +4270,29 @@ input[type="range"]:focus {
 .app.light .cal-day.selected {
   background: rgba(139, 92, 246, 0.12);
   box-shadow: 0 0 0 2px var(--purple);
+}
+.app.light .cal-day.cal-era-pregnancy {
+  background: rgba(214, 51, 132, 0.1);
+  border-bottom-color: rgba(214, 51, 132, 0.5);
+}
+.app.light .cal-day.cal-era-prep {
+  background: rgba(255, 193, 7, 0.16);
+  border-bottom-color: rgba(194, 133, 0, 0.55);
+}
+.app.light .cal-day.cal-era-urgent {
+  background: rgba(220, 53, 69, 0.13);
+  border-bottom-color: rgba(220, 53, 69, 0.58);
+}
+.app.light .cal-day.cal-era-year1 {
+  background: rgba(25, 135, 84, 0.12);
+  border-bottom-color: rgba(25, 135, 84, 0.56);
+}
+.app.light .cal-day.cal-era-long {
+  background: rgba(111, 66, 193, 0.12);
+  border-bottom-color: rgba(111, 66, 193, 0.54);
+}
+.app.light .cal-day.cal-era-tax-window {
+  outline-color: rgba(194, 133, 0, 0.9);
 }
 .app.light .day-detail-backdrop {
   background: rgba(255, 245, 248, 0.7);
