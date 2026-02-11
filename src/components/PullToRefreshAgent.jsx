@@ -1,6 +1,7 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 
 const PULL_THRESHOLD_PX = 70
+const MAX_PULL_PX = 120
 const TRIGGER_COOLDOWN_MS = 12000
 const TOP_EPSILON_PX = 2
 
@@ -54,6 +55,12 @@ function shouldIgnoreTarget(target) {
 }
 
 export default function PullToRefreshAgent() {
+  const [ui, setUi] = useState({
+    visible: false,
+    progress: 0,
+    armed: false,
+    refreshing: false,
+  })
   const stateRef = useRef({
     active: false,
     startY: 0,
@@ -62,9 +69,36 @@ export default function PullToRefreshAgent() {
     scroller: null,
   })
   const lastTriggerRef = useRef(0)
+  const hideTimerRef = useRef(null)
 
   useEffect(() => {
     if (typeof window === 'undefined' || typeof document === 'undefined') return undefined
+
+    const clearHideTimer = () => {
+      if (hideTimerRef.current) {
+        window.clearTimeout(hideTimerRef.current)
+        hideTimerRef.current = null
+      }
+    }
+
+    const showIdleUi = () => {
+      setUi(prev => ({
+        ...prev,
+        visible: prev.progress > 0.03 || prev.refreshing,
+      }))
+    }
+
+    const hideUiSoon = (delay = 120) => {
+      clearHideTimer()
+      hideTimerRef.current = window.setTimeout(() => {
+        setUi({
+          visible: false,
+          progress: 0,
+          armed: false,
+          refreshing: false,
+        })
+      }, delay)
+    }
 
     const reset = () => {
       stateRef.current = { active: false, startY: 0, atTop: false, triggered: false, scroller: null }
@@ -89,6 +123,17 @@ export default function PullToRefreshAgent() {
         triggered: false,
         scroller,
       }
+      if (isAtTop(scroller)) {
+        clearHideTimer()
+        setUi({
+          visible: true,
+          progress: 0,
+          armed: false,
+          refreshing: false,
+        })
+      } else {
+        hideUiSoon(40)
+      }
     }
 
     const onTouchMove = (event) => {
@@ -98,6 +143,19 @@ export default function PullToRefreshAgent() {
       if (!touch) return
       if (!isAtTop(stateRef.current.scroller)) return
       const dy = touch.clientY - stateRef.current.startY
+      const positiveDy = Math.max(0, dy)
+      const progress = Math.min(1, positiveDy / MAX_PULL_PX)
+      const armed = positiveDy >= PULL_THRESHOLD_PX
+      setUi(prev => {
+        const same = prev.visible && Math.abs(prev.progress - progress) < 0.02 && prev.armed === armed && !prev.refreshing
+        if (same) return prev
+        return {
+          visible: positiveDy > 4,
+          progress,
+          armed,
+          refreshing: false,
+        }
+      })
       if (dy >= PULL_THRESHOLD_PX) {
         stateRef.current.triggered = true
       }
@@ -106,12 +164,27 @@ export default function PullToRefreshAgent() {
     const onTouchEnd = async () => {
       const { triggered } = stateRef.current
       reset()
-      if (!triggered) return
+      if (!triggered) {
+        setUi(prev => ({ ...prev, armed: false, refreshing: false }))
+        hideUiSoon(130)
+        return
+      }
       if (isUserEditing()) return
 
       const now = Date.now()
-      if (now - lastTriggerRef.current < TRIGGER_COOLDOWN_MS) return
+      if (now - lastTriggerRef.current < TRIGGER_COOLDOWN_MS) {
+        showIdleUi()
+        hideUiSoon(220)
+        return
+      }
       lastTriggerRef.current = now
+
+      setUi({
+        visible: true,
+        progress: 1,
+        armed: true,
+        refreshing: true,
+      })
 
       // Ask main.jsx to run the "version.json" check + cache-busting reload.
       try {
@@ -122,7 +195,11 @@ export default function PullToRefreshAgent() {
       // If a new SW is installing/waiting, main.jsx will reload when it's ready.
       // Otherwise, do a simple reload to "force refresh" the app.
       if (!hasUpdate) {
-        window.location.reload()
+        window.setTimeout(() => {
+          window.location.reload()
+        }, 140)
+      } else {
+        hideUiSoon(500)
       }
     }
 
@@ -134,6 +211,7 @@ export default function PullToRefreshAgent() {
     document.addEventListener('touchcancel', onTouchEnd, { capture: true })
 
     return () => {
+      clearHideTimer()
       document.removeEventListener('touchstart', onTouchStart, { capture: true })
       document.removeEventListener('touchmove', onTouchMove, { capture: true })
       document.removeEventListener('touchend', onTouchEnd, { capture: true })
@@ -141,5 +219,17 @@ export default function PullToRefreshAgent() {
     }
   }, [])
 
-  return null
+  const indicatorClass = `pull-refresh-indicator ${ui.visible ? 'show' : ''} ${ui.refreshing ? 'refreshing' : ''}`
+  const text = ui.refreshing ? 'Refreshing...' : (ui.armed ? 'Release to refresh' : 'Pull to refresh')
+
+  return (
+    <div className={indicatorClass} aria-hidden="true">
+      <div className="pull-refresh-surface">
+        <div className="pull-refresh-spinner-wrap">
+          <div className="pull-refresh-spinner" style={{ '--pull-progress': ui.progress }} />
+        </div>
+        <div className="pull-refresh-text">{text}</div>
+      </div>
+    </div>
+  )
 }
