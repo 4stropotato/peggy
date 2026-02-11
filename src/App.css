@@ -2068,6 +2068,100 @@ ul { list-style: none; }
   margin-top: 0.1rem;
 }
 
+.salary-rate-form {
+  padding: 0.75rem 0.8rem;
+}
+.salary-rate-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.55rem;
+}
+.salary-summary-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.55rem;
+}
+.salary-summary-card {
+  border-radius: 12px;
+  padding: 0.65rem 0.7rem;
+  border: 1px solid var(--glass-border);
+}
+.salary-person {
+  font-size: 0.7rem;
+  font-weight: 800;
+  letter-spacing: 0.2px;
+  color: var(--text2);
+  text-transform: uppercase;
+}
+.salary-rate-main {
+  margin-top: 0.28rem;
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: var(--text);
+}
+.salary-assume {
+  margin-top: 0.18rem;
+  font-size: 0.68rem;
+  color: var(--text2);
+}
+.salary-annual {
+  margin-top: 0.25rem;
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: var(--green);
+}
+.salary-empty {
+  margin-top: 0.3rem;
+  font-size: 0.76rem;
+  color: var(--text2);
+}
+.salary-rate-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+.salary-rate-item {
+  display: flex;
+  flex-direction: column;
+  gap: 0.28rem;
+  padding: 0.72rem 0.8rem;
+}
+.salary-rate-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.salary-rate-person {
+  font-size: 0.8rem;
+  font-weight: 800;
+  color: var(--text);
+}
+.salary-rate-basis {
+  font-size: 0.62rem;
+  font-weight: 700;
+  color: var(--text2);
+  border: 1px solid var(--glass-border);
+  border-radius: 999px;
+  padding: 0.13rem 0.42rem;
+  background: var(--glass-highlight);
+}
+.salary-rate-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.42rem;
+  font-size: 0.67rem;
+  color: var(--text2);
+}
+.salary-rate-annual {
+  font-size: 0.73rem;
+  font-weight: 700;
+  color: var(--green);
+}
+.salary-rate-note {
+  font-size: 0.7rem;
+  color: var(--text2);
+}
+
 /* ===== Tax Calculator ===== */
 .tax-form {
   display: flex;
@@ -2179,6 +2273,33 @@ ul { list-style: none; }
 .tax-step-actions .btn-glass-primary,
 .tax-step-actions .btn-glass-secondary {
   flex: 1;
+}
+.tax-input-actions {
+  margin-top: 0.5rem;
+}
+.tax-input-actions .btn-glass-secondary {
+  width: 100%;
+}
+.tax-feed-guide {
+  margin-top: 0.55rem;
+  border-radius: 10px;
+  border: 1px solid var(--glass-border);
+  padding: 0.52rem 0.6rem;
+}
+.tax-feed-title {
+  font-size: 0.72rem;
+  font-weight: 800;
+  color: var(--text);
+}
+.tax-feed-list {
+  margin-top: 0.3rem;
+  padding-left: 1rem;
+  list-style: disc;
+}
+.tax-feed-list li {
+  font-size: 0.68rem;
+  color: var(--text2);
+  margin-bottom: 0.22rem;
 }
 .tax-row {
   display: flex;
@@ -3468,6 +3589,10 @@ input[type="range"]:focus {
     grid-template-columns: 1fr;
   }
   .tax-tunnel-steps {
+    grid-template-columns: 1fr;
+  }
+  .salary-rate-grid,
+  .salary-summary-grid {
     grid-template-columns: 1fr;
   }
 }

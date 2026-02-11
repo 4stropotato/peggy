@@ -78,6 +78,7 @@ export function AppProvider({ children }) {
   const [theme, setTheme] = useLS('baby-prep-theme', 'light')
   const [iconStyle, setIconStyle] = useLS('baby-prep-icon-style', 'minimal-clean')
   const [salary, setSalary] = useLS('baby-prep-salary', [])
+  const [payRates, setPayRates] = useLS('baby-prep-pay-rates', [])
   const [checkups, setCheckups] = useLS('baby-prep-checkups', {})
   const [moods, setMoods] = useLS('baby-prep-moods', [])
   // Health tab calendar collapse/expand state per sub-tab.
@@ -200,6 +201,33 @@ export function AppProvider({ children }) {
 
   const addSalary = (entry) => setSalary(prev => [...prev, { ...entry, id: Date.now().toString(36) }])
   const removeSalary = (id) => setSalary(prev => prev.filter(s => s.id !== id))
+  const addPayRate = (entry) => setPayRates(prev => [...prev, { ...entry, id: Date.now().toString(36) + Math.random().toString(36).slice(2, 5) }])
+  const removePayRate = (id) => setPayRates(prev => prev.filter(r => r.id !== id))
+  const updatePayRate = (id, patch) => setPayRates(prev => prev.map(r => (r.id === id ? { ...r, ...patch } : r)))
+
+  // One-time migration from legacy monthly salary entries into pay-rates model.
+  useEffect(() => {
+    if (!Array.isArray(payRates) || payRates.length > 0) return
+    if (!Array.isArray(salary) || salary.length === 0) return
+    const migrated = salary
+      .map((entry) => {
+        const month = String(entry?.month || '').trim()
+        const amount = Number(entry?.amount) || 0
+        if (!month || amount <= 0) return null
+        return {
+          id: `mig-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`,
+          person: 'naomi',
+          basis: 'monthly',
+          rate: amount,
+          effectiveFrom: `${month}-01`,
+          hoursPerDay: '',
+          workDaysPerMonth: '',
+          note: String(entry?.memo || 'Migrated from legacy salary tracker'),
+        }
+      })
+      .filter(Boolean)
+    if (migrated.length) setPayRates(migrated)
+  }, [payRates, salary, setPayRates])
 
   const updateCheckup = (visitId, data) => setCheckups(prev => ({ ...prev, [visitId]: { ...prev[visitId], ...data } }))
 
@@ -366,6 +394,7 @@ export function AppProvider({ children }) {
     moneyClaimed, toggleMoney,
     dueDate, setDueDate,
     salary, addSalary, removeSalary,
+    payRates, addPayRate, removePayRate, updatePayRate,
     checkups, updateCheckup,
     moods, addMood,
     healthCalendarVisibility, setHealthCalendarVisibility,
