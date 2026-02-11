@@ -210,9 +210,13 @@ self.addEventListener('message', (event) => {
   const body = String(payload.body || 'Notification pipeline is active on this device.').trim();
   const tag = String(payload.tag || `peggy-local-test-${Date.now()}`).trim();
   const targetUrl = toAbsoluteUrl(payload.url || BASE);
+  const delayMs = Math.max(0, Number(payload.delayMs) || 0);
 
   event.waitUntil((async () => {
     try {
+      if (delayMs > 0) {
+        await new Promise((resolve) => setTimeout(resolve, delayMs));
+      }
       await self.registration.showNotification(title, {
         body,
         icon: payload.icon || icon,

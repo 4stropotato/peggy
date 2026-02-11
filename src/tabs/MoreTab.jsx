@@ -79,6 +79,22 @@ function formatNotifReason(reason) {
   return value
 }
 
+function withTimeout(promise, timeoutMs, label = 'operation') {
+  const ms = Math.max(1000, Number(timeoutMs) || 15000)
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error(`${label} timed out after ${ms}ms`)), ms)
+    Promise.resolve(promise)
+      .then((value) => {
+        clearTimeout(timer)
+        resolve(value)
+      })
+      .catch((err) => {
+        clearTimeout(timer)
+        reject(err)
+      })
+  })
+}
+
 function InfoPanel({ section }) {
   const [expandedPhase, setExpandedPhase] = useState(null)
   const [expandedItem, setExpandedItem] = useState(null)
@@ -497,12 +513,6 @@ export default function MoreTab() {
   }, [photoCategory, subTab])
 
   useEffect(() => {
-    if (!notifStatus) return undefined
-    const id = setTimeout(() => setNotifStatus(''), 10000)
-    return () => clearTimeout(id)
-  }, [notifStatus])
-
-  useEffect(() => {
     if (subTab !== 'notifications') return undefined
     const id = window.setInterval(() => setNotifNowTick(Date.now()), 60 * 1000)
     return () => window.clearInterval(id)
@@ -889,14 +899,23 @@ export default function MoreTab() {
 
     try {
       setCloudBusy(true)
-      setPushStatus('Registering this device and sending test push...')
-      const sync = await upsertCurrentPushSubscription(cloudSession, { notifEnabled: readSmartNotifEnabled() })
+      setPushStatus('Registering this device... (1/2)')
+      const sync = await withTimeout(
+        upsertCurrentPushSubscription(cloudSession, { notifEnabled: readSmartNotifEnabled() }),
+        20000,
+        'push registration',
+      )
       if (sync?.status !== 'ok') {
         const reason = String(sync?.reason || 'subscription-sync-skipped')
         setPushStatus(`Push registration skipped (${reason}).`)
         return
       }
-      const result = await cloudSendPushTest(cloudSession)
+      setPushStatus('Sending test push... (2/2)')
+      const result = await withTimeout(
+        cloudSendPushTest(cloudSession),
+        20000,
+        'push send_test',
+      )
       const sent = Number(result?.sent || 0)
       const total = Number(result?.total || sent)
       if (sent > 0) {
@@ -912,6 +931,8 @@ export default function MoreTab() {
   }
 
   const handleLocalNotifTest = async () => {
+    const tappedAt = new Date().toISOString()
+    setNotifLastTestAt(tappedAt)
     setNotifStatus('Running local notification test...')
 
     const isStandalone = (() => {
@@ -956,7 +977,7 @@ export default function MoreTab() {
 
     const title = 'Peggy local test'
     const body = isStandalone
-      ? 'Notification pipeline is active on this installed app.'
+      ? 'Local test scheduled. Lock iPhone now and wait ~4s for banner.'
       : 'Notification test from browser mode. For iPhone lock-screen push, use Home Screen app.'
     const options = {
       body,
@@ -984,6 +1005,7 @@ export default function MoreTab() {
               badge: options.badge,
               tag: options.tag,
               url: import.meta.env.BASE_URL || '/',
+              delayMs: 3800,
             },
           })
           swMessageQueued = true
@@ -1019,7 +1041,7 @@ export default function MoreTab() {
       setNotifInbox(readSmartNotifInbox())
       setNotifStatus(
         `Local test sent via ${route}. ` +
-        `${isStandalone ? '' : 'Open Peggy from Home Screen for iPhone lock-screen behavior. '}` +
+        `${isStandalone ? 'Lock phone now; banner should appear in ~4s. ' : 'Open Peggy from Home Screen for iPhone lock-screen behavior. '}` +
         'If no banner appears, check iOS Notification settings + Focus mode.'
       )
     } catch (err) {
