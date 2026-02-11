@@ -34,6 +34,15 @@ function formatYen(value) {
   return `${YEN}${Number(value || 0).toLocaleString()}`
 }
 
+function formatHoursAndMinutes(value) {
+  const safe = Math.max(0, Number(value) || 0)
+  const hours = Math.floor(safe)
+  const minutes = Math.round((safe - hours) * 60)
+  if (minutes <= 0) return `${hours}h`
+  if (minutes >= 60) return `${hours + 1}h`
+  return `${hours}h ${minutes}m`
+}
+
 function normalizeBasis(value) {
   const raw = String(value || '').trim().toLowerCase()
   if (raw === 'hourly' || raw === 'daily' || raw === 'monthly') return raw
