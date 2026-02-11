@@ -42,7 +42,7 @@ function AppInner() {
   const tabs = [
     { id: 'home', label: 'Home', icon: navIcons.home },
     { id: 'tasks', label: 'Tasks', icon: navIcons.tasks },
-    { id: 'money', label: 'Money', icon: navIcons.money },
+    { id: 'money', label: 'Finance', icon: navIcons.money },
     { id: 'health', label: 'Health', icon: navIcons.health },
     { id: 'more', label: 'More', icon: navIcons.more },
   ]

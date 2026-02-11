@@ -42,11 +42,11 @@ export default function MoneyTab() {
   return (
     <div className="content">
       <div className="sub-tabs glass-tabs">
-        {['benefits', 'salary', 'tax'].map(t => (
+        {['benefits', 'tax'].map(t => (
           <button key={t} className={`glass-tab ${subTab === t ? 'active' : ''}`} onClick={() => setSubTab(t)}>
             <span className="tab-icon-label">
-              <UiIcon icon={t === 'benefits' ? APP_ICONS.benefits : t === 'salary' ? APP_ICONS.salary : APP_ICONS.tax} />
-              <span>{t === 'benefits' ? 'Benefits' : t === 'salary' ? 'Salary' : 'Tax Calc'}</span>
+              <UiIcon icon={t === 'benefits' ? APP_ICONS.benefits : APP_ICONS.tax} />
+              <span>{t === 'benefits' ? 'Benefits' : 'Tax Calc'}</span>
             </span>
           </button>
         ))}
@@ -58,7 +58,7 @@ export default function MoneyTab() {
             <div className="section-header">
               <span className="section-icon"><UiIcon icon={APP_ICONS.benefits} /></span>
               <div>
-                <h2>Money Tracker</h2>
+                <h2>Finance Tracker</h2>
                 <span className="section-count">
                   ¥{claimedMoney.toLocaleString()} / ¥{totalMoney.toLocaleString()}
                 </span>
@@ -211,7 +211,7 @@ export default function MoneyTab() {
             <div className="tax-field">
               <label>Naomi's Annual Income (¥)</label>
               <input type="number" value={taxInputs.spouseIncome || salaryTotal || ''} onChange={e => updateTax('spouseIncome', e.target.value)} placeholder={salaryTotal ? `Auto: ¥${salaryTotal.toLocaleString()}` : 'e.g. 1000000'} />
-              {salaryTotal > 0 && !taxInputs.spouseIncome && <span className="tax-auto">Auto-filled from salary tracker</span>}
+              {salaryTotal > 0 && !taxInputs.spouseIncome && <span className="tax-auto">Auto-filled from Work tab salary tracker</span>}
             </div>
             <div className="tax-field">
               <label>Medical Expenses This Year (¥)</label>

@@ -369,6 +369,7 @@ export default function HealthTab() {
     dailySupp, isSuppTaken, toggleSupp, undoSupp, checkups, updateCheckup, moods, addMood,
     suppSchedule, suppLastTaken, suppBottles, resetBottle,
     attendance, markAttendance, workLocation, setWorkLocation,
+    salary, addSalary, removeSalary,
     healthCalendarVisibility, setHealthCalendarVisibility,
   } = useApp()
   const [subTab, setSubTab] = useState('supps')
@@ -404,6 +405,9 @@ export default function HealthTab() {
     ...(getGeoTelemetry()?.live || {})
   }))
   const [locationDraft, setLocationDraft] = useState(() => toLocationDraft(workLocation))
+  const [salaryMonth, setSalaryMonth] = useState('')
+  const [salaryAmount, setSalaryAmount] = useState('')
+  const [salaryMemo, setSalaryMemo] = useState('')
   const draftDirtyRef = useRef(false)
   const geoMessageTimerRef = useRef(null)
 
@@ -433,6 +437,7 @@ export default function HealthTab() {
   const savedHomeTargetValid = isValidLatLng(workLocation.homeLat, workLocation.homeLng)
   const hasSavedGeoTarget = savedWorkTargetValid || savedHomeTargetValid
   const nativeTrackingMode = isNativeIos()
+  const salaryTotal = salary.reduce((acc, entry) => acc + (Number(entry.amount) || 0), 0)
   const attendanceDurationParts = toHoursAndMinutes(attendanceForm.hours, { minHours: 0.5, maxHours: 24 })
   const autoDurationParts = toHoursAndMinutes(locationDraft.autoHours, { minHours: 0.5, maxHours: 12 })
   const computedRangeHours = computeWorkedHoursFromRange(
@@ -527,6 +532,19 @@ export default function HealthTab() {
     }
     markAttendance(attendanceDate, payload)
     setAttendanceForm(createDefaultAttendanceForm())
+  }
+
+  const handleAddSalary = (e) => {
+    e.preventDefault()
+    if (!salaryMonth || !salaryAmount) return
+    addSalary({
+      month: salaryMonth,
+      amount: Number(salaryAmount),
+      memo: salaryMemo,
+    })
+    setSalaryMonth('')
+    setSalaryAmount('')
+    setSalaryMemo('')
   }
 
   const updateLocationDraft = (patch) => {
@@ -1186,6 +1204,41 @@ export default function HealthTab() {
                   </li>
                 ))}
               </ul>
+            )}
+          </section>
+
+          <section className="glass-section">
+            <div className="section-header">
+              <span className="section-icon"><UiIcon icon={APP_ICONS.salary} /></span>
+              <div>
+                <h2>Salary Tracker</h2>
+                <span className="section-count">Total: Â¥{salaryTotal.toLocaleString()}</span>
+              </div>
+            </div>
+            <p className="section-note">Merged with Work tab para sabay ang attendance at salary records.</p>
+
+            <form className="salary-form glass-card" onSubmit={handleAddSalary}>
+              <input type="month" value={salaryMonth} onChange={e => setSalaryMonth(e.target.value)} required />
+              <input type="number" value={salaryAmount} onChange={e => setSalaryAmount(e.target.value)} placeholder="Amount (Â¥)" required />
+              <input type="text" value={salaryMemo} onChange={e => setSalaryMemo(e.target.value)} placeholder="Memo (optional)" />
+              <button type="submit" className="btn-glass-primary">Add</button>
+            </form>
+
+            {salary.length > 0 ? (
+              <ul className="salary-list">
+                {[...salary].sort((a, b) => b.month.localeCompare(a.month)).map(entry => (
+                  <li key={entry.id} className="glass-card salary-entry">
+                    <div className="salary-info">
+                      <span className="salary-month">{entry.month}</span>
+                      <span className="salary-amount">Â¥{Number(entry.amount).toLocaleString()}</span>
+                    </div>
+                    {entry.memo && <div className="salary-memo">{entry.memo}</div>}
+                    <button className="btn-delete" onClick={() => removeSalary(entry.id)}>Ã—</button>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="empty-state">No salary entries yet. Add one above.</p>
             )}
           </section>
         </>
