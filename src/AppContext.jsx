@@ -410,10 +410,32 @@ export function AppProvider({ children }) {
     setAttendance(prev => ({ ...prev, [date]: data }))
   }
   const getAttendance = (date) => attendance[date] || null
+  const removeAttendance = (date) => {
+    const dateKey = String(date || '').trim()
+    if (!dateKey) return
+    setAttendance(prev => {
+      const safe = prev && typeof prev === 'object' ? prev : {}
+      if (!Object.prototype.hasOwnProperty.call(safe, dateKey)) return safe
+      const next = { ...safe }
+      delete next[dateKey]
+      return next
+    })
+  }
   const markHusbandAttendance = (date, data) => {
     setHusbandAttendance(prev => ({ ...prev, [date]: data }))
   }
   const getHusbandAttendance = (date) => husbandAttendance[date] || null
+  const removeHusbandAttendance = (date) => {
+    const dateKey = String(date || '').trim()
+    if (!dateKey) return
+    setHusbandAttendance(prev => {
+      const safe = prev && typeof prev === 'object' ? prev : {}
+      if (!Object.prototype.hasOwnProperty.call(safe, dateKey)) return safe
+      const next = { ...safe }
+      delete next[dateKey]
+      return next
+    })
+  }
 
   const addExpense = (entry) => {
     const date = String(entry?.date || '').trim()
@@ -455,8 +477,8 @@ export function AppProvider({ children }) {
     doctor, setDoctor,
     contacts, addContact, removeContact, updateContact,
     taxInputs, setTaxInputs,
-    attendance, markAttendance, getAttendance, workLocation, setWorkLocation,
-    husbandAttendance, markHusbandAttendance, getHusbandAttendance, husbandWorkLocation, setHusbandWorkLocation,
+    attendance, markAttendance, getAttendance, removeAttendance, workLocation, setWorkLocation,
+    husbandAttendance, markHusbandAttendance, getHusbandAttendance, removeHusbandAttendance, husbandWorkLocation, setHusbandWorkLocation,
     familyConfig, setFamilyConfig,
     financeConfig, setFinanceConfig,
     expenses, addExpense, removeExpense,

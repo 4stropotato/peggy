@@ -12,6 +12,9 @@ const DEFAULT_AUTO_HOURS = 8
 const DEFAULT_AWAY_MINUTES = 90
 const MAX_GEOFENCE_RADIUS_METERS = 3000
 const MAX_AWAY_MINUTES = 720
+const SHAKE_DELTA_THRESHOLD = 17
+const SHAKE_COOLDOWN_MS = 1200
+const QUICK_ACTION_MESSAGE_MS = 4200
 
 const DEFAULT_GEO_LIVE = {
   tracking: false,
@@ -221,10 +224,12 @@ export default function WorkFinancePanel({
   const {
     attendance,
     markAttendance,
+    removeAttendance,
     workLocation,
     setWorkLocation,
     husbandAttendance,
     markHusbandAttendance,
+    removeHusbandAttendance,
     husbandWorkLocation,
     setHusbandWorkLocation,
   } = useApp()
@@ -232,6 +237,7 @@ export default function WorkFinancePanel({
   const isHusband = String(personKey || '').toLowerCase() === 'husband'
   const activeAttendance = isHusband ? husbandAttendance : attendance
   const activeMarkAttendance = isHusband ? markHusbandAttendance : markAttendance
+  const activeRemoveAttendance = isHusband ? removeHusbandAttendance : removeAttendance
   const activeWorkLocation = isHusband ? husbandWorkLocation : workLocation
   const activeSetWorkLocation = isHusband ? setHusbandWorkLocation : setWorkLocation
   const calendarStorageKey = `baby-prep-finance-work-calendar-${isHusband ? 'husband' : 'wife'}`
@@ -246,6 +252,7 @@ export default function WorkFinancePanel({
   const [showGeoPanel, setShowGeoPanel] = useState(() => readCalendarPreference(geoPanelStorageKey, false))
   const [showGeoAdvanced, setShowGeoAdvanced] = useState(() => readCalendarPreference(geoAdvancedStorageKey, false))
   const [geoMessage, setGeoMessage] = useState('')
+  const [quickActionMessage, setQuickActionMessage] = useState('')
   const [geoStatus, setGeoStatus] = useState(() => String(getGeoTelemetry()?.status || ''))
   const [geoLive, setGeoLive] = useState(() => ({
     ...DEFAULT_GEO_LIVE,
@@ -255,6 +262,11 @@ export default function WorkFinancePanel({
   const [mapPinInput, setMapPinInput] = useState({ work: '', home: '' })
   const draftDirtyRef = useRef(false)
   const geoMessageTimerRef = useRef(null)
+  const quickActionTimerRef = useRef(null)
+  const undoActionRef = useRef(null)
+  const shakeLastAtRef = useRef(0)
+  const shakePermissionAttemptedRef = useRef(false)
+  const [shakeEnabled, setShakeEnabled] = useState(() => !isIosLikeDevice())
   const savedWorkTargetValid = isValidLatLng(activeWorkLocation.lat, activeWorkLocation.lng)
   const savedHomeTargetValid = isValidLatLng(activeWorkLocation.homeLat, activeWorkLocation.homeLng)
   const hasSavedGeoTarget = savedWorkTargetValid || savedHomeTargetValid
@@ -324,6 +336,115 @@ export default function WorkFinancePanel({
       if (geoMessageTimerRef.current) clearTimeout(geoMessageTimerRef.current)
     }
   }, [geoMessage])
+
+  useEffect(() => {
+    if (!quickActionMessage) return undefined
+    if (quickActionTimerRef.current) clearTimeout(quickActionTimerRef.current)
+    quickActionTimerRef.current = setTimeout(() => {
+      setQuickActionMessage('')
+    }, QUICK_ACTION_MESSAGE_MS)
+    return () => {
+      if (quickActionTimerRef.current) clearTimeout(quickActionTimerRef.current)
+    }
+  }, [quickActionMessage])
+
+  const showQuickAction = (text) => {
+    setQuickActionMessage(String(text || '').trim())
+  }
+
+  const ensureShakePermission = async () => {
+    if (typeof window === 'undefined') return false
+    const MotionEventCtor = window.DeviceMotionEvent
+    if (!MotionEventCtor) return false
+    const requestPermission = MotionEventCtor.requestPermission
+    if (typeof requestPermission !== 'function') {
+      setShakeEnabled(true)
+      return true
+    }
+    if (shakePermissionAttemptedRef.current) return shakeEnabled
+    shakePermissionAttemptedRef.current = true
+    try {
+      const result = await requestPermission.call(MotionEventCtor)
+      const granted = String(result || '').toLowerCase() === 'granted'
+      setShakeEnabled(granted)
+      if (granted) {
+        showQuickAction('Shake undo enabled for quick logs.')
+      } else {
+        showQuickAction('Motion access denied. Use long press to remove logs.')
+      }
+      return granted
+    } catch {
+      setShakeEnabled(false)
+      showQuickAction('Could not enable motion access for shake undo.')
+      return false
+    }
+  }
+
+  const saveUndoAction = (dateISO, previousRecord) => {
+    undoActionRef.current = {
+      dateISO,
+      previousRecord: previousRecord ?? null,
+      recordedAt: Date.now(),
+    }
+  }
+
+  const applyUndoQuickAction = () => {
+    const action = undoActionRef.current
+    if (!action || !action.dateISO) return false
+    const previousRecord = action.previousRecord
+    if (previousRecord && typeof previousRecord === 'object') {
+      activeMarkAttendance(action.dateISO, previousRecord)
+      setAttendanceForm(toAttendanceForm(previousRecord, { isHusband }))
+      showQuickAction(`Undo complete for ${action.dateISO}.`)
+    } else {
+      activeRemoveAttendance(action.dateISO)
+      setAttendanceForm(createDefaultAttendanceForm({ isHusband }))
+      showQuickAction(`Cleared quick log for ${action.dateISO}.`)
+    }
+    setAttendanceDate(action.dateISO)
+    undoActionRef.current = null
+    return true
+  }
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return undefined
+    if (!shakeEnabled) return undefined
+    if (!window.DeviceMotionEvent) return undefined
+
+    let lastX = null
+    let lastY = null
+    let lastZ = null
+
+    const onMotion = (event) => {
+      const acc = event?.accelerationIncludingGravity || event?.acceleration
+      if (!acc) return
+      const x = Number(acc.x || 0)
+      const y = Number(acc.y || 0)
+      const z = Number(acc.z || 0)
+      if (lastX === null || lastY === null || lastZ === null) {
+        lastX = x
+        lastY = y
+        lastZ = z
+        return
+      }
+
+      const delta = Math.abs(x - lastX) + Math.abs(y - lastY) + Math.abs(z - lastZ)
+      lastX = x
+      lastY = y
+      lastZ = z
+      if (delta < SHAKE_DELTA_THRESHOLD) return
+
+      const nowMs = Date.now()
+      if ((nowMs - shakeLastAtRef.current) < SHAKE_COOLDOWN_MS) return
+      shakeLastAtRef.current = nowMs
+      if (!applyUndoQuickAction()) {
+        showQuickAction('No recent quick action to undo.')
+      }
+    }
+
+    window.addEventListener('devicemotion', onMotion)
+    return () => window.removeEventListener('devicemotion', onMotion)
+  }, [shakeEnabled, activeMarkAttendance, activeRemoveAttendance, isHusband])
 
   const updateLocationDraft = (patch) => {
     draftDirtyRef.current = true
@@ -492,6 +613,7 @@ export default function WorkFinancePanel({
 
   const handleCalendarQuickLog = (dateISO) => {
     const source = activeAttendance[dateISO]
+    saveUndoAction(dateISO, source || null)
     const base = toAttendanceForm(source, { isHusband })
     const computedRange = base.useTimeRange
       ? computeWorkedHoursFromRange(base.startTime, base.endTime, base.breakMinutes)
@@ -506,6 +628,22 @@ export default function WorkFinancePanel({
     activeMarkAttendance(dateISO, payload)
     setAttendanceDate(dateISO)
     setAttendanceForm(toAttendanceForm(payload, { isHusband }))
+    showQuickAction(`Quick logged Worked for ${dateISO}. Shake to undo.`)
+    void ensureShakePermission()
+  }
+
+  const handleCalendarQuickDelete = (dateISO) => {
+    const existing = activeAttendance[dateISO]
+    if (!existing) {
+      showQuickAction(`No saved log on ${dateISO} to remove.`)
+      return
+    }
+    saveUndoAction(dateISO, existing)
+    activeRemoveAttendance(dateISO)
+    setAttendanceDate(dateISO)
+    setAttendanceForm(createDefaultAttendanceForm({ isHusband }))
+    showQuickAction(`Removed log for ${dateISO}. Shake to undo.`)
+    void ensureShakePermission()
   }
 
   const toggleWorkCalendar = () => {
@@ -542,7 +680,8 @@ export default function WorkFinancePanel({
 
         {showWorkCalendar && (
           <>
-            <p className="section-note">Double tap a date to quick-log Worked.</p>
+            <p className="section-note">Double tap a date to quick-log Worked. Long press to delete that day log. Shake phone to undo last quick action.</p>
+            {quickActionMessage && <p className="section-note">{quickActionMessage}</p>}
             <Calendar
               year={workCal.y}
               month={workCal.m}
@@ -553,6 +692,7 @@ export default function WorkFinancePanel({
                 setAttendanceForm(toAttendanceForm(activeAttendance[d], { isHusband }))
               }}
               onDayDoubleTap={(d) => handleCalendarQuickLog(d)}
+              onDayLongPress={(d) => handleCalendarQuickDelete(d)}
               renderDay={(dateISO) => {
                 const att = activeAttendance[dateISO]
                 if (!att) return null

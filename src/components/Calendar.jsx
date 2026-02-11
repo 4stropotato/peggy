@@ -22,8 +22,11 @@ export default function Calendar({
   selectedDate,
   onDayClick,
   onDayDoubleTap,
+  onDayLongPress,
 }) {
   const lastTapRef = useRef({ date: '', time: 0 })
+  const longPressTimerRef = useRef(null)
+  const suppressClickRef = useRef({ date: '', until: 0 })
   const today = new Date()
   const todayISO = toISO(today.getFullYear(), today.getMonth() + 1, today.getDate())
 
@@ -75,6 +78,8 @@ export default function Calendar({
 
   const handleDayTap = (cell) => {
     if (cell.overflow) return
+    const suppress = suppressClickRef.current || { date: '', until: 0 }
+    if (suppress.date === cell.date && Date.now() <= suppress.until) return
     const now = Date.now()
     const last = lastTapRef.current || { date: '', time: 0 }
     const isDoubleTap = last.date === cell.date && (now - last.time) <= 360
@@ -85,6 +90,27 @@ export default function Calendar({
     }
     lastTapRef.current = { date: cell.date, time: now }
     onDayClick?.(cell.date)
+  }
+
+  const clearLongPressTimer = () => {
+    if (longPressTimerRef.current) {
+      clearTimeout(longPressTimerRef.current)
+      longPressTimerRef.current = null
+    }
+  }
+
+  const handleLongPressStart = (cell) => {
+    if (cell.overflow || !onDayLongPress) return
+    clearLongPressTimer()
+    longPressTimerRef.current = setTimeout(() => {
+      lastTapRef.current = { date: '', time: 0 }
+      suppressClickRef.current = { date: cell.date, until: Date.now() + 450 }
+      onDayLongPress?.(cell.date)
+    }, 680)
+  }
+
+  const handleLongPressEnd = () => {
+    clearLongPressTimer()
   }
 
   return (
@@ -104,6 +130,13 @@ export default function Calendar({
               key={i}
               className={`cal-day ${cell.overflow ? 'overflow' : ''} ${isToday ? 'today' : ''} ${isSelected ? 'selected' : ''}`}
               onClick={() => handleDayTap(cell)}
+              onPointerDown={() => handleLongPressStart(cell)}
+              onPointerUp={handleLongPressEnd}
+              onPointerLeave={handleLongPressEnd}
+              onPointerCancel={handleLongPressEnd}
+              onTouchStart={() => handleLongPressStart(cell)}
+              onTouchEnd={handleLongPressEnd}
+              onTouchCancel={handleLongPressEnd}
             >
               <span className="cal-day-num">{cell.day}</span>
               {!cell.overflow && renderDay?.(cell.date)}
