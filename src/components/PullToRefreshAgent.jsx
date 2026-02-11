@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 
-const PULL_THRESHOLD_PX = 70
-const MAX_PULL_PX = 120
+const PULL_THRESHOLD_PX = 110
+const MAX_PULL_PX = 170
 const TRIGGER_COOLDOWN_MS = 12000
 const TOP_EPSILON_PX = 2
 
@@ -25,6 +25,20 @@ async function checkForUpdate() {
     // ignore update failures
   }
   return false
+}
+
+function forceReloadNavigation() {
+  if (typeof window === 'undefined') return
+  try {
+    const url = new URL(window.location.href)
+    // Change URL minimally to force a new navigation entry in stubborn iOS PWAs.
+    url.searchParams.set('_r', String(Date.now()))
+    window.location.replace(url.toString())
+    return
+  } catch {
+    // fallback
+  }
+  window.location.reload()
 }
 
 function getPrimaryScroller() {
@@ -78,6 +92,7 @@ export default function PullToRefreshAgent() {
   const stateRef = useRef({
     active: false,
     startY: 0,
+    currentY: 0,
     atTop: false,
     triggered: false,
     scroller: null,
@@ -116,7 +131,7 @@ export default function PullToRefreshAgent() {
     }
 
     const reset = () => {
-      stateRef.current = { active: false, startY: 0, atTop: false, triggered: false, scroller: null, eligible: false }
+      stateRef.current = { active: false, startY: 0, currentY: 0, atTop: false, triggered: false, scroller: null, eligible: false }
     }
 
     const onTouchStart = (event) => {
@@ -134,6 +149,7 @@ export default function PullToRefreshAgent() {
       stateRef.current = {
         active: true,
         startY: touch.clientY,
+        currentY: touch.clientY,
         atTop: isAtTop(scroller),
         triggered: false,
         scroller,
@@ -155,6 +171,7 @@ export default function PullToRefreshAgent() {
         hideUiSoon(20)
         return
       }
+      stateRef.current.currentY = touch.clientY
       const dy = touch.clientY - stateRef.current.startY
       const positiveDy = Math.max(0, dy)
       const progress = Math.min(1, positiveDy / MAX_PULL_PX)
@@ -175,9 +192,10 @@ export default function PullToRefreshAgent() {
     }
 
     const onTouchEnd = async () => {
-      const { triggered } = stateRef.current
+      const { triggered, startY, currentY } = stateRef.current
+      const releaseDistance = Math.max(0, Number(currentY) - Number(startY))
       reset()
-      if (!triggered) {
+      if (!triggered || releaseDistance < PULL_THRESHOLD_PX) {
         setUi(prev => ({ ...prev, armed: false, refreshing: false }))
         hideUiSoon(130)
         return
@@ -205,15 +223,11 @@ export default function PullToRefreshAgent() {
       } catch {}
 
       const hasUpdate = await checkForUpdate()
-      // If a new SW is installing/waiting, main.jsx will reload when it's ready.
-      // Otherwise, do a simple reload to "force refresh" the app.
-      if (!hasUpdate) {
-        window.setTimeout(() => {
-          window.location.reload()
-        }, 140)
-      } else {
-        hideUiSoon(500)
-      }
+      // Always navigate after pull-refresh so users get a clear "actual refresh" behavior.
+      // The SW + version check logic still handles cache busting behind the scenes.
+      window.setTimeout(() => {
+        forceReloadNavigation()
+      }, hasUpdate ? 240 : 140)
     }
 
     // Use document-level listeners for iOS standalone PWA where container listeners
