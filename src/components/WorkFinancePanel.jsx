@@ -138,6 +138,30 @@ function parseCoordinatesInput(value) {
   return null
 }
 
+function isIosLikeDevice() {
+  if (typeof navigator === 'undefined') return false
+  const ua = String(navigator.userAgent || '')
+  const platform = String(navigator.platform || '')
+  const maxTouchPoints = Number(navigator.maxTouchPoints || 0)
+  return /iPhone|iPad|iPod/i.test(ua) || (/Mac/i.test(platform) && maxTouchPoints > 1)
+}
+
+function openExternalUrl(url) {
+  if (typeof window === 'undefined') return
+  const target = String(url || '').trim()
+  if (!target) return
+  try {
+    if (isIosLikeDevice()) {
+      window.location.assign(target)
+      return
+    }
+    const popup = window.open(target, '_blank', 'noopener,noreferrer')
+    if (!popup) window.location.assign(target)
+  } catch {
+    window.location.assign(target)
+  }
+}
+
 function toLocationDraft(location) {
   return {
     workName: String(location?.name || ''),
@@ -235,6 +259,7 @@ export default function WorkFinancePanel({
   const savedHomeTargetValid = isValidLatLng(activeWorkLocation.homeLat, activeWorkLocation.homeLng)
   const hasSavedGeoTarget = savedWorkTargetValid || savedHomeTargetValid
   const nativeTrackingMode = isNativeIos()
+  const prefersAppleMaps = isIosLikeDevice()
   const attendanceDurationParts = toHoursAndMinutes(attendanceForm.hours, { minHours: 0.5, maxHours: 24 })
   const autoDurationParts = toHoursAndMinutes(locationDraft.autoHours, { minHours: 0.5, maxHours: 12 })
   const computedRangeHours = computeWorkedHoursFromRange(
@@ -397,14 +422,13 @@ export default function WorkFinancePanel({
   }
 
   const openMapPicker = (target = 'work') => {
-    if (typeof window === 'undefined') return
     const lat = target === 'home' ? activeWorkLocation.homeLat : activeWorkLocation.lat
     const lng = target === 'home' ? activeWorkLocation.homeLng : activeWorkLocation.lng
     const hasPin = isValidLatLng(lat, lng)
-    const base = hasPin
-      ? `https://www.google.com/maps/search/?api=1&query=${lat},${lng}`
-      : 'https://www.google.com/maps'
-    window.open(base, '_blank', 'noopener,noreferrer')
+    const mapUrl = prefersAppleMaps
+      ? (hasPin ? `https://maps.apple.com/?ll=${lat},${lng}` : 'https://maps.apple.com/')
+      : (hasPin ? `https://www.google.com/maps/search/?api=1&query=${lat},${lng}` : 'https://www.google.com/maps')
+    openExternalUrl(mapUrl)
   }
 
   const handleApplyMapPin = (target = 'work') => {
@@ -712,7 +736,7 @@ export default function WorkFinancePanel({
             </button>
           </div>
           <p className="section-note">
-            Open map, pin the place, paste pin link, then save. Latitude/longitude are under Advanced options.
+            Open map, pin the place, paste pin link, then save. {prefersAppleMaps ? 'On iPhone this opens Apple Maps.' : 'On non-iOS this opens Google Maps.'} Latitude/longitude are under Advanced options.
           </p>
 
           {showGeoPanel && (
@@ -751,7 +775,7 @@ export default function WorkFinancePanel({
                       Use Current
                     </button>
                     <button type="button" className="btn-glass-secondary" onClick={() => openMapPicker('work')}>
-                      Open Map
+                      {prefersAppleMaps ? 'Open Apple Maps' : 'Open Google Maps'}
                     </button>
                   </div>
                   <div className="form-row">
@@ -789,7 +813,7 @@ export default function WorkFinancePanel({
                       Use Current
                     </button>
                     <button type="button" className="btn-glass-secondary" onClick={() => openMapPicker('home')}>
-                      Open Map
+                      {prefersAppleMaps ? 'Open Apple Maps' : 'Open Google Maps'}
                     </button>
                   </div>
                   <div className="form-row">
