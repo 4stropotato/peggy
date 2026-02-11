@@ -23,8 +23,20 @@ if ('serviceWorker' in navigator) {
     return tag === 'INPUT' || tag === 'TEXTAREA' || el.isContentEditable
   }
 
-  const scheduleReloadWhenSafe = () => {
+  const buildCacheBustedUrl = (buildId = '') => {
+    try {
+      const url = new URL(window.location.href)
+      url.searchParams.set('_pv', String(buildId || BUILD_ID || 'refresh'))
+      url.searchParams.set('_ts', String(Date.now()))
+      return url.toString()
+    } catch {
+      return window.location.href
+    }
+  }
+
+  const scheduleReloadWhenSafe = (opts = {}) => {
     if (refreshing) return
+    const forceUrl = typeof opts.forceUrl === 'string' ? opts.forceUrl : ''
     const tryReload = () => {
       if (refreshing) return
       if (typeof document !== 'undefined' && document.visibilityState === 'hidden') {
@@ -36,6 +48,10 @@ if ('serviceWorker' in navigator) {
         return
       }
       refreshing = true
+      if (forceUrl) {
+        window.location.replace(forceUrl)
+        return
+      }
       window.location.reload()
     }
     window.setTimeout(tryReload, 350)
@@ -66,12 +82,13 @@ if ('serviceWorker' in navigator) {
   }
 
   const maybeForceUpdateIfRemoteChanged = async (reg, reason = 'boot') => {
-    if (!reg || !BUILD_ID) return
+    if (!reg) return
     const base = import.meta.env.BASE_URL || '/'
     const remote = await fetchRemoteVersion(base)
     const remoteBuildId = String(remote?.buildId || '').trim()
     if (!remoteBuildId) return
-    if (remoteBuildId === BUILD_ID) return
+    const localBuildId = String(BUILD_ID || '').trim()
+    if (localBuildId && remoteBuildId === localBuildId) return
 
     const key = `peggy-update-attempted:${remoteBuildId}`
     try {
@@ -82,7 +99,7 @@ if ('serviceWorker' in navigator) {
     // Clear caches first so the next navigation is forced to pull fresh assets.
     await clearAppCaches()
     try { await reg.update() } catch {}
-    scheduleReloadWhenSafe()
+    scheduleReloadWhenSafe({ forceUrl: buildCacheBustedUrl(remoteBuildId) })
   }
 
   window.addEventListener('load', async () => {
@@ -93,21 +110,30 @@ if ('serviceWorker' in navigator) {
     try {
       const reg = await navigator.serviceWorker.register(swUrl)
 
+      const probeForUpdate = (reason) => {
+        try { reg.update() } catch {}
+        void maybeForceUpdateIfRemoteChanged(reg, reason)
+      }
+
       // Kick an update check immediately on load.
-      try { await reg.update() } catch {}
-      void maybeForceUpdateIfRemoteChanged(reg, 'load')
+      probeForUpdate('load')
 
       // When the app comes back into view, re-check for updates.
       document.addEventListener('visibilitychange', () => {
         if (document.visibilityState === 'visible') {
-          try { reg.update() } catch {}
-          void maybeForceUpdateIfRemoteChanged(reg, 'visible')
+          probeForUpdate('visible')
         }
       })
+      window.addEventListener('focus', () => probeForUpdate('focus'))
+      window.addEventListener('pageshow', () => probeForUpdate('pageshow'))
+      window.addEventListener('online', () => probeForUpdate('online'))
+      window.setInterval(() => {
+        if (document.visibilityState === 'visible') probeForUpdate('interval')
+      }, 45000)
 
       // Manual trigger (PullToRefreshAgent + any future update UI).
       window.addEventListener('peggy-force-update', () => {
-        void maybeForceUpdateIfRemoteChanged(reg, 'manual')
+        probeForUpdate('manual')
       })
 
       // Reload once a new SW takes control (but skip the first install takeover).
