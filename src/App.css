@@ -2777,23 +2777,46 @@ input[type="range"]:focus {
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
   z-index: 10;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.sub-tabs::-webkit-scrollbar {
+  display: none;
 }
 .sub-tabs button {
-  flex: 1;
-  padding: 0.55rem 0.3rem;
+  flex: 1 1 0;
+  min-width: 0;
+  padding: 0.55rem 0.35rem;
   border: 1px solid var(--glass-border);
   border-radius: 10px;
   background: var(--surface2);
   color: var(--text2);
-  font-size: 0.75rem;
+  font-size: 0.68rem;
   font-weight: 600;
   cursor: pointer;
   transition: all 0.2s;
   -webkit-tap-highlight-color: transparent;
+  white-space: nowrap;
+  overflow: hidden;
 }
 .sub-tabs button.active {
   background: linear-gradient(135deg, var(--pink), var(--purple));
   color: white;
+}
+.sub-tabs .tab-icon-label {
+  width: 100%;
+  min-width: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.24rem;
+}
+.sub-tabs .tab-icon-label > span:last-child {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 /* ===== Old supplement grid (legacy) ===== */
