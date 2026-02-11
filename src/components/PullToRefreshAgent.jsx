@@ -2,6 +2,7 @@ import { useEffect, useRef } from 'react'
 
 const PULL_THRESHOLD_PX = 70
 const TRIGGER_COOLDOWN_MS = 12000
+const TOP_EPSILON_PX = 2
 
 function isUserEditing() {
   if (typeof document === 'undefined') return false
@@ -25,32 +26,68 @@ async function checkForUpdate() {
   return false
 }
 
+function getPrimaryScroller() {
+  if (typeof document === 'undefined') return null
+  return (
+    document.getElementById('peggy-scroll-root')
+    || document.scrollingElement
+    || document.documentElement
+    || document.body
+    || null
+  )
+}
+
+function isAtTop(scroller) {
+  if (!scroller) return true
+  const y = Number(scroller.scrollTop)
+  if (Number.isFinite(y)) return y <= TOP_EPSILON_PX
+  if (typeof window !== 'undefined') return window.scrollY <= TOP_EPSILON_PX
+  return true
+}
+
+function shouldIgnoreTarget(target) {
+  if (!(target instanceof Element)) return false
+  // Ignore modal sheets and form controls to avoid accidental refresh while editing.
+  if (target.closest('.day-detail-sheet, .photo-modal-content')) return true
+  const formEl = target.closest('input, textarea, select, [contenteditable="true"]')
+  return Boolean(formEl)
+}
+
 export default function PullToRefreshAgent() {
   const stateRef = useRef({
     active: false,
     startY: 0,
     atTop: false,
     triggered: false,
+    scroller: null,
   })
   const lastTriggerRef = useRef(0)
 
   useEffect(() => {
     if (typeof window === 'undefined' || typeof document === 'undefined') return undefined
-    const el = document.getElementById('peggy-scroll-root')
-    if (!el) return undefined
 
     const reset = () => {
-      stateRef.current = { active: false, startY: 0, atTop: false, triggered: false }
+      stateRef.current = { active: false, startY: 0, atTop: false, triggered: false, scroller: null }
     }
 
     const onTouchStart = (event) => {
+      if (event.touches?.length !== 1) {
+        reset()
+        return
+      }
+      if (shouldIgnoreTarget(event.target)) {
+        reset()
+        return
+      }
       const touch = event.touches?.[0]
       if (!touch) return
+      const scroller = getPrimaryScroller()
       stateRef.current = {
         active: true,
         startY: touch.clientY,
-        atTop: el.scrollTop <= 0,
+        atTop: isAtTop(scroller),
         triggered: false,
+        scroller,
       }
     }
 
@@ -59,6 +96,7 @@ export default function PullToRefreshAgent() {
       if (!stateRef.current.atTop) return
       const touch = event.touches?.[0]
       if (!touch) return
+      if (!isAtTop(stateRef.current.scroller)) return
       const dy = touch.clientY - stateRef.current.startY
       if (dy >= PULL_THRESHOLD_PX) {
         stateRef.current.triggered = true
@@ -88,16 +126,18 @@ export default function PullToRefreshAgent() {
       }
     }
 
-    el.addEventListener('touchstart', onTouchStart, { passive: true })
-    el.addEventListener('touchmove', onTouchMove, { passive: true })
-    el.addEventListener('touchend', onTouchEnd)
-    el.addEventListener('touchcancel', onTouchEnd)
+    // Use document-level listeners for iOS standalone PWA where container listeners
+    // can be unreliable depending on scroll ownership.
+    document.addEventListener('touchstart', onTouchStart, { passive: true, capture: true })
+    document.addEventListener('touchmove', onTouchMove, { passive: true, capture: true })
+    document.addEventListener('touchend', onTouchEnd, { capture: true })
+    document.addEventListener('touchcancel', onTouchEnd, { capture: true })
 
     return () => {
-      el.removeEventListener('touchstart', onTouchStart)
-      el.removeEventListener('touchmove', onTouchMove)
-      el.removeEventListener('touchend', onTouchEnd)
-      el.removeEventListener('touchcancel', onTouchEnd)
+      document.removeEventListener('touchstart', onTouchStart, { capture: true })
+      document.removeEventListener('touchmove', onTouchMove, { capture: true })
+      document.removeEventListener('touchend', onTouchEnd, { capture: true })
+      document.removeEventListener('touchcancel', onTouchEnd, { capture: true })
     }
   }, [])
 
