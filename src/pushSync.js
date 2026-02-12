@@ -6,6 +6,23 @@ import {
 
 const PUSH_DEVICE_ID_KEY = 'peggy-push-device-id'
 const PUSH_ENDPOINT_CACHE_KEY = 'peggy-push-endpoint'
+const PUSH_TIMEOUT_MS = 12000
+
+function withTimeout(promise, timeoutMs = PUSH_TIMEOUT_MS, label = 'operation') {
+  const ms = Math.max(1000, Number(timeoutMs) || PUSH_TIMEOUT_MS)
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error(`${label} timed out after ${ms}ms`)), ms)
+    Promise.resolve(promise)
+      .then((value) => {
+        clearTimeout(timer)
+        resolve(value)
+      })
+      .catch((err) => {
+        clearTimeout(timer)
+        reject(err)
+      })
+  })
+}
 
 function toBase64UrlUint8Array(base64) {
   const padded = `${base64}`.replace(/-/g, '+').replace(/_/g, '/')
@@ -25,6 +42,39 @@ function randomId() {
 
 function readPublicVapidKey() {
   return String(import.meta.env.VITE_WEB_PUSH_PUBLIC_KEY || '').trim()
+}
+
+async function resolveServiceWorkerRegistration() {
+  if (!isPushSupported()) return null
+  const base = import.meta.env.BASE_URL || '/'
+  const swUrl = `${base.replace(/\/+$/, '/')}sw.js`
+
+  const byScope = await withTimeout(
+    navigator.serviceWorker.getRegistration(base),
+    2500,
+    'service worker getRegistration(scope)',
+  ).catch(() => null)
+  if (byScope) return byScope
+
+  const anyScope = await withTimeout(
+    navigator.serviceWorker.getRegistration(),
+    2500,
+    'service worker getRegistration',
+  ).catch(() => null)
+  if (anyScope) return anyScope
+
+  const registered = await withTimeout(
+    navigator.serviceWorker.register(swUrl),
+    9000,
+    'service worker register',
+  ).catch(() => null)
+  if (registered) return registered
+
+  return withTimeout(
+    navigator.serviceWorker.ready,
+    PUSH_TIMEOUT_MS,
+    'service worker ready',
+  )
 }
 
 export function isPushSupported() {
@@ -47,8 +97,13 @@ export function getPushDeviceId() {
 
 async function readCurrentSubscription() {
   if (!isPushSupported()) return null
-  const registration = await navigator.serviceWorker.ready
-  return registration.pushManager.getSubscription()
+  const registration = await resolveServiceWorkerRegistration()
+  if (!registration?.pushManager) return null
+  return withTimeout(
+    registration.pushManager.getSubscription(),
+    8000,
+    'pushManager.getSubscription',
+  )
 }
 
 export async function upsertCurrentPushSubscription(session, { notifEnabled = true } = {}) {
@@ -60,13 +115,25 @@ export async function upsertCurrentPushSubscription(session, { notifEnabled = tr
   const publicVapidKey = readPublicVapidKey()
   if (!publicVapidKey) return { status: 'skipped', reason: 'missing-vapid-public-key' }
 
-  const registration = await navigator.serviceWorker.ready
-  let subscription = await registration.pushManager.getSubscription()
+  const registration = await resolveServiceWorkerRegistration()
+  if (!registration?.pushManager) {
+    return { status: 'skipped', reason: 'push-manager-unavailable' }
+  }
+
+  let subscription = await withTimeout(
+    registration.pushManager.getSubscription(),
+    8000,
+    'pushManager.getSubscription',
+  ).catch(() => null)
   if (!subscription) {
-    subscription = await registration.pushManager.subscribe({
-      userVisibleOnly: true,
-      applicationServerKey: toBase64UrlUint8Array(publicVapidKey),
-    })
+    subscription = await withTimeout(
+      registration.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: toBase64UrlUint8Array(publicVapidKey),
+      }),
+      12000,
+      'pushManager.subscribe',
+    )
   }
 
   const data = subscription.toJSON()
@@ -81,17 +148,21 @@ export async function upsertCurrentPushSubscription(session, { notifEnabled = tr
     window.localStorage.setItem(PUSH_ENDPOINT_CACHE_KEY, endpoint)
   }
 
-  const result = await cloudUpsertPushSubscription({
-    deviceId: getPushDeviceId(),
-    notifEnabled: Boolean(notifEnabled),
-    endpoint,
-    p256dh,
-    auth,
-    subscription: data,
-    userAgent: typeof navigator !== 'undefined' ? navigator.userAgent : '',
-    platform: typeof navigator !== 'undefined' ? navigator.platform : '',
-    appBaseUrl: import.meta.env.BASE_URL || '/',
-  }, session)
+  const result = await withTimeout(
+    cloudUpsertPushSubscription({
+      deviceId: getPushDeviceId(),
+      notifEnabled: Boolean(notifEnabled),
+      endpoint,
+      p256dh,
+      auth,
+      subscription: data,
+      userAgent: typeof navigator !== 'undefined' ? navigator.userAgent : '',
+      platform: typeof navigator !== 'undefined' ? navigator.platform : '',
+      appBaseUrl: import.meta.env.BASE_URL || '/',
+    }, session),
+    15000,
+    'cloudUpsertPushSubscription',
+  )
 
   return { status: 'ok', result }
 }

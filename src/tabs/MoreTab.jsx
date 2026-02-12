@@ -948,7 +948,7 @@ export default function MoreTab() {
 
     try {
       setCloudBusy(true)
-      setPushStatus('Registering this device... (1/2)')
+      setPushStatus('Registering this device... (1/2). Keep app open first; lock after step 2 starts.')
       const sync = await withTimeout(
         upsertCurrentPushSubscription(cloudSession, { notifEnabled: readSmartNotifEnabled() }),
         20000,
@@ -959,7 +959,7 @@ export default function MoreTab() {
         setPushStatus(`Push registration skipped (${reason}).`)
         return
       }
-      setPushStatus('Sending test push... (2/2)')
+      setPushStatus('Sending test push... (2/2). Lock phone now and wait 5-10 seconds.')
       let result = await withTimeout(
         cloudSendPushTest(cloudSession),
         20000,
