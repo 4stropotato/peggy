@@ -156,10 +156,14 @@ Deno.serve(async (req) => {
       .from('push_subscriptions')
       .select('id, device_id, endpoint, subscription, app_base_url')
       .eq('user_id', user.id)
-      .eq('enabled', true)
-      .eq('notif_enabled', true)
     if (targetDeviceId) {
+      // Manual test from a specific device should still work even when reminder toggles are OFF.
+      // This validates transport/registration without changing user preference state.
       query = query.eq('device_id', targetDeviceId)
+    } else {
+      query = query
+        .eq('enabled', true)
+        .eq('notif_enabled', true)
     }
 
     const { data, error } = await query

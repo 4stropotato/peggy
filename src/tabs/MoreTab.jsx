@@ -972,7 +972,7 @@ export default function MoreTab() {
       let sync = null
       try {
         sync = await withTimeout(
-          upsertCurrentPushSubscription(activeSession, { notifEnabled: readSmartNotifEnabled() }),
+          upsertCurrentPushSubscription(activeSession, { notifEnabled: true }),
           90000,
           'push registration',
         )
@@ -993,6 +993,10 @@ export default function MoreTab() {
         const failed = Number(existing?.failed || 0)
         if (sent > 0) {
           setPushStatus(`Test push sent via existing subscription after slow registration (${sent}/${total}, stale ${stale}, failed ${failed}).`)
+          return
+        }
+        if (total <= 0) {
+          setPushStatus('No push subscription found for this device yet. Reopen Peggy from Home Screen, keep it open for 10s, then retry Send Test Push.')
           return
         }
         throw new Error(`push registration timed out and existing subscription did not deliver (${sent}/${total}, stale ${stale}, failed ${failed})`)
@@ -1048,7 +1052,7 @@ export default function MoreTab() {
           'push disable current subscription',
         )
         const repairSync = await withTimeout(
-          upsertCurrentPushSubscription(activeSession, { notifEnabled: readSmartNotifEnabled() }),
+          upsertCurrentPushSubscription(activeSession, { notifEnabled: true }),
           90000,
           'push re-registration',
         )
