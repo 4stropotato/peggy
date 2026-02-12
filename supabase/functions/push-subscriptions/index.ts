@@ -42,20 +42,23 @@ Deno.serve(async (req) => {
   }
 
   const supabaseUrl = getEnv('SUPABASE_URL')
-  const supabaseAnonKey = getEnv('SUPABASE_ANON_KEY')
-  if (!supabaseUrl || !supabaseAnonKey) {
-    return jsonResponse(500, { error: 'Missing SUPABASE_URL/SUPABASE_ANON_KEY.' })
+  const serviceRoleKey = getEnv('SUPABASE_SERVICE_ROLE_KEY')
+  if (!supabaseUrl || !serviceRoleKey) {
+    return jsonResponse(500, { error: 'Missing SUPABASE_URL/SUPABASE_SERVICE_ROLE_KEY.' })
   }
 
   const authHeader = req.headers.get('Authorization') || ''
-  const client = createClient(supabaseUrl, supabaseAnonKey, {
-    global: { headers: { Authorization: authHeader } },
-  })
+  const accessToken = authHeader.replace(/^Bearer\s+/i, '').trim()
+  if (!accessToken) {
+    return jsonResponse(401, { error: 'Unauthorized' })
+  }
+
+  const client = createClient(supabaseUrl, serviceRoleKey)
 
   const {
     data: { user },
     error: userError,
-  } = await client.auth.getUser()
+  } = await client.auth.getUser(accessToken)
 
   if (userError || !user?.id) {
     return jsonResponse(401, { error: 'Unauthorized' })

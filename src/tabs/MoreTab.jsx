@@ -9,7 +9,7 @@ import {
   healthTipsInfo, supplementsDetailInfo, babyNamesInfo, financialSummary
 } from '../infoData'
 import {
-  isCloudConfigured, getCloudSession, cloudSignUp, cloudSignIn, cloudSignOut,
+  isCloudConfigured, getCloudSession, clearCloudSession, cloudSignUp, cloudSignIn, cloudSignOut,
   cloudValidateSession, cloudUploadBackup, cloudDownloadBackup, cloudSendPushTest
 } from '../cloudSync'
 import {
@@ -656,7 +656,7 @@ export default function MoreTab() {
           msg.includes('session expired')
         )
         if (mustSignInAgain) {
-          setCloudSession(null)
+          clearCloudSession()
           return
         }
         // Keep current session for transient network/deploy-time glitches.
@@ -865,7 +865,7 @@ export default function MoreTab() {
       const signedIn = await cloudSignIn(cloudEmail.trim(), cloudPassword)
       const validated = await cloudValidateSession(signedIn)
       setCloudSession(validated)
-      setCloudStatus(`Signed in as ${validated.user.email || validated.user.id}. Syncing account data...`)
+      setCloudStatus(`Signed in as ${validated.user.email || validated.user.id}. Auto-sync is running in background.`)
     } catch (err) {
       setCloudStatus('Sign in failed: ' + err.message)
     } finally {
@@ -933,7 +933,7 @@ export default function MoreTab() {
   }
 
   const handlePushTest = async () => {
-    const latestSession = getCloudSession() || cloudSession
+    const latestSession = cloudSession || getCloudSession()
     if (!latestSession) {
       setPushStatus('Sign in first to test push notifications.')
       return
@@ -961,11 +961,12 @@ export default function MoreTab() {
         const sessionMsg = String(sessionErr?.message || '').toLowerCase()
         const isAuthExpired = sessionMsg.includes('invalid jwt') || sessionMsg.includes('http 401') || sessionMsg.includes('refresh token')
         if (isAuthExpired) {
-          setCloudSession(null)
+          clearCloudSession()
           setPushStatus('Cloud session expired (Invalid JWT). Please sign in again in Cloud Sync, then retry Send Test Push.')
           return
         }
-        // For transient network errors, continue with current session.
+        setPushStatus(`Cloud session check failed: ${sessionErr?.message || 'unknown error'}. Please retry.`)
+        return
       }
       setPushStatus('Registering this device... (1/2). Keep app open first; lock after step 2 starts.')
       let sync = null
@@ -1077,7 +1078,7 @@ export default function MoreTab() {
     } catch (err) {
       const errorMsg = String(err?.message || 'unknown error')
       if (errorMsg.toLowerCase().includes('invalid jwt')) {
-        setCloudSession(null)
+        clearCloudSession()
         setPushStatus('Test push failed: Invalid JWT. Please sign in again in Cloud Sync, then retry.')
       } else {
         setPushStatus('Test push failed: ' + errorMsg)
