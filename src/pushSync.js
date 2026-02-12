@@ -51,6 +51,17 @@ function readPublicVapidKey() {
   return String(import.meta.env.VITE_WEB_PUSH_PUBLIC_KEY || '').trim()
 }
 
+function hasPushManagerGlobalSupport() {
+  if (typeof window === 'undefined') return false
+  if ('PushManager' in window) return true
+  try {
+    return typeof ServiceWorkerRegistration !== 'undefined'
+      && 'pushManager' in ServiceWorkerRegistration.prototype
+  } catch {
+    return false
+  }
+}
+
 async function resolveServiceWorkerRegistration() {
   if (!isPushSupported()) return null
   const base = import.meta.env.BASE_URL || '/'
@@ -157,7 +168,7 @@ export function isPushSupported() {
     typeof window !== 'undefined' &&
     typeof Notification !== 'undefined' &&
     'serviceWorker' in navigator &&
-    'PushManager' in window
+    hasPushManagerGlobalSupport()
   )
 }
 
@@ -172,7 +183,14 @@ export function getPushDeviceId() {
 
 async function readCurrentSubscription() {
   if (!isPushSupported()) return null
-  const registration = await resolveServiceWorkerRegistration()
+  const baseRegistration = await resolveServiceWorkerRegistration()
+  const registration = baseRegistration?.pushManager
+    ? baseRegistration
+    : await withTimeout(
+      navigator.serviceWorker.ready,
+      SW_READY_TIMEOUT_MS,
+      'service worker ready for readCurrentSubscription',
+    ).catch(() => null)
   if (!registration?.pushManager) return null
   return withTimeout(
     registration.pushManager.getSubscription(),
@@ -191,9 +209,21 @@ export async function upsertCurrentPushSubscription(session, { notifEnabled = tr
   if (!publicVapidKey) return { status: 'skipped', reason: 'missing-vapid-public-key' }
 
   const registration = await resolveServiceWorkerRegistration()
-  const activeRegistration = registration?.active
+  let activeRegistration = registration?.active
     ? registration
     : await waitForActiveServiceWorkerRegistration()
+
+  if (!activeRegistration?.pushManager) {
+    const readyRegistration = await withTimeout(
+      navigator.serviceWorker.ready,
+      SW_READY_TIMEOUT_MS,
+      'service worker ready with push manager',
+    ).catch(() => null)
+    if (readyRegistration?.active && readyRegistration?.pushManager) {
+      activeRegistration = readyRegistration
+    }
+  }
+
   if (!activeRegistration?.pushManager) {
     return { status: 'skipped', reason: 'push-manager-unavailable' }
   }

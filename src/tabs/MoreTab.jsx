@@ -957,6 +957,24 @@ export default function MoreTab() {
       )
       if (sync?.status !== 'ok') {
         const reason = String(sync?.reason || 'subscription-sync-skipped')
+        if (reason === 'push-manager-unavailable') {
+          setPushStatus('Push manager unavailable in current context. Trying server test on existing subscription...')
+          const existing = await withTimeout(
+            cloudSendPushTest(cloudSession, { deviceId: getPushDeviceId() }),
+            20000,
+            'push send_test existing-subscription',
+          )
+          const sent = Number(existing?.sent || 0)
+          const total = Number(existing?.total || sent)
+          const stale = Number(existing?.stale || 0)
+          const failed = Number(existing?.failed || 0)
+          if (sent > 0) {
+            setPushStatus(`Test push sent via existing subscription (${sent}/${total}, stale ${stale}, failed ${failed}).`)
+            return
+          }
+          setPushStatus(`Push registration skipped (${reason}) and no existing delivery (${sent}/${total}, stale ${stale}, failed ${failed}).`)
+          return
+        }
         setPushStatus(`Push registration skipped (${reason}).`)
         return
       }
