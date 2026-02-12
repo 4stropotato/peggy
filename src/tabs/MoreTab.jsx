@@ -42,6 +42,7 @@ import {
 } from '../reminderContent'
 import {
   disableCurrentPushSubscription,
+  getPushDeviceId,
   isPushSupported,
   upsertCurrentPushSubscription,
 } from '../pushSync'
@@ -951,7 +952,7 @@ export default function MoreTab() {
       setPushStatus('Registering this device... (1/2). Keep app open first; lock after step 2 starts.')
       const sync = await withTimeout(
         upsertCurrentPushSubscription(cloudSession, { notifEnabled: readSmartNotifEnabled() }),
-        20000,
+        45000,
         'push registration',
       )
       if (sync?.status !== 'ok') {
@@ -961,7 +962,7 @@ export default function MoreTab() {
       }
       setPushStatus('Sending test push... (2/2). Lock phone now and wait 5-10 seconds.')
       let result = await withTimeout(
-        cloudSendPushTest(cloudSession),
+        cloudSendPushTest(cloudSession, { deviceId: getPushDeviceId() }),
         20000,
         'push send_test',
       )
@@ -990,7 +991,7 @@ export default function MoreTab() {
         }
         setPushStatus('Retrying test push after subscription repair...')
         result = await withTimeout(
-          cloudSendPushTest(cloudSession),
+          cloudSendPushTest(cloudSession, { deviceId: getPushDeviceId() }),
           20000,
           'push send_test retry',
         )

@@ -336,13 +336,19 @@ export async function cloudDisablePushSubscription(payload, session) {
   return result;
 }
 
-export async function cloudSendPushTest(session) {
+export async function cloudSendPushTest(session, options = {}) {
+  const body = {
+    action: 'send_test',
+  }
+  const deviceId = String(options?.deviceId || '').trim()
+  if (deviceId) body.deviceId = deviceId
+
   const { result } = await withSessionRetry(session, async (workingSession) => {
     return cloudFetch(
       '/functions/v1/push-subscriptions',
       {
         method: 'POST',
-        body: { action: 'send_test' }
+        body
       },
       workingSession.accessToken
     );

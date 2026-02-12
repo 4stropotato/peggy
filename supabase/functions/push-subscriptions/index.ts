@@ -4,6 +4,8 @@ import { isSubscriptionGoneStatus, sendWebPush } from '../_shared/push.ts'
 
 type PushRow = {
   id: string
+  device_id: string | null
+  endpoint: string | null
   subscription: Record<string, unknown>
   app_base_url: string | null
 }
@@ -145,12 +147,19 @@ Deno.serve(async (req) => {
   }
 
   if (action === 'send_test') {
-    const { data, error } = await client
+    const targetDeviceId = String(body?.deviceId || '').trim()
+
+    let query = client
       .from('push_subscriptions')
-      .select('id, subscription, app_base_url')
+      .select('id, device_id, endpoint, subscription, app_base_url')
       .eq('user_id', user.id)
       .eq('enabled', true)
       .eq('notif_enabled', true)
+    if (targetDeviceId) {
+      query = query.eq('device_id', targetDeviceId)
+    }
+
+    const { data, error } = await query
 
     if (error) return jsonResponse(400, { error: error.message })
     const rows = (Array.isArray(data) ? data : []) as PushRow[]
@@ -195,6 +204,7 @@ Deno.serve(async (req) => {
       stale: staleIds.length,
       failed,
       errors,
+      targetDeviceId: targetDeviceId || null,
     })
   }
 

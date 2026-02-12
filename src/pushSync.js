@@ -7,6 +7,12 @@ import {
 const PUSH_DEVICE_ID_KEY = 'peggy-push-device-id'
 const PUSH_ENDPOINT_CACHE_KEY = 'peggy-push-endpoint'
 const PUSH_TIMEOUT_MS = 12000
+const SW_LOOKUP_TIMEOUT_MS = 1400
+const SW_REGISTER_TIMEOUT_MS = 7000
+const SW_READY_TIMEOUT_MS = 9000
+const PUSH_SUB_READ_TIMEOUT_MS = 5000
+const PUSH_SUBSCRIBE_TIMEOUT_MS = 12000
+const CLOUD_UPSERT_TIMEOUT_MS = 10000
 
 function withTimeout(promise, timeoutMs = PUSH_TIMEOUT_MS, label = 'operation') {
   const ms = Math.max(1000, Number(timeoutMs) || PUSH_TIMEOUT_MS)
@@ -49,30 +55,31 @@ async function resolveServiceWorkerRegistration() {
   const base = import.meta.env.BASE_URL || '/'
   const swUrl = `${base.replace(/\/+$/, '/')}sw.js`
 
-  const byScope = await withTimeout(
-    navigator.serviceWorker.getRegistration(base),
-    2500,
-    'service worker getRegistration(scope)',
-  ).catch(() => null)
+  const [byScope, anyScope] = await Promise.all([
+    withTimeout(
+      navigator.serviceWorker.getRegistration(base),
+      SW_LOOKUP_TIMEOUT_MS,
+      'service worker getRegistration(scope)',
+    ).catch(() => null),
+    withTimeout(
+      navigator.serviceWorker.getRegistration(),
+      SW_LOOKUP_TIMEOUT_MS,
+      'service worker getRegistration',
+    ).catch(() => null),
+  ])
   if (byScope?.active) return byScope
-
-  const anyScope = await withTimeout(
-    navigator.serviceWorker.getRegistration(),
-    2500,
-    'service worker getRegistration',
-  ).catch(() => null)
   if (anyScope?.active) return anyScope
 
   const registered = await withTimeout(
     navigator.serviceWorker.register(swUrl),
-    9000,
+    SW_REGISTER_TIMEOUT_MS,
     'service worker register',
   ).catch(() => null)
   if (registered?.active) return registered
 
   const readyReg = await withTimeout(
     navigator.serviceWorker.ready,
-    PUSH_TIMEOUT_MS,
+    SW_READY_TIMEOUT_MS,
     'service worker ready',
   ).catch(() => null)
   if (readyReg?.active) return readyReg
@@ -106,7 +113,7 @@ async function readCurrentSubscription() {
   if (!registration?.pushManager) return null
   return withTimeout(
     registration.pushManager.getSubscription(),
-    8000,
+    PUSH_SUB_READ_TIMEOUT_MS,
     'pushManager.getSubscription',
   )
 }
@@ -127,7 +134,7 @@ export async function upsertCurrentPushSubscription(session, { notifEnabled = tr
 
   let subscription = await withTimeout(
     registration.pushManager.getSubscription(),
-    8000,
+    PUSH_SUB_READ_TIMEOUT_MS,
     'pushManager.getSubscription',
   ).catch(() => null)
   if (!subscription) {
@@ -137,7 +144,7 @@ export async function upsertCurrentPushSubscription(session, { notifEnabled = tr
           userVisibleOnly: true,
           applicationServerKey: toBase64UrlUint8Array(publicVapidKey),
         }),
-        12000,
+        PUSH_SUBSCRIBE_TIMEOUT_MS,
         'pushManager.subscribe',
       )
     } catch (err) {
@@ -148,7 +155,7 @@ export async function upsertCurrentPushSubscription(session, { notifEnabled = tr
       // iOS/Safari can race here right after install/update. Wait for ready registration and retry once.
       const readyReg = await withTimeout(
         navigator.serviceWorker.ready,
-        12000,
+        SW_READY_TIMEOUT_MS,
         'service worker ready retry',
       ).catch(() => null)
       if (!readyReg?.pushManager) throw err
@@ -157,7 +164,7 @@ export async function upsertCurrentPushSubscription(session, { notifEnabled = tr
           userVisibleOnly: true,
           applicationServerKey: toBase64UrlUint8Array(publicVapidKey),
         }),
-        12000,
+        PUSH_SUBSCRIBE_TIMEOUT_MS,
         'pushManager.subscribe retry',
       )
     }
@@ -187,7 +194,7 @@ export async function upsertCurrentPushSubscription(session, { notifEnabled = tr
       platform: typeof navigator !== 'undefined' ? navigator.platform : '',
       appBaseUrl: import.meta.env.BASE_URL || '/',
     }, session),
-    15000,
+    CLOUD_UPSERT_TIMEOUT_MS,
     'cloudUpsertPushSubscription',
   )
 
