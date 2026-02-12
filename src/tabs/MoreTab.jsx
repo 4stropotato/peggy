@@ -960,17 +960,59 @@ export default function MoreTab() {
         return
       }
       setPushStatus('Sending test push... (2/2)')
-      const result = await withTimeout(
+      let result = await withTimeout(
         cloudSendPushTest(cloudSession),
         20000,
         'push send_test',
       )
-      const sent = Number(result?.sent || 0)
-      const total = Number(result?.total || sent)
+
+      let sent = Number(result?.sent || 0)
+      let total = Number(result?.total || sent)
+      let stale = Number(result?.stale || 0)
+      let failed = Number(result?.failed || 0)
+
+      if (sent <= 0) {
+        setPushStatus('No delivery yet. Repairing device subscription then retrying test push...')
+        await withTimeout(
+          disableCurrentPushSubscription(cloudSession, { unsubscribeLocal: true }),
+          12000,
+          'push disable current subscription',
+        )
+        const repairSync = await withTimeout(
+          upsertCurrentPushSubscription(cloudSession, { notifEnabled: readSmartNotifEnabled() }),
+          20000,
+          'push re-registration',
+        )
+        if (repairSync?.status !== 'ok') {
+          const reason = String(repairSync?.reason || 'push-repair-sync-skipped')
+          setPushStatus(`Push re-registration skipped (${reason}).`)
+          return
+        }
+        setPushStatus('Retrying test push after subscription repair...')
+        result = await withTimeout(
+          cloudSendPushTest(cloudSession),
+          20000,
+          'push send_test retry',
+        )
+        sent = Number(result?.sent || 0)
+        total = Number(result?.total || sent)
+        stale = Number(result?.stale || 0)
+        failed = Number(result?.failed || 0)
+      }
+
       if (sent > 0) {
-        setPushStatus(`Test push sent (${sent}/${total} device${total === 1 ? '' : 's'}).`)
+        setPushStatus(`Test push sent (${sent}/${total} device${total === 1 ? '' : 's'}, stale ${stale}, failed ${failed}).`)
+      } else if (total > 0) {
+        const errorHint = Array.isArray(result?.errors) && result.errors.length
+          ? ` First error: ${String(result.errors[0]).slice(0, 140)}.`
+          : ''
+        setPushStatus(
+          `Push request reached server but no device delivered (${sent}/${total}, stale ${stale}, failed ${failed}).` +
+          errorHint +
+          ' Usually this is a stale/mismatched subscription or VAPID mismatch.'
+        )
       } else {
-        setPushStatus('No active push device found yet. Open Peggy as installed PWA and allow notifications.')
+        setPushStatus('No active push device found yet. Open Peggy as installed PWA and allow notifications, then retry.')
       }
     } catch (err) {
       setPushStatus('Test push failed: ' + err.message)

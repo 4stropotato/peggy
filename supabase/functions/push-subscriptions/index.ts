@@ -23,13 +23,14 @@ function getSafeUrl(path: string) {
 }
 
 function buildTestPayload(appBaseUrl: string) {
+  const stamp = Date.now()
   return {
     title: 'Peggy test notification',
     body: 'Push is connected on this device.',
-    tag: 'peggy-test',
+    tag: `peggy-test-${stamp}`,
     url: getSafeUrl(appBaseUrl || '/peggy/'),
-    renotify: false,
-    requireInteraction: false,
+    renotify: true,
+    requireInteraction: true,
   }
 }
 
@@ -156,12 +157,20 @@ Deno.serve(async (req) => {
 
     const staleIds: string[] = []
     let sent = 0
+    let failed = 0
+    const errors: string[] = []
 
     for (const row of rows) {
       const push = await sendWebPush(row.subscription, buildTestPayload(row.app_base_url || '/peggy/'))
       if (push.ok) {
         sent += 1
         continue
+      }
+      failed += 1
+      const status = Number(push.statusCode || 0)
+      const message = String(push.message || 'push-send-failed').slice(0, 180)
+      if (errors.length < 5) {
+        errors.push(`status=${status || 'n/a'} ${message}`)
       }
       if (isSubscriptionGoneStatus(push.statusCode) && row.id) {
         staleIds.push(row.id)
@@ -184,6 +193,8 @@ Deno.serve(async (req) => {
       sent,
       total: rows.length,
       stale: staleIds.length,
+      failed,
+      errors,
     })
   }
 
