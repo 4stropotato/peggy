@@ -123,12 +123,30 @@ async function resolveServiceWorkerRegistration() {
   return byScope || anyScope || registered || readyReg || null
 }
 
-async function waitForActiveServiceWorkerRegistration(maxMs = SW_ACTIVE_WAIT_MS) {
+function waitForWorkerActive(worker, timeoutMs = 8000) {
+  if (worker?.state === 'activated') return Promise.resolve(true)
+  return new Promise((resolve) => {
+    const timer = setTimeout(() => resolve(false), timeoutMs)
+    const check = () => {
+      if (worker?.state === 'activated') {
+        clearTimeout(timer)
+        resolve(true)
+      }
+    }
+    try {
+      worker.addEventListener('statechange', check)
+    } catch {}
+    check()
+  })
+}
+
+async function waitForActiveServiceWorkerRegistration(maxMs = SW_ACTIVE_WAIT_MS, log) {
   if (!isPushSupported()) return null
   const base = getBasePath()
   const swUrl = getSwUrl()
   const origin = typeof window !== 'undefined' ? window.location.origin : ''
   const deadline = Date.now() + Math.max(3000, Number(maxMs) || SW_ACTIVE_WAIT_MS)
+  const _log = typeof log === 'function' ? log : () => {}
   let lastRegistration = null
 
   while (Date.now() < deadline) {
@@ -172,7 +190,73 @@ async function waitForActiveServiceWorkerRegistration(maxMs = SW_ACTIVE_WAIT_MS)
       }
     }
 
+    // Listen for installing/waiting worker to become active
+    const pendingWorker = lastRegistration?.installing || lastRegistration?.waiting
+    if (pendingWorker && pendingWorker.state !== 'activated') {
+      _log('sw-wait-active', `Worker in state "${pendingWorker.state}", listening for statechange...`)
+      const became = await waitForWorkerActive(pendingWorker, Math.min(4000, deadline - Date.now()))
+      if (became) {
+        _log('sw-wait-active', 'Worker became active via statechange')
+        // Re-fetch the registration since the worker is now active
+        const freshReg = await withTimeout(
+          navigator.serviceWorker.getRegistration(base),
+          SW_LOOKUP_TIMEOUT_MS,
+          'service worker getRegistration after statechange',
+        ).catch(() => null)
+        if (freshReg?.active) return freshReg
+      }
+    }
+
     await new Promise(resolve => setTimeout(resolve, 600))
+  }
+
+  // If still not active, nuclear option: unregister everything and re-register fresh
+  _log('sw-nuke', 'SW stuck non-active after timeout. Unregistering and re-registering...')
+  try {
+    const allRegs = await navigator.serviceWorker.getRegistrations()
+    for (const reg of allRegs) {
+      const scope = String(reg?.scope || '')
+      if (scope.startsWith(`${origin}${base}`) || !scope) {
+        await reg.unregister()
+      }
+    }
+    _log('sw-nuke', 'Old registrations cleared. Registering fresh SW...')
+    const freshReg = await withTimeout(
+      navigator.serviceWorker.register(swUrl, { scope: base }),
+      SW_REGISTER_TIMEOUT_MS,
+      'service worker fresh register after nuke',
+    )
+    if (freshReg?.active) {
+      _log('sw-nuke', 'Fresh registration immediately active')
+      return freshReg
+    }
+    const pendingWorker = freshReg?.installing || freshReg?.waiting
+    if (pendingWorker) {
+      _log('sw-nuke', `Fresh SW in state "${pendingWorker.state}", waiting for activation...`)
+      const became = await waitForWorkerActive(pendingWorker, 10000)
+      if (became) {
+        _log('sw-nuke', 'Fresh SW became active')
+        const finalReg = await withTimeout(
+          navigator.serviceWorker.getRegistration(base),
+          SW_LOOKUP_TIMEOUT_MS,
+          'service worker getRegistration after fresh activate',
+        ).catch(() => null)
+        if (finalReg?.active) return finalReg
+      }
+    }
+    // Final fallback: navigator.serviceWorker.ready
+    const readyReg = await withTimeout(
+      navigator.serviceWorker.ready,
+      8000,
+      'service worker ready after nuke',
+    ).catch(() => null)
+    if (readyReg?.active) {
+      _log('sw-nuke', 'Got active via navigator.serviceWorker.ready after nuke')
+      return readyReg
+    }
+    _log('sw-nuke', 'Fresh registration still not active after nuke')
+  } catch (nukeErr) {
+    _log('sw-nuke', `Nuke failed: ${nukeErr?.message || 'unknown'}`)
   }
 
   const readyReg = await withTimeout(
@@ -250,7 +334,7 @@ export async function upsertCurrentPushSubscription(session, { notifEnabled = tr
     : null
   if (!activeRegistration) {
     log('sw-wait-active', 'Waiting for active service worker...')
-    activeRegistration = await waitForActiveServiceWorkerRegistration()
+    activeRegistration = await waitForActiveServiceWorkerRegistration(SW_ACTIVE_WAIT_MS, log)
     log('sw-wait-active', `Wait result: active=${!!activeRegistration?.active}`)
   }
 
@@ -317,7 +401,7 @@ export async function upsertCurrentPushSubscription(session, { notifEnabled = tr
       ).catch(() => null)
       const retryReg = readyReg?.active
         ? readyReg
-        : await waitForActiveServiceWorkerRegistration(12000)
+        : await waitForActiveServiceWorkerRegistration(12000, log)
       if (!retryReg?.pushManager) throw err
       subscription = await withTimeout(
         retryReg.pushManager.subscribe({
