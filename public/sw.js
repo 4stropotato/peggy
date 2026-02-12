@@ -1,6 +1,6 @@
 // Cache version bump: change this whenever static assets (icons, CSS, JS) change
 // so installed PWAs pick up updates reliably.
-const CACHE_NAME = 'peggy-v16';
+const CACHE_NAME = 'peggy-v17';
 const CACHE_PREFIXES = ['peggy-', 'baby-prep-'];
 
 function resolveBasePath() {
@@ -73,6 +73,21 @@ self.addEventListener('activate', (event) => {
 
 self.addEventListener('fetch', (event) => {
   if (event.request.method !== 'GET') return;
+
+  let requestUrl = null;
+  try {
+    requestUrl = new URL(event.request.url);
+  } catch {
+    requestUrl = null;
+  }
+
+  const isSameOrigin = Boolean(requestUrl && requestUrl.origin === self.location.origin);
+  if (!isSameOrigin) {
+    // Never cache cross-origin API calls (e.g., Supabase auth/user endpoints).
+    // Caching those can replay stale 401 responses after a fresh sign-in.
+    event.respondWith(fetch(event.request));
+    return;
+  }
 
   const isDocument = event.request.mode === 'navigate' || event.request.destination === 'document';
   if (isVersionFile(event.request.url)) {
