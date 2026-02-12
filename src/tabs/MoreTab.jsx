@@ -949,11 +949,25 @@ export default function MoreTab() {
 
     try {
       setCloudBusy(true)
+      let activeSession = cloudSession
+      try {
+        activeSession = await cloudValidateSession(cloudSession)
+        setCloudSession(activeSession)
+      } catch (sessionErr) {
+        const sessionMsg = String(sessionErr?.message || '').toLowerCase()
+        const isAuthExpired = sessionMsg.includes('invalid jwt') || sessionMsg.includes('http 401') || sessionMsg.includes('refresh token')
+        if (isAuthExpired) {
+          setCloudSession(null)
+          setPushStatus('Cloud session expired (Invalid JWT). Please sign in again in Cloud Sync, then retry Send Test Push.')
+          return
+        }
+        // For transient network errors, continue with current session.
+      }
       setPushStatus('Registering this device... (1/2). Keep app open first; lock after step 2 starts.')
       let sync = null
       try {
         sync = await withTimeout(
-          upsertCurrentPushSubscription(cloudSession, { notifEnabled: readSmartNotifEnabled() }),
+          upsertCurrentPushSubscription(activeSession, { notifEnabled: readSmartNotifEnabled() }),
           90000,
           'push registration',
         )
@@ -964,7 +978,7 @@ export default function MoreTab() {
 
         setPushStatus('Registration is slow. Trying server push test on existing device subscription...')
         const existing = await withTimeout(
-          cloudSendPushTest(cloudSession, { deviceId: getPushDeviceId() }),
+          cloudSendPushTest(activeSession, { deviceId: getPushDeviceId() }),
           20000,
           'push send_test after registration-timeout',
         )
@@ -983,7 +997,7 @@ export default function MoreTab() {
         if (reason === 'push-manager-unavailable') {
           setPushStatus('Push manager unavailable in current context. Trying server test on existing subscription...')
           const existing = await withTimeout(
-            cloudSendPushTest(cloudSession, { deviceId: getPushDeviceId() }),
+            cloudSendPushTest(activeSession, { deviceId: getPushDeviceId() }),
             20000,
             'push send_test existing-subscription',
           )
@@ -1003,7 +1017,7 @@ export default function MoreTab() {
       }
       setPushStatus('Sending test push... (2/2). Lock phone now and wait 5-10 seconds.')
       let result = await withTimeout(
-        cloudSendPushTest(cloudSession, { deviceId: getPushDeviceId() }),
+        cloudSendPushTest(activeSession, { deviceId: getPushDeviceId() }),
         20000,
         'push send_test',
       )
@@ -1016,12 +1030,12 @@ export default function MoreTab() {
       if (sent <= 0) {
         setPushStatus('No delivery yet. Repairing device subscription then retrying test push...')
         await withTimeout(
-          disableCurrentPushSubscription(cloudSession, { unsubscribeLocal: true }),
+          disableCurrentPushSubscription(activeSession, { unsubscribeLocal: true }),
           12000,
           'push disable current subscription',
         )
         const repairSync = await withTimeout(
-          upsertCurrentPushSubscription(cloudSession, { notifEnabled: readSmartNotifEnabled() }),
+          upsertCurrentPushSubscription(activeSession, { notifEnabled: readSmartNotifEnabled() }),
           90000,
           'push re-registration',
         )
@@ -1032,7 +1046,7 @@ export default function MoreTab() {
         }
         setPushStatus('Retrying test push after subscription repair...')
         result = await withTimeout(
-          cloudSendPushTest(cloudSession, { deviceId: getPushDeviceId() }),
+          cloudSendPushTest(activeSession, { deviceId: getPushDeviceId() }),
           20000,
           'push send_test retry',
         )
@@ -1057,7 +1071,13 @@ export default function MoreTab() {
         setPushStatus('No active push device found yet. Open Peggy as installed PWA and allow notifications, then retry.')
       }
     } catch (err) {
-      setPushStatus('Test push failed: ' + err.message)
+      const errorMsg = String(err?.message || 'unknown error')
+      if (errorMsg.toLowerCase().includes('invalid jwt')) {
+        setCloudSession(null)
+        setPushStatus('Test push failed: Invalid JWT. Please sign in again in Cloud Sync, then retry.')
+      } else {
+        setPushStatus('Test push failed: ' + errorMsg)
+      }
     } finally {
       setCloudBusy(false)
     }
