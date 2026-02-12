@@ -648,6 +648,8 @@ export default function MoreTab() {
       .catch((err) => {
         const msg = String(err?.message || '').toLowerCase()
         const mustSignInAgain = (
+          msg.includes('invalid jwt') ||
+          msg.includes('unauthorized') ||
           msg.includes('http 401') ||
           msg.includes('refresh token') ||
           msg.includes('invalid refresh') ||
@@ -860,9 +862,10 @@ export default function MoreTab() {
     try {
       setCloudBusy(true)
       setCloudStatus('Signing in...')
-      const session = await cloudSignIn(cloudEmail.trim(), cloudPassword)
-      setCloudSession(session)
-      setCloudStatus(`Signed in as ${session.user.email || session.user.id}. Syncing account data...`)
+      const signedIn = await cloudSignIn(cloudEmail.trim(), cloudPassword)
+      const validated = await cloudValidateSession(signedIn)
+      setCloudSession(validated)
+      setCloudStatus(`Signed in as ${validated.user.email || validated.user.id}. Syncing account data...`)
     } catch (err) {
       setCloudStatus('Sign in failed: ' + err.message)
     } finally {
@@ -930,7 +933,8 @@ export default function MoreTab() {
   }
 
   const handlePushTest = async () => {
-    if (!cloudSession) {
+    const latestSession = getCloudSession() || cloudSession
+    if (!latestSession) {
       setPushStatus('Sign in first to test push notifications.')
       return
     }
@@ -949,9 +953,9 @@ export default function MoreTab() {
 
     try {
       setCloudBusy(true)
-      let activeSession = cloudSession
+      let activeSession = latestSession
       try {
-        activeSession = await cloudValidateSession(cloudSession)
+        activeSession = await cloudValidateSession(latestSession)
         setCloudSession(activeSession)
       } catch (sessionErr) {
         const sessionMsg = String(sessionErr?.message || '').toLowerCase()
