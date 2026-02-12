@@ -117,6 +117,33 @@ function waitForLocalTestAck(expectedTag, timeoutMs = 10000) {
   })
 }
 
+async function resolveServiceWorkerRegistration(timeoutMs = 12000) {
+  if (typeof navigator === 'undefined' || !('serviceWorker' in navigator)) return null
+
+  const base = import.meta.env.BASE_URL || '/'
+  const byScope = await withTimeout(
+    navigator.serviceWorker.getRegistration(base),
+    2500,
+    'service worker getRegistration(scope)',
+  ).catch(() => null)
+
+  if (byScope) return byScope
+
+  const anyScope = await withTimeout(
+    navigator.serviceWorker.getRegistration(),
+    2500,
+    'service worker getRegistration',
+  ).catch(() => null)
+
+  if (anyScope) return anyScope
+
+  return withTimeout(
+    navigator.serviceWorker.ready,
+    timeoutMs,
+    'service worker ready',
+  ).catch(() => null)
+}
+
 function InfoPanel({ section }) {
   const [expandedPhase, setExpandedPhase] = useState(null)
   const [expandedItem, setExpandedItem] = useState(null)
@@ -1012,37 +1039,33 @@ export default function MoreTab() {
     }
 
     try {
-      let route = 'notification-api'
+      let route = ''
       let sent = false
-      let swMessageQueued = false
-      let registration = null
-      if ('serviceWorker' in navigator) {
-        setNotifStatus('Running local notification test... waiting for Service Worker')
+      const attemptErrors = []
+      const registration = await resolveServiceWorkerRegistration(12000)
+      if (registration?.showNotification) {
+        setNotifStatus('Running local notification test... service-worker showNotification')
         try {
-          const base = import.meta.env.BASE_URL || '/'
-          const byScope = await withTimeout(
-            navigator.serviceWorker.getRegistration(base),
-            2200,
-            'service worker getRegistration(scope)',
-          ).catch(() => null)
-          const anyScope = byScope || await withTimeout(
-            navigator.serviceWorker.getRegistration(),
-            2200,
-            'service worker getRegistration',
-          ).catch(() => null)
-          registration = anyScope
-          if (!registration) {
-            registration = await withTimeout(
-              navigator.serviceWorker.ready,
-              12000,
-              'service worker ready',
-            )
-          }
-        } catch {
-          registration = null
+          await registration.showNotification(title, {
+            ...options,
+            renotify: true,
+            requireInteraction: true,
+            data: {
+              url: import.meta.env.BASE_URL || '/',
+              actionUrls: {},
+            },
+          })
+          route = 'service-worker-showNotification'
+          sent = true
+        } catch (err) {
+          attemptErrors.push(`sw-showNotification: ${String(err?.message || err || 'unknown-error')}`)
         }
-        if (registration?.active) {
-          const testTag = String(options.tag || '').trim()
+      }
+
+      if (!sent && registration?.active) {
+        const testTag = String(options.tag || '').trim()
+        setNotifStatus('Running local notification test... service-worker message')
+        try {
           registration.active.postMessage({
             type: 'peggy-local-test',
             payload: {
@@ -1052,29 +1075,37 @@ export default function MoreTab() {
               badge: options.badge,
               tag: testTag,
               url: import.meta.env.BASE_URL || '/',
-              delayMs: 3800,
+              delayMs: 0,
             },
           })
-          swMessageQueued = true
           try {
-            setNotifStatus('Local test queued in Service Worker. Lock phone now...')
-            await waitForLocalTestAck(testTag, 12000)
-            route = 'service-worker-message-delayed'
+            await waitForLocalTestAck(testTag, 9000)
+            route = 'service-worker-message'
             sent = true
-          } catch {
-            sent = false
+          } catch (err) {
+            attemptErrors.push(`sw-message-ack: ${String(err?.message || err || 'unknown-error')}`)
           }
+        } catch (err) {
+          attemptErrors.push(`sw-message-post: ${String(err?.message || err || 'unknown-error')}`)
         }
       }
+
       if (!sent) {
         setNotifStatus('Running local notification test... fallback to Notification API')
-        new Notification(title, options)
-        route = swMessageQueued ? 'service-worker-message+notification-api' : 'notification-api'
-        sent = true
+        try {
+          new Notification(title, options)
+          route = 'notification-api'
+          sent = true
+        } catch (err) {
+          attemptErrors.push(`notification-api: ${String(err?.message || err || 'unknown-error')}`)
+        }
       }
+
       if (!sent) {
-        throw new Error('No available notification route')
+        const reason = attemptErrors.length ? attemptErrors.join(' | ') : 'No available notification route'
+        throw new Error(reason)
       }
+
       const testAt = new Date().toISOString()
       setNotifLastTestAt(testAt)
       appendSmartNotifInbox({
@@ -1090,9 +1121,13 @@ export default function MoreTab() {
         read: false,
       })
       setNotifInbox(readSmartNotifInbox())
+      const remindersEnabledNote = readSmartNotifEnabled()
+        ? ''
+        : ' Reminder channels are OFF in this device; enable them for automatic reminders.'
       setNotifStatus(
         `Local test sent via ${route}. ` +
-        `${isStandalone ? 'Lock phone now; banner should appear in ~4s. ' : 'Open Peggy from Home Screen for iPhone lock-screen behavior. '}` +
+        `${isStandalone ? 'If lock-screen banner still does not appear, use Send Test Push and lock phone for 5-10s. ' : 'Open Peggy from Home Screen for iPhone lock-screen behavior. '}` +
+        remindersEnabledNote +
         'If no banner appears, check iOS Notification settings + Focus mode.'
       )
     } catch (err) {
