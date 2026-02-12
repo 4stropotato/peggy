@@ -11,8 +11,13 @@ const RESERVED_STORAGE_KEYS = new Set([
   'baby-prep-smart-notif-channels',
 ]);
 
+function isReservedStorageKey(key) {
+  const safe = String(key || '');
+  return RESERVED_STORAGE_KEYS.has(safe) || safe.startsWith('baby-prep-cloud-session:');
+}
+
 function isAppStorageKey(key) {
-  return Boolean(key && key.startsWith(STORAGE_PREFIX) && !RESERVED_STORAGE_KEYS.has(key));
+  return Boolean(key && key.startsWith(STORAGE_PREFIX) && !isReservedStorageKey(key));
 }
 
 function listAppStorageKeys() {

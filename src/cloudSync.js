@@ -1,6 +1,6 @@
 import { loadState, saveState } from './db'
 
-const CLOUD_SESSION_KEY = 'baby-prep-cloud-session';
+const CLOUD_SESSION_KEY_LEGACY = 'baby-prep-cloud-session';
 const CLOUD_SESSION_EVENT = 'peggy-cloud-session-changed';
 const REFRESH_SKEW_SECONDS = 45;
 
@@ -20,22 +20,90 @@ function getCloudConfig() {
   };
 }
 
+function getBaseScopeToken() {
+  const base = String(import.meta.env.BASE_URL || '/').trim() || '/';
+  return base.replace(/^\/+|\/+$/g, '') || 'root';
+}
+
+function getSupabaseRefFromUrl(url) {
+  try {
+    const host = new URL(String(url || '')).hostname || '';
+    if (!host.endsWith('.supabase.co')) return '';
+    return host.split('.')[0] || '';
+  } catch {
+    return '';
+  }
+}
+
+function getScopedSessionKey() {
+  const config = getCloudConfig();
+  const ref = getSupabaseRefFromUrl(config.url) || 'unknown-ref';
+  const scope = getBaseScopeToken();
+  return `${CLOUD_SESSION_KEY_LEGACY}:${ref}:${scope}`;
+}
+
+function decodeJwtPayload(token) {
+  try {
+    const parts = String(token || '').split('.');
+    if (parts.length < 2) return null;
+    const normalized = parts[1].replace(/-/g, '+').replace(/_/g, '/');
+    const padded = normalized.padEnd(Math.ceil(normalized.length / 4) * 4, '=');
+    const json = atob(padded);
+    return JSON.parse(json);
+  } catch {
+    return null;
+  }
+}
+
+function isSessionForCurrentProject(session) {
+  const token = String(session?.accessToken || '').trim();
+  if (!token) return false;
+
+  const payload = decodeJwtPayload(token);
+  if (!payload?.iss) return true;
+
+  const expectedIssuer = `${String(getCloudConfig().url || '').replace(/\/+$/, '')}/auth/v1`;
+  const actualIssuer = String(payload.iss || '').trim();
+  if (!expectedIssuer || !actualIssuer) return true;
+  return actualIssuer === expectedIssuer;
+}
+
+function isValidSessionShape(session) {
+  return Boolean(session?.accessToken && session?.user?.id);
+}
+
 function readSession() {
   try {
-    const raw = localStorage.getItem(CLOUD_SESSION_KEY);
-    if (!raw) return null;
-    const parsed = JSON.parse(raw);
-    if (!parsed?.accessToken || !parsed?.user?.id) return null;
-    return parsed;
+    const scopedKey = getScopedSessionKey();
+    const scopedRaw = localStorage.getItem(scopedKey);
+    if (scopedRaw) {
+      const scopedParsed = JSON.parse(scopedRaw);
+      if (isValidSessionShape(scopedParsed) && isSessionForCurrentProject(scopedParsed)) {
+        return scopedParsed;
+      }
+      localStorage.removeItem(scopedKey);
+    }
+
+    // Legacy fallback for older builds that used a single global key.
+    const legacyRaw = localStorage.getItem(CLOUD_SESSION_KEY_LEGACY);
+    if (!legacyRaw) return null;
+    const legacyParsed = JSON.parse(legacyRaw);
+    if (!isValidSessionShape(legacyParsed) || !isSessionForCurrentProject(legacyParsed)) return null;
+
+    // Migrate legacy session to scoped key for this app path/project.
+    localStorage.setItem(scopedKey, JSON.stringify(legacyParsed));
+    try { void saveState(scopedKey, legacyParsed); } catch {}
+    return legacyParsed;
   } catch {
     return null;
   }
 }
 
 function writeSession(session) {
-  localStorage.setItem(CLOUD_SESSION_KEY, JSON.stringify(session));
+  const scopedKey = getScopedSessionKey();
+  localStorage.setItem(scopedKey, JSON.stringify(session));
   // iOS PWAs sometimes clear localStorage; mirroring to IndexedDB helps keep users signed in across updates.
-  try { void saveState(CLOUD_SESSION_KEY, session); } catch {}
+  try { void saveState(scopedKey, session); } catch {}
   notifySessionChanged(session);
   return session;
 }
@@ -165,8 +233,9 @@ export function getCloudSession() {
 }
 
 export function clearCloudSession() {
-  localStorage.removeItem(CLOUD_SESSION_KEY);
-  try { void saveState(CLOUD_SESSION_KEY, null); } catch {}
+  const scopedKey = getScopedSessionKey();
+  localStorage.removeItem(scopedKey);
+  try { void saveState(scopedKey, null); } catch {}
   notifySessionChanged(null);
 }
 
@@ -175,9 +244,14 @@ export async function cloudTryRecoverSession() {
   const existing = readSession()
   if (existing) return existing
   try {
-    const idbValue = await loadState(CLOUD_SESSION_KEY)
-    if (idbValue?.accessToken && idbValue?.user?.id) {
-      return writeSession(idbValue)
+    const scopedKey = getScopedSessionKey()
+    const scopedIdb = await loadState(scopedKey)
+    if (isValidSessionShape(scopedIdb) && isSessionForCurrentProject(scopedIdb)) {
+      return writeSession(scopedIdb)
+    }
+    const legacyIdb = await loadState(CLOUD_SESSION_KEY_LEGACY)
+    if (isValidSessionShape(legacyIdb) && isSessionForCurrentProject(legacyIdb)) {
+      return writeSession(legacyIdb)
     }
   } catch {
     // ignore recovery failures
