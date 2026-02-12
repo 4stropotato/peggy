@@ -1777,6 +1777,27 @@ export default function MoreTab() {
                   <pre style={{fontSize:'11px',whiteSpace:'pre-wrap',wordBreak:'break-all',background:'rgba(0,0,0,0.3)',padding:'8px',borderRadius:'6px',maxHeight:'200px',overflow:'auto',margin:'6px 0'}}>
                     {pushDebugLog.join('\n')}
                   </pre>
+                  <button
+                    type="button"
+                    className="btn-glass-secondary"
+                    style={{fontSize:'11px',padding:'4px 10px',marginTop:'4px'}}
+                    onClick={() => {
+                      const text = pushDebugLog.join('\n')
+                      if (navigator.clipboard?.writeText) {
+                        navigator.clipboard.writeText(text).then(() => setPushStatus('Debug log copied!')).catch(() => {})
+                      } else {
+                        const ta = document.createElement('textarea')
+                        ta.value = text
+                        document.body.appendChild(ta)
+                        ta.select()
+                        document.execCommand('copy')
+                        document.body.removeChild(ta)
+                        setPushStatus('Debug log copied!')
+                      }
+                    }}
+                  >
+                    Copy Log
+                  </button>
                 </details>
               )}
               <button
@@ -1909,6 +1930,27 @@ export default function MoreTab() {
                         <pre style={{fontSize:'11px',whiteSpace:'pre-wrap',wordBreak:'break-all',background:'rgba(0,0,0,0.3)',padding:'8px',borderRadius:'6px',maxHeight:'200px',overflow:'auto',margin:'6px 0'}}>
                           {pushDebugLog.join('\n')}
                         </pre>
+                        <button
+                          type="button"
+                          className="btn-glass-secondary"
+                          style={{fontSize:'11px',padding:'4px 10px',marginTop:'4px'}}
+                          onClick={() => {
+                            const text = pushDebugLog.join('\n')
+                            if (navigator.clipboard?.writeText) {
+                              navigator.clipboard.writeText(text).then(() => setPushStatus('Debug log copied!')).catch(() => {})
+                            } else {
+                              const ta = document.createElement('textarea')
+                              ta.value = text
+                              document.body.appendChild(ta)
+                              ta.select()
+                              document.execCommand('copy')
+                              document.body.removeChild(ta)
+                              setPushStatus('Debug log copied!')
+                            }
+                          }}
+                        >
+                          Copy Log
+                        </button>
                       </details>
                     )}
                   </>
