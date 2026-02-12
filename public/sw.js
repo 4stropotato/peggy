@@ -202,6 +202,10 @@ self.addEventListener('notificationclick', (event) => {
 self.addEventListener('message', (event) => {
   const data = event?.data && typeof event.data === 'object' ? event.data : {};
   const type = String(data.type || '').trim();
+  if (type === 'peggy-skip-waiting') {
+    self.skipWaiting();
+    return;
+  }
   if (type !== 'peggy-local-test') return;
 
   const payload = data?.payload && typeof data.payload === 'object' ? data.payload : {};

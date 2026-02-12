@@ -10,6 +10,7 @@ const PUSH_TIMEOUT_MS = 12000
 const SW_LOOKUP_TIMEOUT_MS = 1400
 const SW_REGISTER_TIMEOUT_MS = 7000
 const SW_READY_TIMEOUT_MS = 9000
+const SW_ACTIVE_WAIT_MS = 22000
 const PUSH_SUB_READ_TIMEOUT_MS = 5000
 const PUSH_SUBSCRIBE_TIMEOUT_MS = 12000
 const CLOUD_UPSERT_TIMEOUT_MS = 10000
@@ -89,6 +90,68 @@ async function resolveServiceWorkerRegistration() {
   return byScope || anyScope || registered || readyReg || null
 }
 
+async function waitForActiveServiceWorkerRegistration(maxMs = SW_ACTIVE_WAIT_MS) {
+  if (!isPushSupported()) return null
+  const base = import.meta.env.BASE_URL || '/'
+  const swUrl = `${base.replace(/\/+$/, '/')}sw.js`
+  const origin = typeof window !== 'undefined' ? window.location.origin : ''
+  const deadline = Date.now() + Math.max(3000, Number(maxMs) || SW_ACTIVE_WAIT_MS)
+  let lastRegistration = null
+
+  while (Date.now() < deadline) {
+    const byScope = await withTimeout(
+      navigator.serviceWorker.getRegistration(base),
+      SW_LOOKUP_TIMEOUT_MS,
+      'service worker getRegistration(scope) wait-active',
+    ).catch(() => null)
+    const all = await withTimeout(
+      navigator.serviceWorker.getRegistrations(),
+      SW_LOOKUP_TIMEOUT_MS,
+      'service worker getRegistrations wait-active',
+    ).catch(() => [])
+
+    const scopedAll = Array.isArray(all)
+      ? all.filter((reg) => {
+        const scope = String(reg?.scope || '')
+        if (!scope) return true
+        if (!origin) return true
+        return scope.startsWith(`${origin}${base}`)
+      })
+      : []
+
+    const candidates = [byScope, ...scopedAll].filter(Boolean)
+    const active = candidates.find(reg => reg?.active)
+    if (active) return active
+
+    lastRegistration = candidates[0] || lastRegistration
+
+    if (!lastRegistration) {
+      lastRegistration = await withTimeout(
+        navigator.serviceWorker.register(swUrl),
+        SW_REGISTER_TIMEOUT_MS,
+        'service worker register wait-active',
+      ).catch(() => null)
+    } else if (lastRegistration.waiting) {
+      try {
+        lastRegistration.waiting.postMessage({ type: 'peggy-skip-waiting' })
+      } catch {
+        // no-op
+      }
+    }
+
+    await new Promise(resolve => setTimeout(resolve, 600))
+  }
+
+  const readyReg = await withTimeout(
+    navigator.serviceWorker.ready,
+    6000,
+    'service worker ready final wait-active',
+  ).catch(() => null)
+  if (readyReg?.active) return readyReg
+
+  return lastRegistration?.active ? lastRegistration : null
+}
+
 export function isPushSupported() {
   return (
     typeof window !== 'undefined' &&
@@ -128,19 +191,22 @@ export async function upsertCurrentPushSubscription(session, { notifEnabled = tr
   if (!publicVapidKey) return { status: 'skipped', reason: 'missing-vapid-public-key' }
 
   const registration = await resolveServiceWorkerRegistration()
-  if (!registration?.pushManager) {
+  const activeRegistration = registration?.active
+    ? registration
+    : await waitForActiveServiceWorkerRegistration()
+  if (!activeRegistration?.pushManager) {
     return { status: 'skipped', reason: 'push-manager-unavailable' }
   }
 
   let subscription = await withTimeout(
-    registration.pushManager.getSubscription(),
+    activeRegistration.pushManager.getSubscription(),
     PUSH_SUB_READ_TIMEOUT_MS,
     'pushManager.getSubscription',
   ).catch(() => null)
   if (!subscription) {
     try {
       subscription = await withTimeout(
-        registration.pushManager.subscribe({
+        activeRegistration.pushManager.subscribe({
           userVisibleOnly: true,
           applicationServerKey: toBase64UrlUint8Array(publicVapidKey),
         }),
@@ -158,9 +224,12 @@ export async function upsertCurrentPushSubscription(session, { notifEnabled = tr
         SW_READY_TIMEOUT_MS,
         'service worker ready retry',
       ).catch(() => null)
-      if (!readyReg?.pushManager) throw err
+      const retryReg = readyReg?.active
+        ? readyReg
+        : await waitForActiveServiceWorkerRegistration(12000)
+      if (!retryReg?.pushManager) throw err
       subscription = await withTimeout(
-        readyReg.pushManager.subscribe({
+        retryReg.pushManager.subscribe({
           userVisibleOnly: true,
           applicationServerKey: toBase64UrlUint8Array(publicVapidKey),
         }),
