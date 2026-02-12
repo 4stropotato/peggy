@@ -999,8 +999,16 @@ export default function MoreTab() {
       }
       if (sync?.status !== 'ok') {
         const reason = String(sync?.reason || 'subscription-sync-skipped')
+        if (reason === 'service-worker-unavailable') {
+          setPushStatus(
+            'Service worker is not ready yet in this app context. Close Peggy completely, reopen from Home Screen, wait 10 seconds, then retry Send Test Push.'
+          )
+          return
+        }
         if (reason === 'push-manager-unavailable') {
-          setPushStatus('Push manager unavailable in current context. Trying server test on existing subscription...')
+          setPushStatus(
+            'Push manager unavailable in current context. On iPhone, use Safari Add to Home Screen for the HTTPS GH Pages URL, then open that Home Screen app and retry.'
+          )
           const existing = await withTimeout(
             cloudSendPushTest(activeSession, { deviceId: getPushDeviceId() }),
             20000,

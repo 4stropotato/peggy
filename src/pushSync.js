@@ -7,10 +7,10 @@ import {
 const PUSH_DEVICE_ID_KEY = 'peggy-push-device-id'
 const PUSH_ENDPOINT_CACHE_KEY = 'peggy-push-endpoint'
 const PUSH_TIMEOUT_MS = 12000
-const SW_LOOKUP_TIMEOUT_MS = 1400
-const SW_REGISTER_TIMEOUT_MS = 7000
-const SW_READY_TIMEOUT_MS = 9000
-const SW_ACTIVE_WAIT_MS = 12000
+const SW_LOOKUP_TIMEOUT_MS = 2500
+const SW_REGISTER_TIMEOUT_MS = 12000
+const SW_READY_TIMEOUT_MS = 25000
+const SW_ACTIVE_WAIT_MS = 30000
 const PUSH_SUB_READ_TIMEOUT_MS = 5000
 const PUSH_SUBSCRIBE_TIMEOUT_MS = 12000
 const CLOUD_UPSERT_TIMEOUT_MS = 10000
@@ -51,6 +51,14 @@ function readPublicVapidKey() {
   return String(import.meta.env.VITE_WEB_PUSH_PUBLIC_KEY || '').trim()
 }
 
+function getBasePath() {
+  return `${String(import.meta.env.BASE_URL || '/').replace(/\/+$/, '')}/`
+}
+
+function getSwUrl() {
+  return `${getBasePath()}sw.js`
+}
+
 function hasPushManagerGlobalSupport() {
   if (typeof window === 'undefined') return false
   if ('PushManager' in window) return true
@@ -64,8 +72,8 @@ function hasPushManagerGlobalSupport() {
 
 async function resolveServiceWorkerRegistration() {
   if (!isPushSupported()) return null
-  const base = import.meta.env.BASE_URL || '/'
-  const swUrl = `${base.replace(/\/+$/, '/')}sw.js`
+  const base = getBasePath()
+  const swUrl = getSwUrl()
 
   const [byScope, anyScope] = await Promise.all([
     withTimeout(
@@ -83,7 +91,7 @@ async function resolveServiceWorkerRegistration() {
   if (anyScope?.active) return anyScope
 
   const registered = await withTimeout(
-    navigator.serviceWorker.register(swUrl),
+    navigator.serviceWorker.register(swUrl, { scope: base }),
     SW_REGISTER_TIMEOUT_MS,
     'service worker register',
   ).catch(() => null)
@@ -103,8 +111,8 @@ async function resolveServiceWorkerRegistration() {
 
 async function waitForActiveServiceWorkerRegistration(maxMs = SW_ACTIVE_WAIT_MS) {
   if (!isPushSupported()) return null
-  const base = import.meta.env.BASE_URL || '/'
-  const swUrl = `${base.replace(/\/+$/, '/')}sw.js`
+  const base = getBasePath()
+  const swUrl = getSwUrl()
   const origin = typeof window !== 'undefined' ? window.location.origin : ''
   const deadline = Date.now() + Math.max(3000, Number(maxMs) || SW_ACTIVE_WAIT_MS)
   let lastRegistration = null
@@ -138,7 +146,7 @@ async function waitForActiveServiceWorkerRegistration(maxMs = SW_ACTIVE_WAIT_MS)
 
     if (!lastRegistration) {
       lastRegistration = await withTimeout(
-        navigator.serviceWorker.register(swUrl),
+        navigator.serviceWorker.register(swUrl, { scope: base }),
         SW_REGISTER_TIMEOUT_MS,
         'service worker register wait-active',
       ).catch(() => null)
@@ -160,7 +168,9 @@ async function waitForActiveServiceWorkerRegistration(maxMs = SW_ACTIVE_WAIT_MS)
   ).catch(() => null)
   if (readyReg?.active) return readyReg
 
-  return lastRegistration?.active ? lastRegistration : null
+  if (lastRegistration?.active) return lastRegistration
+  if (lastRegistration?.pushManager) return lastRegistration
+  return null
 }
 
 export function isPushSupported() {
@@ -212,6 +222,14 @@ export async function upsertCurrentPushSubscription(session, { notifEnabled = tr
   let activeRegistration = registration?.active
     ? registration
     : await waitForActiveServiceWorkerRegistration()
+
+  if (!activeRegistration && registration?.pushManager) {
+    activeRegistration = registration
+  }
+
+  if (!activeRegistration) {
+    return { status: 'skipped', reason: 'service-worker-unavailable' }
+  }
 
   if (!activeRegistration?.pushManager) {
     const readyRegistration = await withTimeout(
