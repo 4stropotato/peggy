@@ -223,7 +223,9 @@ async function readCurrentSubscription() {
   )
 }
 
-export async function upsertCurrentPushSubscription(session, { notifEnabled = true } = {}) {
+export async function upsertCurrentPushSubscription(session, { notifEnabled = true, onStep } = {}) {
+  const log = typeof onStep === 'function' ? onStep : () => {}
+  log('prechecks', 'Running prechecks...')
   if (!isCloudConfigured()) return { status: 'skipped', reason: 'cloud-not-configured' }
   if (!session?.accessToken || !session?.user?.id) return { status: 'skipped', reason: 'no-session' }
   if (!isPushSupported()) return { status: 'skipped', reason: 'push-not-supported' }
@@ -237,21 +239,33 @@ export async function upsertCurrentPushSubscription(session, { notifEnabled = tr
 
   const publicVapidKey = readPublicVapidKey()
   if (!publicVapidKey) return { status: 'skipped', reason: 'missing-vapid-public-key' }
+  log('prechecks', 'All prechecks passed')
 
+  log('sw-resolve', 'Resolving service worker registration...')
   const registration = await resolveServiceWorkerRegistration()
+  log('sw-resolve', `SW resolved: active=${!!registration?.active}, scope=${registration?.scope || 'none'}`)
+
   let activeRegistration = registration?.active
     ? registration
-    : await waitForActiveServiceWorkerRegistration()
+    : null
+  if (!activeRegistration) {
+    log('sw-wait-active', 'Waiting for active service worker...')
+    activeRegistration = await waitForActiveServiceWorkerRegistration()
+    log('sw-wait-active', `Wait result: active=${!!activeRegistration?.active}`)
+  }
 
   if (!activeRegistration && registration?.pushManager) {
+    log('sw-fallback', 'Using non-active registration with pushManager')
     activeRegistration = registration
   }
 
   if (!activeRegistration) {
+    log('sw-fail', 'No service worker registration available')
     return { status: 'skipped', reason: 'service-worker-unavailable' }
   }
 
   if (!activeRegistration?.pushManager) {
+    log('pm-ready', 'pushManager missing, waiting for navigator.serviceWorker.ready...')
     const readyRegistration = await withTimeout(
       navigator.serviceWorker.ready,
       SW_READY_TIMEOUT_MS,
@@ -259,19 +273,26 @@ export async function upsertCurrentPushSubscription(session, { notifEnabled = tr
     ).catch(() => null)
     if (readyRegistration?.active && readyRegistration?.pushManager) {
       activeRegistration = readyRegistration
+      log('pm-ready', 'Got pushManager from ready registration')
     }
   }
 
   if (!activeRegistration?.pushManager) {
+    log('pm-fail', 'pushManager still unavailable after all attempts')
     return { status: 'skipped', reason: 'push-manager-unavailable' }
   }
+  log('pm-ok', `pushManager available, scope=${activeRegistration.scope || 'n/a'}`)
 
+  log('get-sub', 'Calling pushManager.getSubscription()...')
   let subscription = await withTimeout(
     activeRegistration.pushManager.getSubscription(),
     PUSH_SUB_READ_TIMEOUT_MS,
     'pushManager.getSubscription',
   ).catch(() => null)
+  log('get-sub', subscription ? 'Existing subscription found' : 'No existing subscription')
+
   if (!subscription) {
+    log('subscribe', 'Calling pushManager.subscribe()...')
     try {
       subscription = await withTimeout(
         activeRegistration.pushManager.subscribe({
@@ -281,12 +302,14 @@ export async function upsertCurrentPushSubscription(session, { notifEnabled = tr
         PUSH_SUBSCRIBE_TIMEOUT_MS,
         'pushManager.subscribe',
       )
+      log('subscribe', 'Subscribe succeeded')
     } catch (err) {
       const msg = String(err?.message || '').toLowerCase()
       const needsActiveWorker = msg.includes('active service worker')
+      log('subscribe', `Subscribe failed: ${err?.message || 'unknown'}`)
       if (!needsActiveWorker) throw err
 
-      // iOS/Safari can race here right after install/update. Wait for ready registration and retry once.
+      log('subscribe-retry', 'Needs active worker, retrying after ready...')
       const readyReg = await withTimeout(
         navigator.serviceWorker.ready,
         SW_READY_TIMEOUT_MS,
@@ -304,6 +327,7 @@ export async function upsertCurrentPushSubscription(session, { notifEnabled = tr
         PUSH_SUBSCRIBE_TIMEOUT_MS,
         'pushManager.subscribe retry',
       )
+      log('subscribe-retry', 'Subscribe retry succeeded')
     }
   }
 
@@ -312,13 +336,16 @@ export async function upsertCurrentPushSubscription(session, { notifEnabled = tr
   const p256dh = data?.keys?.p256dh || ''
   const auth = data?.keys?.auth || ''
   if (!endpoint || !p256dh || !auth) {
+    log('validate', `Invalid subscription data: endpoint=${!!endpoint}, p256dh=${!!p256dh}, auth=${!!auth}`)
     return { status: 'skipped', reason: 'invalid-subscription' }
   }
+  log('validate', `Subscription valid, endpoint hash: ...${endpoint.slice(-20)}`)
 
   if (typeof window !== 'undefined') {
     window.localStorage.setItem(PUSH_ENDPOINT_CACHE_KEY, endpoint)
   }
 
+  log('upsert', 'Sending subscription to server...')
   const result = await withTimeout(
     cloudUpsertPushSubscription({
       deviceId: getPushDeviceId(),
@@ -334,8 +361,68 @@ export async function upsertCurrentPushSubscription(session, { notifEnabled = tr
     CLOUD_UPSERT_TIMEOUT_MS,
     'cloudUpsertPushSubscription',
   )
+  log('upsert', 'Server upsert complete')
 
   return { status: 'ok', result }
+}
+
+export function getPushDiagnostics() {
+  const ios = isIosDevice()
+  const standalone = isStandaloneMode()
+  const secure = typeof window !== 'undefined' ? window.isSecureContext : null
+  const swSupported = typeof navigator !== 'undefined' && 'serviceWorker' in navigator
+  const pmGlobal = hasPushManagerGlobalSupport()
+  const notifPerm = typeof Notification !== 'undefined' ? Notification.permission : 'unavailable'
+  const vapid = readPublicVapidKey()
+  const deviceId = getPushDeviceId()
+  const cachedEndpoint = typeof window !== 'undefined'
+    ? window.localStorage.getItem(PUSH_ENDPOINT_CACHE_KEY) || ''
+    : ''
+  const displayMode = typeof window !== 'undefined' && window.matchMedia
+    ? (window.matchMedia('(display-mode: standalone)').matches ? 'standalone'
+      : window.matchMedia('(display-mode: fullscreen)').matches ? 'fullscreen'
+      : 'browser')
+    : 'unknown'
+  const basePath = getBasePath()
+  const swUrl = getSwUrl()
+
+  return {
+    ios,
+    standalone,
+    secure,
+    swSupported,
+    pmGlobal,
+    notifPerm,
+    vapidPresent: !!vapid,
+    deviceId,
+    cachedEndpoint: cachedEndpoint ? `...${cachedEndpoint.slice(-25)}` : 'none',
+    displayMode,
+    basePath,
+    swUrl,
+  }
+}
+
+export async function getPushDiagnosticsAsync() {
+  const sync = getPushDiagnostics()
+  let swState = 'unknown'
+  let swScope = 'none'
+  let subEndpoint = 'none'
+  try {
+    const reg = await navigator.serviceWorker.getRegistration(sync.basePath)
+    if (reg) {
+      swScope = reg.scope || 'none'
+      swState = reg.active ? 'active' : reg.waiting ? 'waiting' : reg.installing ? 'installing' : 'no-worker'
+      try {
+        const sub = await reg.pushManager?.getSubscription()
+        if (sub?.endpoint) subEndpoint = `...${sub.endpoint.slice(-25)}`
+      } catch {}
+    } else {
+      swState = 'not-registered'
+    }
+  } catch (e) {
+    swState = `error: ${e?.message || 'unknown'}`
+  }
+  return { ...sync, swState, swScope, subEndpoint }
 }
 
 export async function disableCurrentPushSubscription(session, { unsubscribeLocal = false } = {}) {

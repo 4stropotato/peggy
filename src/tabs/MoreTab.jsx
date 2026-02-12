@@ -43,6 +43,8 @@ import {
 import {
   disableCurrentPushSubscription,
   getPushDeviceId,
+  getPushDiagnostics,
+  getPushDiagnosticsAsync,
   isPushSupported,
   upsertCurrentPushSubscription,
 } from '../pushSync'
@@ -533,6 +535,9 @@ export default function MoreTab() {
   const [backupStatus, setBackupStatus] = useState('')
   const [cloudStatus, setCloudStatus] = useState('')
   const [pushStatus, setPushStatus] = useState('')
+  const [pushDebugLog, setPushDebugLog] = useState([])
+  const [showPushDiag, setShowPushDiag] = useState(false)
+  const [pushDiagData, setPushDiagData] = useState(null)
   const [cloudBusy, setCloudBusy] = useState(false)
   const [cloudEmail, setCloudEmail] = useState('')
   const [cloudPassword, setCloudPassword] = useState('')
@@ -951,20 +956,32 @@ export default function MoreTab() {
       return
     }
 
+    const debugSteps = []
+    const onStep = (step, msg) => {
+      const entry = `[${step}] ${msg}`
+      debugSteps.push(entry)
+      setPushDebugLog([...debugSteps])
+    }
+
     try {
       setCloudBusy(true)
+      setPushDebugLog([])
       let activeSession = latestSession
+      onStep('session', 'Validating cloud session...')
       try {
         activeSession = await cloudValidateSession(latestSession)
         setCloudSession(activeSession)
+        onStep('session', 'Session valid')
       } catch (sessionErr) {
         const sessionMsg = String(sessionErr?.message || '').toLowerCase()
         const isAuthExpired = sessionMsg.includes('invalid jwt') || sessionMsg.includes('http 401') || sessionMsg.includes('refresh token')
         if (isAuthExpired) {
           clearCloudSession()
+          onStep('session', 'FAILED: JWT expired')
           setPushStatus('Cloud session expired (Invalid JWT). Please sign in again in Cloud Sync, then retry Send Test Push.')
           return
         }
+        onStep('session', `FAILED: ${sessionErr?.message || 'unknown'}`)
         setPushStatus(`Cloud session check failed: ${sessionErr?.message || 'unknown error'}. Please retry.`)
         return
       }
@@ -972,7 +989,7 @@ export default function MoreTab() {
       let sync = null
       try {
         sync = await withTimeout(
-          upsertCurrentPushSubscription(activeSession, { notifEnabled: true }),
+          upsertCurrentPushSubscription(activeSession, { notifEnabled: true, onStep }),
           25000,
           'push registration',
         )
@@ -1059,8 +1076,9 @@ export default function MoreTab() {
           12000,
           'push disable current subscription',
         )
+        onStep('repair', 'Re-registering push subscription...')
         const repairSync = await withTimeout(
-          upsertCurrentPushSubscription(activeSession, { notifEnabled: true }),
+          upsertCurrentPushSubscription(activeSession, { notifEnabled: true, onStep }),
           90000,
           'push re-registration',
         )
@@ -1753,6 +1771,37 @@ export default function MoreTab() {
               )}
               {notifStatus && <p className="section-note">{notifStatus}</p>}
               {pushStatus && <p className="section-note">{pushStatus}</p>}
+              {pushDebugLog.length > 0 && (
+                <details className="push-debug-log" open>
+                  <summary>Push Debug Log ({pushDebugLog.length} steps)</summary>
+                  <pre style={{fontSize:'11px',whiteSpace:'pre-wrap',wordBreak:'break-all',background:'rgba(0,0,0,0.3)',padding:'8px',borderRadius:'6px',maxHeight:'200px',overflow:'auto',margin:'6px 0'}}>
+                    {pushDebugLog.join('\n')}
+                  </pre>
+                </details>
+              )}
+              <button
+                type="button"
+                className="btn-glass-secondary"
+                style={{marginTop:'8px',fontSize:'12px'}}
+                onClick={async () => {
+                  setShowPushDiag(!showPushDiag)
+                  if (!showPushDiag) {
+                    try {
+                      const d = await getPushDiagnosticsAsync()
+                      setPushDiagData(d)
+                    } catch (e) {
+                      setPushDiagData({ error: e?.message || 'unknown' })
+                    }
+                  }
+                }}
+              >
+                {showPushDiag ? 'Hide' : 'Show'} Push Diagnostics
+              </button>
+              {showPushDiag && pushDiagData && (
+                <pre style={{fontSize:'11px',whiteSpace:'pre-wrap',wordBreak:'break-all',background:'rgba(0,0,0,0.3)',padding:'8px',borderRadius:'6px',maxHeight:'250px',overflow:'auto',margin:'6px 0'}}>
+                  {JSON.stringify(pushDiagData, null, 2)}
+                </pre>
+              )}
             </div>
 
             <div className="glass-card backup-card">
@@ -1854,6 +1903,14 @@ export default function MoreTab() {
                     </p>
                     <p className="section-note">iPhone note: install Peggy to Home Screen, then allow notifications when prompted.</p>
                     {pushStatus && <p className="section-note">{pushStatus}</p>}
+                    {pushDebugLog.length > 0 && (
+                      <details className="push-debug-log">
+                        <summary style={{fontSize:'12px',cursor:'pointer'}}>Debug Log ({pushDebugLog.length} steps)</summary>
+                        <pre style={{fontSize:'11px',whiteSpace:'pre-wrap',wordBreak:'break-all',background:'rgba(0,0,0,0.3)',padding:'8px',borderRadius:'6px',maxHeight:'200px',overflow:'auto',margin:'6px 0'}}>
+                          {pushDebugLog.join('\n')}
+                        </pre>
+                      </details>
+                    )}
                   </>
                 )}
               </div>
