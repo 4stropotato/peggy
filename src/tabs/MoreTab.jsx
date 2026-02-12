@@ -950,11 +950,34 @@ export default function MoreTab() {
     try {
       setCloudBusy(true)
       setPushStatus('Registering this device... (1/2). Keep app open first; lock after step 2 starts.')
-      const sync = await withTimeout(
-        upsertCurrentPushSubscription(cloudSession, { notifEnabled: readSmartNotifEnabled() }),
-        45000,
-        'push registration',
-      )
+      let sync = null
+      try {
+        sync = await withTimeout(
+          upsertCurrentPushSubscription(cloudSession, { notifEnabled: readSmartNotifEnabled() }),
+          90000,
+          'push registration',
+        )
+      } catch (err) {
+        const msg = String(err?.message || '').toLowerCase()
+        const isRegistrationTimeout = msg.includes('push registration timed out')
+        if (!isRegistrationTimeout) throw err
+
+        setPushStatus('Registration is slow. Trying server push test on existing device subscription...')
+        const existing = await withTimeout(
+          cloudSendPushTest(cloudSession, { deviceId: getPushDeviceId() }),
+          20000,
+          'push send_test after registration-timeout',
+        )
+        const sent = Number(existing?.sent || 0)
+        const total = Number(existing?.total || sent)
+        const stale = Number(existing?.stale || 0)
+        const failed = Number(existing?.failed || 0)
+        if (sent > 0) {
+          setPushStatus(`Test push sent via existing subscription after slow registration (${sent}/${total}, stale ${stale}, failed ${failed}).`)
+          return
+        }
+        throw new Error(`push registration timed out and existing subscription did not deliver (${sent}/${total}, stale ${stale}, failed ${failed})`)
+      }
       if (sync?.status !== 'ok') {
         const reason = String(sync?.reason || 'subscription-sync-skipped')
         if (reason === 'push-manager-unavailable') {
@@ -999,7 +1022,7 @@ export default function MoreTab() {
         )
         const repairSync = await withTimeout(
           upsertCurrentPushSubscription(cloudSession, { notifEnabled: readSmartNotifEnabled() }),
-          20000,
+          90000,
           'push re-registration',
         )
         if (repairSync?.status !== 'ok') {
