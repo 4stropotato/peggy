@@ -968,12 +968,12 @@ export default function MoreTab() {
         setPushStatus(`Cloud session check failed: ${sessionErr?.message || 'unknown error'}. Please retry.`)
         return
       }
-      setPushStatus('Registering this device... (1/2). Keep app open first; lock after step 2 starts.')
+      setPushStatus('Checking push capability, then registering this device... (1/2). Keep app open first; lock after step 2 starts.')
       let sync = null
       try {
         sync = await withTimeout(
           upsertCurrentPushSubscription(activeSession, { notifEnabled: true }),
-          90000,
+          25000,
           'push registration',
         )
       } catch (err) {
@@ -1001,8 +1001,16 @@ export default function MoreTab() {
         }
         throw new Error(`push registration timed out and existing subscription did not deliver (${sent}/${total}, stale ${stale}, failed ${failed})`)
       }
-      if (sync?.status !== 'ok') {
+        if (sync?.status !== 'ok') {
         const reason = String(sync?.reason || 'subscription-sync-skipped')
+        if (reason === 'ios-home-screen-required') {
+          setPushStatus('Push on iPhone requires Home Screen mode. Open Peggy from Safari > Add to Home Screen, then retry Send Test Push from that installed icon.')
+          return
+        }
+        if (reason === 'insecure-context') {
+          setPushStatus('Push requires secure HTTPS context. Use the GitHub Pages URL and Home Screen app, not localhost.')
+          return
+        }
         if (reason === 'service-worker-unavailable') {
           setPushStatus(
             'Service worker is not ready yet in this app context. Close Peggy completely, reopen from Home Screen, wait 10 seconds, then retry Send Test Push.'

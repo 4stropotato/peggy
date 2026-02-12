@@ -9,8 +9,8 @@ const PUSH_ENDPOINT_CACHE_KEY = 'peggy-push-endpoint'
 const PUSH_TIMEOUT_MS = 12000
 const SW_LOOKUP_TIMEOUT_MS = 2500
 const SW_REGISTER_TIMEOUT_MS = 12000
-const SW_READY_TIMEOUT_MS = 15000
-const SW_ACTIVE_WAIT_MS = 15000
+const SW_READY_TIMEOUT_MS = 10000
+const SW_ACTIVE_WAIT_MS = 10000
 const PUSH_SUB_READ_TIMEOUT_MS = 5000
 const PUSH_SUBSCRIBE_TIMEOUT_MS = 12000
 const CLOUD_UPSERT_TIMEOUT_MS = 10000
@@ -49,6 +49,20 @@ function randomId() {
 
 function readPublicVapidKey() {
   return String(import.meta.env.VITE_WEB_PUSH_PUBLIC_KEY || '').trim()
+}
+
+function isIosDevice() {
+  if (typeof navigator === 'undefined') return false
+  const ua = String(navigator.userAgent || '').toLowerCase()
+  const platform = String(navigator.platform || '').toLowerCase()
+  return /iphone|ipad|ipod/.test(ua) || /iphone|ipad|ipod/.test(platform)
+}
+
+function isStandaloneMode() {
+  if (typeof window === 'undefined') return false
+  const mediaStandalone = window.matchMedia?.('(display-mode: standalone)')?.matches
+  const iosStandalone = window.navigator?.standalone === true
+  return Boolean(mediaStandalone || iosStandalone)
 }
 
 function getBasePath() {
@@ -213,6 +227,12 @@ export async function upsertCurrentPushSubscription(session, { notifEnabled = tr
   if (!isCloudConfigured()) return { status: 'skipped', reason: 'cloud-not-configured' }
   if (!session?.accessToken || !session?.user?.id) return { status: 'skipped', reason: 'no-session' }
   if (!isPushSupported()) return { status: 'skipped', reason: 'push-not-supported' }
+  if (typeof window !== 'undefined' && window.isSecureContext === false) {
+    return { status: 'skipped', reason: 'insecure-context' }
+  }
+  if (isIosDevice() && !isStandaloneMode()) {
+    return { status: 'skipped', reason: 'ios-home-screen-required' }
+  }
   if (Notification.permission !== 'granted') return { status: 'skipped', reason: 'permission-not-granted' }
 
   const publicVapidKey = readPublicVapidKey()
