@@ -1,6 +1,6 @@
 // Cache version bump: change this whenever static assets (icons, CSS, JS) change
 // so installed PWAs pick up updates reliably.
-const CACHE_NAME = 'peggy-v19';
+const CACHE_NAME = 'peggy-v20';
 const CACHE_PREFIXES = ['peggy-', 'baby-prep-'];
 
 function resolveBasePath() {
@@ -53,9 +53,11 @@ function notifyClients(message) {
 }
 
 self.addEventListener('install', (event) => {
+  // skipWaiting MUST run even if precache fails (iOS standalone can 404/timeout on assets).
+  // Without this, the SW stays stuck in "installing" and push subscribe never works.
   event.waitUntil(
     caches.open(CACHE_NAME)
-      .then(cache => cache.addAll(PRECACHE))
+      .then(cache => cache.addAll(PRECACHE).catch(() => {}))
       .then(() => self.skipWaiting())
   );
 });
