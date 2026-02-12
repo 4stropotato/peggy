@@ -34,9 +34,13 @@ Run this script in Supabase SQL Editor:
 From `app/`:
 
 ```bash
-npx supabase functions deploy push-subscriptions
+npx supabase functions deploy push-subscriptions --no-verify-jwt
 npx supabase functions deploy push-dispatch
 ```
+
+Why `--no-verify-jwt` on `push-subscriptions`:
+- Some projects issue ES256 access tokens and Supabase function gateway JWT verification can reject them with `Invalid JWT`.
+- This function already validates bearer access token internally via `auth.getUser(accessToken)` using service-role client, so auth remains enforced.
 
 ## 5) Set edge function secrets
 
