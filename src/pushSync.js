@@ -54,27 +54,32 @@ async function resolveServiceWorkerRegistration() {
     2500,
     'service worker getRegistration(scope)',
   ).catch(() => null)
-  if (byScope) return byScope
+  if (byScope?.active) return byScope
 
   const anyScope = await withTimeout(
     navigator.serviceWorker.getRegistration(),
     2500,
     'service worker getRegistration',
   ).catch(() => null)
-  if (anyScope) return anyScope
+  if (anyScope?.active) return anyScope
 
   const registered = await withTimeout(
     navigator.serviceWorker.register(swUrl),
     9000,
     'service worker register',
   ).catch(() => null)
-  if (registered) return registered
+  if (registered?.active) return registered
 
-  return withTimeout(
+  const readyReg = await withTimeout(
     navigator.serviceWorker.ready,
     PUSH_TIMEOUT_MS,
     'service worker ready',
-  )
+  ).catch(() => null)
+  if (readyReg?.active) return readyReg
+
+  // Last fallback: return whichever registration exists, even if not active,
+  // so caller can decide whether to retry or skip.
+  return byScope || anyScope || registered || readyReg || null
 }
 
 export function isPushSupported() {
@@ -126,14 +131,36 @@ export async function upsertCurrentPushSubscription(session, { notifEnabled = tr
     'pushManager.getSubscription',
   ).catch(() => null)
   if (!subscription) {
-    subscription = await withTimeout(
-      registration.pushManager.subscribe({
-        userVisibleOnly: true,
-        applicationServerKey: toBase64UrlUint8Array(publicVapidKey),
-      }),
-      12000,
-      'pushManager.subscribe',
-    )
+    try {
+      subscription = await withTimeout(
+        registration.pushManager.subscribe({
+          userVisibleOnly: true,
+          applicationServerKey: toBase64UrlUint8Array(publicVapidKey),
+        }),
+        12000,
+        'pushManager.subscribe',
+      )
+    } catch (err) {
+      const msg = String(err?.message || '').toLowerCase()
+      const needsActiveWorker = msg.includes('active service worker')
+      if (!needsActiveWorker) throw err
+
+      // iOS/Safari can race here right after install/update. Wait for ready registration and retry once.
+      const readyReg = await withTimeout(
+        navigator.serviceWorker.ready,
+        12000,
+        'service worker ready retry',
+      ).catch(() => null)
+      if (!readyReg?.pushManager) throw err
+      subscription = await withTimeout(
+        readyReg.pushManager.subscribe({
+          userVisibleOnly: true,
+          applicationServerKey: toBase64UrlUint8Array(publicVapidKey),
+        }),
+        12000,
+        'pushManager.subscribe retry',
+      )
+    }
   }
 
   const data = subscription.toJSON()
