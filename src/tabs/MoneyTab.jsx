@@ -91,6 +91,105 @@ const BENEFIT_ASK_REQUIRED_BY_ID = {
   m16: true,
 }
 
+const FAMILY_BENEFITS_OPEN_KEY = 'baby-prep-family-benefits-open'
+const FAMILY_BENEFITS_CLAIMED_KEY = 'baby-prep-family-benefits-claimed'
+
+const FAMILY_BENEFIT_ITEMS = [
+  {
+    id: 'f1',
+    label: 'Shinji childcare leave benefit setup (育児休業給付)',
+    estimateLabel: 'Income replacement',
+    where: 'Employer HR + Hello Work',
+    howTo: 'Confirm eligibility, leave window, and filing flow before leave starts. Ask payout timing and first payment month.',
+    timing: 'Before childcare leave starts',
+    askRequired: true,
+    sourceLinks: [
+      { label: 'MHLW: 育児休業給付', url: 'https://www.mhlw.go.jp/stf/seisakunitsuite/bunya/0000135090_00001.html' },
+    ],
+  },
+  {
+    id: 'f2',
+    label: 'Company birth bonus / dependent allowance update',
+    estimateLabel: 'Varies by company',
+    where: 'Shinji employer HR / payroll',
+    howTo: 'Ask if company offers childbirth bonus, family allowance increase, or dependent registration-linked payouts.',
+    timing: 'During pregnancy or immediately after birth registration',
+    askRequired: true,
+    sourceLinks: [
+      { label: 'CFA: 家計応援 (policy context)', url: 'https://www.cfa.go.jp/resources/strategy/kakei-oen' },
+    ],
+  },
+  {
+    id: 'f3',
+    label: 'Health insurance extra payout (付加給付 / fuka kyuufu)',
+    estimateLabel: 'Often ¥10K-¥90K',
+    where: 'Health insurance association (健保組合) + HR',
+    howTo: 'Check if insurer adds money on top of childbirth lump-sum. Ask required form and filing deadline.',
+    timing: 'Before delivery or right after invoice finalization',
+    askRequired: true,
+    sourceLinks: [
+      { label: 'Kyokai Kenpo: 出産育児一時金', url: 'https://www.kyoukaikenpo.or.jp/g3/sb3280/' },
+    ],
+  },
+  {
+    id: 'f4',
+    label: 'Confirm childbirth lump-sum payer path (if Naomi under Shinji insurance)',
+    estimateLabel: 'Route check',
+    where: 'Insurance office + hospital billing desk',
+    howTo: 'Confirm who files and which route applies (direct payment vs refund) to avoid delayed payout.',
+    timing: 'Before delivery admission',
+    askRequired: true,
+    sourceLinks: [
+      { label: 'MHLW: 出産育児一時金', url: 'https://www.mhlw.go.jp/stf/seisakunitsuite/bunya/kenkou_iryou/iryouhoken/shussan/index.html' },
+    ],
+  },
+  {
+    id: 'f5',
+    label: 'Household claim packet check (tax receipts, child allowance docs, insurer forms)',
+    estimateLabel: 'Savings protection',
+    where: 'At home prep + ward office + HR',
+    howTo: 'Prepare one shared folder for receipts, transport logs, ID docs, and application copies so no support is missed.',
+    timing: 'Start now and maintain monthly',
+    askRequired: false,
+    sourceLinks: [
+      { label: 'NTA e-Tax', url: 'https://www.e-tax.nta.go.jp/' },
+      { label: 'CFA: 児童手当概要', url: 'https://www.cfa.go.jp/policies/kokoseido/jidouteate/gaiyou/' },
+    ],
+  },
+]
+
+function readStorageBool(key, fallback = false) {
+  if (typeof window === 'undefined') return Boolean(fallback)
+  const raw = String(window.localStorage.getItem(key) || '').trim().toLowerCase()
+  if (raw === '1' || raw === 'true') return true
+  if (raw === '0' || raw === 'false') return false
+  return Boolean(fallback)
+}
+
+function writeStorageBool(key, value) {
+  if (typeof window === 'undefined') return
+  window.localStorage.setItem(key, value ? '1' : '0')
+}
+
+function readStorageMap(key) {
+  if (typeof window === 'undefined') return {}
+  try {
+    const raw = window.localStorage.getItem(key)
+    if (!raw) return {}
+    const parsed = JSON.parse(raw)
+    if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) return parsed
+    return {}
+  } catch {
+    return {}
+  }
+}
+
+function writeStorageMap(key, value) {
+  if (typeof window === 'undefined') return
+  const safe = value && typeof value === 'object' && !Array.isArray(value) ? value : {}
+  window.localStorage.setItem(key, JSON.stringify(safe))
+}
+
 function formatYen(value) {
   return `${YEN}${Number(value || 0).toLocaleString()}`
 }
@@ -377,6 +476,8 @@ export default function MoneyTab() {
   const [salarySetupOpen, setSalarySetupOpen] = useState(false)
   const [salarySetupTab, setSalarySetupTab] = useState('rates')
   const [recentIncomeMode, setRecentIncomeMode] = useState('work')
+  const [familyBenefitsOpen, setFamilyBenefitsOpen] = useState(() => readStorageBool(FAMILY_BENEFITS_OPEN_KEY, false))
+  const [familyBenefitsClaimed, setFamilyBenefitsClaimed] = useState(() => readStorageMap(FAMILY_BENEFITS_CLAIMED_KEY))
   const [rateForm, setRateForm] = useState(() => ({
     person: 'naomi',
     basis: 'hourly',
@@ -430,10 +531,22 @@ export default function MoneyTab() {
     () => filteredMoneyTracker.filter((item) => moneyClaimed[item.id]).reduce((acc, item) => acc + item.amount, 0),
     [filteredMoneyTracker, moneyClaimed]
   )
+  const familyBenefitsDoneCount = useMemo(
+    () => FAMILY_BENEFIT_ITEMS.filter(item => familyBenefitsClaimed[item.id]).length,
+    [familyBenefitsClaimed]
+  )
 
   useEffect(() => {
     if (!includeHusband && workView === 'husband') setWorkView('wife')
   }, [includeHusband, workView])
+
+  useEffect(() => {
+    writeStorageBool(FAMILY_BENEFITS_OPEN_KEY, familyBenefitsOpen)
+  }, [familyBenefitsOpen])
+
+  useEffect(() => {
+    writeStorageMap(FAMILY_BENEFITS_CLAIMED_KEY, familyBenefitsClaimed)
+  }, [familyBenefitsClaimed])
 
   const recentMonthKeys = useMemo(() => getRecentMonthKeys(6), [])
   const recentYearMonthKeys = useMemo(() => getRecentMonthKeys(12), [])
@@ -533,6 +646,26 @@ export default function MoneyTab() {
   const toggleExpand = (id, event) => {
     event.stopPropagation()
     setExpandedItem(prev => (prev === id ? null : id))
+  }
+
+  const toggleFamilyBenefit = (id) => {
+    setFamilyBenefitsClaimed(prev => ({
+      ...(prev && typeof prev === 'object' ? prev : {}),
+      [id]: !Boolean(prev?.[id]),
+    }))
+  }
+
+  const addFamilyBenefitFollowUp = (item) => {
+    const today = toIsoDate()
+    const when = String(item?.timing || '').trim()
+    const where = String(item?.where || '').trim()
+    addPlan(today, {
+      time: '',
+      title: `Follow-up: ${item.label}`,
+      location: where || '',
+      notes: when ? `Timing: ${when}` : 'Follow-up action',
+      done: false,
+    })
   }
 
   const canMoveToNextTaxStep = (() => {
@@ -822,6 +955,88 @@ export default function MoneyTab() {
                 </li>
               ))}
             </ul>
+          </section>
+
+          <section className="glass-section">
+            <div className="section-header">
+              <span className="section-icon"><UiIcon icon={APP_ICONS.work} /></span>
+              <div>
+                <h2>Father / Family Lane (Draft)</h2>
+                <span className="section-count">{familyBenefitsDoneCount}/{FAMILY_BENEFIT_ITEMS.length} checked</span>
+              </div>
+            </div>
+            <p className="section-note">
+              Optional Shinji-side support lane (kaisha/hoken). Naomi flow above stays unchanged.
+            </p>
+            <div className="glass-tabs salary-mini-tabs">
+              <button
+                type="button"
+                className={`glass-tab ${familyBenefitsOpen ? 'active' : ''}`}
+                onClick={() => setFamilyBenefitsOpen(prev => !prev)}
+              >
+                <span>{familyBenefitsOpen ? 'Hide lane' : 'Show lane'}</span>
+              </button>
+            </div>
+            {familyBenefitsOpen && (
+              <ul>
+                {FAMILY_BENEFIT_ITEMS.map((item) => {
+                  const detailId = `family-${item.id}`
+                  const claimed = Boolean(familyBenefitsClaimed[item.id])
+                  return (
+                    <li key={item.id} className={`glass-card money-card ${claimed ? 'done' : ''}`}>
+                      <div className="money-card-top">
+                        <span className="checkbox glass-inner" onClick={() => toggleFamilyBenefit(item.id)}>
+                          {claimed ? '\u2713' : ''}
+                        </span>
+                        <span className={`item-text ${claimed ? 'claimed' : ''}`}>{item.label}</span>
+                        <span className="money-amount">{item.estimateLabel}</span>
+                        {item.askRequired && !claimed && <span className="badge ask-badge">ASK</span>}
+                        <button className="info-btn glass-inner" onClick={(event) => toggleExpand(detailId, event)}>
+                          {expandedItem === detailId ? 'Hide' : 'i'}
+                        </button>
+                      </div>
+                      {expandedItem === detailId && (
+                        <div className="money-detail">
+                          <div className="detail-section">
+                            <div className="detail-label">Action:</div>
+                            <div className="detail-text">{item.howTo}</div>
+                          </div>
+                          <div className="detail-section">
+                            <div className="detail-label">Where:</div>
+                            <div className="detail-text">{item.where}</div>
+                          </div>
+                          <div className="detail-section">
+                            <div className="detail-label">Timing:</div>
+                            <div className="detail-text">{item.timing}</div>
+                          </div>
+                          <div className="detail-section">
+                            <button
+                              type="button"
+                              className="tax-preset-btn glass-inner"
+                              onClick={() => addFamilyBenefitFollowUp(item)}
+                            >
+                              Add follow-up to Home calendar
+                            </button>
+                          </div>
+                          {Array.isArray(item.sourceLinks) && item.sourceLinks.length > 0 && (
+                            <div className="detail-section">
+                              <div className="detail-label">Official sources:</div>
+                              <div className="detail-text">
+                                {item.sourceLinks.map((source, index) => (
+                                  <div key={`${item.id}-family-source-${index}`}>
+                                    <a href={source.url} target="_blank" rel="noopener noreferrer">{source.label}</a>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </li>
+                  )
+                })}
+              </ul>
+            )}
           </section>
 
           <section className="glass-section">
