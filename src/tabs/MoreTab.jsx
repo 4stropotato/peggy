@@ -10,7 +10,7 @@ import {
 } from '../infoData'
 import {
   isCloudConfigured, getCloudSession, clearCloudSession, cloudSignUp, cloudSignIn, cloudSignOut,
-  cloudValidateSession, cloudUploadBackup, cloudDownloadBackup, cloudSendPushTest
+  cloudTryRecoverSession, cloudValidateSession, cloudUploadBackup, cloudDownloadBackup, cloudSendPushTest
 } from '../cloudSync'
 import {
   buildMoodReminder,
@@ -538,6 +538,13 @@ export default function MoreTab() {
   const [pushDebugLog, setPushDebugLog] = useState([])
   const [showPushDiag, setShowPushDiag] = useState(false)
   const [pushDiagData, setPushDiagData] = useState(null)
+  const [pushDiagQuick, setPushDiagQuick] = useState(() => ({
+    ...getPushDiagnostics(),
+    swState: 'unknown',
+    swScope: 'none',
+    subEndpoint: 'none',
+    scopedRegistrations: 0,
+  }))
   const [showAdvanced, setShowAdvanced] = useState(false)
   const [cloudBusy, setCloudBusy] = useState(false)
   const [cloudEmail, setCloudEmail] = useState('')
@@ -574,12 +581,43 @@ export default function MoreTab() {
     return () => window.clearInterval(id)
   }, [subTab])
 
+  useEffect(() => {
+    if (typeof window === 'undefined') return undefined
+    if (subTab !== 'settings') return undefined
+
+    let cancelled = false
+    const refresh = async () => {
+      try {
+        const diag = await getPushDiagnosticsAsync()
+        if (!cancelled) setPushDiagQuick(diag)
+      } catch {
+        if (!cancelled) setPushDiagQuick((prev) => ({ ...prev, swState: 'error' }))
+      }
+    }
+
+    refresh()
+    const id = window.setInterval(refresh, 12000)
+    return () => {
+      cancelled = true
+      window.clearInterval(id)
+    }
+  }, [subTab])
+
   const refreshNotifPermission = () => {
     if (typeof Notification === 'undefined') {
       setNotifPermission('unsupported')
       return
     }
     setNotifPermission(Notification.permission)
+  }
+
+  const refreshPushDiagQuick = async () => {
+    try {
+      const diag = await getPushDiagnosticsAsync()
+      setPushDiagQuick(diag)
+    } catch {
+      setPushDiagQuick((prev) => ({ ...prev, swState: 'error' }))
+    }
   }
 
   useEffect(() => {
@@ -939,7 +977,16 @@ export default function MoreTab() {
   }
 
   const handlePushTest = async () => {
-    const latestSession = cloudSession || getCloudSession()
+    void refreshPushDiagQuick()
+    let latestSession = cloudSession || getCloudSession()
+    if (!latestSession) {
+      try {
+        latestSession = await cloudTryRecoverSession()
+        if (latestSession) setCloudSession(latestSession)
+      } catch {
+        // Continue to sign-in guard below.
+      }
+    }
     if (!latestSession) {
       setPushStatus('Sign in first to test push notifications.')
       return
@@ -986,12 +1033,12 @@ export default function MoreTab() {
         setPushStatus(`Cloud session check failed: ${sessionErr?.message || 'unknown error'}. Please retry.`)
         return
       }
-      setPushStatus('Checking push capability, then registering this device... (1/2). Keep app open first; lock after step 2 starts.')
+      setPushStatus('Checking push capability, then registering this device... (1/2). Keep app open while registration finishes.')
       let sync = null
       try {
         sync = await withTimeout(
           upsertCurrentPushSubscription(activeSession, { notifEnabled: true, onStep }),
-          25000,
+          90000,
           'push registration',
         )
       } catch (err) {
@@ -1009,8 +1056,9 @@ export default function MoreTab() {
         const total = Number(existing?.total || sent)
         const stale = Number(existing?.stale || 0)
         const failed = Number(existing?.failed || 0)
+        const fallbackSuffix = existing?.fallbackUsed ? ' (fallback subscription path)' : ''
         if (sent > 0) {
-          setPushStatus(`Test push sent via existing subscription after slow registration (${sent}/${total}, stale ${stale}, failed ${failed}).`)
+          setPushStatus(`Test push sent via existing subscription after slow registration (${sent}/${total}, stale ${stale}, failed ${failed})${fallbackSuffix}.`)
           return
         }
         if (total <= 0) {
@@ -1048,8 +1096,9 @@ export default function MoreTab() {
           const total = Number(existing?.total || sent)
           const stale = Number(existing?.stale || 0)
           const failed = Number(existing?.failed || 0)
+          const fallbackSuffix = existing?.fallbackUsed ? ' (fallback subscription path)' : ''
           if (sent > 0) {
-            setPushStatus(`Test push sent via existing subscription (${sent}/${total}, stale ${stale}, failed ${failed}).`)
+            setPushStatus(`Test push sent via existing subscription (${sent}/${total}, stale ${stale}, failed ${failed})${fallbackSuffix}.`)
             return
           }
           setPushStatus(`Push registration skipped (${reason}) and no existing delivery (${sent}/${total}, stale ${stale}, failed ${failed}).`)
@@ -1101,7 +1150,8 @@ export default function MoreTab() {
       }
 
       if (sent > 0) {
-        setPushStatus(`Test push sent (${sent}/${total} device${total === 1 ? '' : 's'}, stale ${stale}, failed ${failed}).`)
+        const fallbackSuffix = result?.fallbackUsed ? ' (fallback subscription path)' : ''
+        setPushStatus(`Test push sent (${sent}/${total} device${total === 1 ? '' : 's'}, stale ${stale}, failed ${failed})${fallbackSuffix}.`)
       } else if (total > 0) {
         const errorHint = Array.isArray(result?.errors) && result.errors.length
           ? ` First error: ${String(result.errors[0]).slice(0, 140)}.`
@@ -1123,6 +1173,7 @@ export default function MoreTab() {
         setPushStatus('Test push failed: ' + errorMsg)
       }
     } finally {
+      void refreshPushDiagQuick()
       setCloudBusy(false)
     }
   }
@@ -1719,6 +1770,22 @@ export default function MoreTab() {
                 <div className="notif-diagnostic-row">
                   <span>Mode</span>
                   <strong>{isStandaloneMode ? 'Home Screen App' : 'Browser tab'}</strong>
+                </div>
+                <div className="notif-diagnostic-row">
+                  <span>Service Worker</span>
+                  <strong>{String(pushDiagQuick?.swState || 'unknown')}</strong>
+                </div>
+                <div className="notif-diagnostic-row">
+                  <span>SW Scope</span>
+                  <strong>{String(pushDiagQuick?.swScope || 'none')}</strong>
+                </div>
+                <div className="notif-diagnostic-row">
+                  <span>Push Subscription</span>
+                  <strong>{String(pushDiagQuick?.subEndpoint || 'none')}</strong>
+                </div>
+                <div className="notif-diagnostic-row">
+                  <span>Scoped SW Count</span>
+                  <strong>{Number(pushDiagQuick?.scopedRegistrations || 0)}</strong>
                 </div>
                 <div className="notif-diagnostic-row">
                   <span>Quiet Hours Active</span>

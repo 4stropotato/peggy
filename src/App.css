@@ -936,10 +936,70 @@ ul { list-style: none; }
   border: 1px solid rgba(47, 128, 237, 0.5);
   color: #dce9ff;
 }
+.owner-badge {
+  border: 1px solid rgba(255, 255, 255, 0.24);
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--text);
+}
+.owner-badge.owner-naomi {
+  border-color: rgba(214, 51, 132, 0.45);
+  background: rgba(214, 51, 132, 0.18);
+  color: #ffdff0;
+}
+.owner-badge.owner-husband {
+  border-color: rgba(76, 132, 217, 0.5);
+  background: rgba(76, 132, 217, 0.2);
+  color: #dce9ff;
+}
+.owner-badge.owner-family {
+  border-color: rgba(0, 184, 148, 0.45);
+  background: rgba(0, 184, 148, 0.18);
+  color: #dffcf5;
+}
+.done-badge {
+  background: rgba(0, 184, 148, 0.2);
+  border: 1px solid rgba(0, 184, 148, 0.5);
+  color: #d9fff6;
+}
+.pending-badge {
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid var(--glass-border);
+  color: var(--text2);
+}
 .app.light .ask-badge {
   background: rgba(47, 128, 237, 0.14);
   border-color: rgba(47, 128, 237, 0.35);
   color: #174f9d;
+}
+.app.light .owner-badge {
+  border-color: rgba(200, 100, 140, 0.28);
+  background: rgba(255, 255, 255, 0.66);
+  color: #7b3a61;
+}
+.app.light .owner-badge.owner-naomi {
+  border-color: rgba(214, 51, 132, 0.42);
+  background: rgba(214, 51, 132, 0.2);
+  color: #8e2459;
+}
+.app.light .owner-badge.owner-husband {
+  border-color: rgba(76, 132, 217, 0.42);
+  background: rgba(76, 132, 217, 0.16);
+  color: #20599e;
+}
+.app.light .owner-badge.owner-family {
+  border-color: rgba(0, 184, 148, 0.4);
+  background: rgba(0, 184, 148, 0.14);
+  color: #057a57;
+}
+.app.light .done-badge {
+  border-color: rgba(0, 184, 148, 0.34);
+  background: rgba(0, 184, 148, 0.12);
+  color: #067856;
+}
+.app.light .pending-badge {
+  border-color: rgba(200, 100, 140, 0.22);
+  background: rgba(255, 255, 255, 0.68);
+  color: #8a5070;
 }
 .money-badge {
   background: var(--gold);
@@ -1072,6 +1132,16 @@ ul { list-style: none; }
   font-size: 0.8rem;
   line-height: 1.5;
   color: var(--text);
+}
+.benefit-task-row {
+  display: flex;
+  gap: 0.45rem;
+  align-items: flex-start;
+  flex-wrap: wrap;
+  margin-bottom: 0.35rem;
+}
+.benefit-task-row:last-child {
+  margin-bottom: 0;
 }
 .deadline-text {
   color: var(--red);

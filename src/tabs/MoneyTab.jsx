@@ -49,6 +49,39 @@ const BENEFIT_SOURCE_BY_ID = {
   m16: 'kawasaki',
 }
 
+const BENEFIT_OWNER_BY_ID = {
+  m1: 'naomi',
+  m2: 'naomi',
+  m3: 'naomi',
+  m4: 'family',
+  m5: 'family',
+  m6: 'family',
+  m7: 'family',
+  m8: 'family',
+  m9: 'family',
+  m10: 'family',
+  m11: 'naomi',
+  m12: 'family',
+  m13: 'family',
+  m14: 'family',
+  m15: 'family',
+  m16: 'naomi',
+}
+
+const BENEFIT_OWNER_FILTERS = [
+  { id: 'all', label: 'All Owners' },
+  { id: 'naomi', label: 'Naomi' },
+  { id: 'husband', label: 'Shinji' },
+  { id: 'family', label: 'Family' },
+]
+
+const BENEFIT_STATUS_FILTERS = [
+  { id: 'all', label: 'All Status' },
+  { id: 'pending', label: 'Pending' },
+  { id: 'ask', label: 'Ask Required' },
+  { id: 'claimed', label: 'Claimed' },
+]
+
 const BENEFIT_TIMING_HINT_BY_ID = {
   m1: 'Pregnancy registration day (ward office)',
   m2: 'As early as possible in pregnancy',
@@ -94,11 +127,20 @@ const BENEFIT_ASK_REQUIRED_BY_ID = {
 const FAMILY_BENEFITS_OPEN_KEY = 'baby-prep-family-benefits-open'
 const FAMILY_BENEFITS_CLAIMED_KEY = 'baby-prep-family-benefits-claimed'
 
+const FAMILY_BENEFIT_GROUP_FILTERS = [
+  { id: 'all', label: 'All Tracks' },
+  { id: 'employer', label: 'Employer / HR' },
+  { id: 'insurance', label: 'Insurance' },
+  { id: 'household', label: 'Household' },
+]
+
 const FAMILY_BENEFIT_ITEMS = [
   {
     id: 'f1',
     label: 'Shinji childcare leave benefit setup (育児休業給付)',
     estimateLabel: 'Income replacement',
+    owner: 'husband',
+    group: 'employer',
     where: 'Employer HR + Hello Work',
     howTo: 'Confirm eligibility, leave window, and filing flow before leave starts. Ask payout timing and first payment month.',
     timing: 'Before childcare leave starts',
@@ -111,6 +153,8 @@ const FAMILY_BENEFIT_ITEMS = [
     id: 'f2',
     label: 'Company birth bonus / dependent allowance update',
     estimateLabel: 'Varies by company',
+    owner: 'husband',
+    group: 'employer',
     where: 'Shinji employer HR / payroll',
     howTo: 'Ask if company offers childbirth bonus, family allowance increase, or dependent registration-linked payouts.',
     timing: 'During pregnancy or immediately after birth registration',
@@ -123,6 +167,8 @@ const FAMILY_BENEFIT_ITEMS = [
     id: 'f3',
     label: 'Health insurance extra payout (付加給付 / fuka kyuufu)',
     estimateLabel: 'Often ¥10K-¥90K',
+    owner: 'family',
+    group: 'insurance',
     where: 'Health insurance association (健保組合) + HR',
     howTo: 'Check if insurer adds money on top of childbirth lump-sum. Ask required form and filing deadline.',
     timing: 'Before delivery or right after invoice finalization',
@@ -135,6 +181,8 @@ const FAMILY_BENEFIT_ITEMS = [
     id: 'f4',
     label: 'Confirm childbirth lump-sum payer path (if Naomi under Shinji insurance)',
     estimateLabel: 'Route check',
+    owner: 'family',
+    group: 'insurance',
     where: 'Insurance office + hospital billing desk',
     howTo: 'Confirm who files and which route applies (direct payment vs refund) to avoid delayed payout.',
     timing: 'Before delivery admission',
@@ -147,6 +195,8 @@ const FAMILY_BENEFIT_ITEMS = [
     id: 'f5',
     label: 'Household claim packet check (tax receipts, child allowance docs, insurer forms)',
     estimateLabel: 'Savings protection',
+    owner: 'family',
+    group: 'household',
     where: 'At home prep + ward office + HR',
     howTo: 'Prepare one shared folder for receipts, transport logs, ID docs, and application copies so no support is missed.',
     timing: 'Start now and maintain monthly',
@@ -154,6 +204,48 @@ const FAMILY_BENEFIT_ITEMS = [
     sourceLinks: [
       { label: 'NTA e-Tax', url: 'https://www.e-tax.nta.go.jp/' },
       { label: 'CFA: 児童手当概要', url: 'https://www.cfa.go.jp/policies/kokoseido/jidouteate/gaiyou/' },
+    ],
+  },
+  {
+    id: 'f6',
+    label: 'Shinji birth-time leave benefit (出生時育児休業給付金)',
+    estimateLabel: '~67% wage (eligible period)',
+    owner: 'husband',
+    group: 'employer',
+    where: 'Employer HR + Hello Work',
+    howTo: 'Confirm if Shinji will take birth-time childcare leave (産後パパ育休). File leave dates and benefit paperwork before leave starts.',
+    timing: 'Before expected delivery month',
+    askRequired: true,
+    sourceLinks: [
+      { label: 'MHLW: 育児休業給付', url: 'https://www.mhlw.go.jp/stf/seisakunitsuite/bunya/0000135090_00001.html' },
+    ],
+  },
+  {
+    id: 'f7',
+    label: 'Postpartum leave add-on support check (出生後休業支援給付金)',
+    estimateLabel: 'Extra top-up (if eligible)',
+    owner: 'husband',
+    group: 'employer',
+    where: 'Employer HR + Hello Work',
+    howTo: 'Ask if your leave pattern qualifies for the new postpartum add-on support and what exact filing windows apply.',
+    timing: 'Within first 8 weeks after birth',
+    askRequired: true,
+    sourceLinks: [
+      { label: 'MHLW leaflet (R7): 育児休業給付', url: 'https://www.mhlw.go.jp/content/11600000/001421353.pdf' },
+    ],
+  },
+  {
+    id: 'f8',
+    label: 'Reduced-hours childcare benefit check (育児時短就業給付金)',
+    estimateLabel: 'Rate depends on setup',
+    owner: 'family',
+    group: 'employer',
+    where: 'Employer HR + Hello Work',
+    howTo: 'If either parent returns on reduced hours, ask whether childcare short-time work benefit can apply and from which payroll month.',
+    timing: 'Before return-to-work schedule is finalized',
+    askRequired: true,
+    sourceLinks: [
+      { label: 'MHLW: 育児休業給付', url: 'https://www.mhlw.go.jp/stf/seisakunitsuite/bunya/0000135090_00001.html' },
     ],
   },
 ]
@@ -214,6 +306,20 @@ function normalizePerson(value) {
   if (raw === 'shinji' || raw === 'husband' || raw === 'partner') return 'husband'
   if (raw === 'naomi' || raw === 'wife') return 'naomi'
   return raw || 'naomi'
+}
+
+function normalizeBenefitOwner(value) {
+  const raw = String(value || '').trim().toLowerCase()
+  if (raw === 'naomi' || raw === 'wife' || raw === 'mom') return 'naomi'
+  if (raw === 'husband' || raw === 'shinji' || raw === 'dad' || raw === 'partner') return 'husband'
+  return 'family'
+}
+
+function getBenefitOwnerLabel(owner) {
+  const normalized = normalizeBenefitOwner(owner)
+  if (normalized === 'naomi') return PERSON_LABELS.naomi
+  if (normalized === 'husband') return PERSON_LABELS.husband
+  return 'Family / Shared'
 }
 
 function toDateStamp(value) {
@@ -439,6 +545,7 @@ function toIsoDate(date = new Date()) {
 
 export default function MoneyTab() {
   const {
+    checked,
     moneyClaimed,
     toggleMoney,
     payRates,
@@ -468,6 +575,8 @@ export default function MoneyTab() {
 
   const [subTab, setSubTab] = useState('benefits')
   const [benefitSourceFilter, setBenefitSourceFilter] = useState('all')
+  const [benefitOwnerFilter, setBenefitOwnerFilter] = useState('all')
+  const [benefitStatusFilter, setBenefitStatusFilter] = useState('all')
   const [workView, setWorkView] = useState('wife')
   const [summaryPeriod, setSummaryPeriod] = useState('annual')
   const [summaryMonthKey, setSummaryMonthKey] = useState(() => toMonthKey(new Date()))
@@ -478,6 +587,8 @@ export default function MoneyTab() {
   const [recentIncomeMode, setRecentIncomeMode] = useState('work')
   const [familyBenefitsOpen, setFamilyBenefitsOpen] = useState(() => readStorageBool(FAMILY_BENEFITS_OPEN_KEY, false))
   const [familyBenefitsClaimed, setFamilyBenefitsClaimed] = useState(() => readStorageMap(FAMILY_BENEFITS_CLAIMED_KEY))
+  const [familyBenefitGroupFilter, setFamilyBenefitGroupFilter] = useState('all')
+  const [familyBenefitStatusFilter, setFamilyBenefitStatusFilter] = useState('all')
   const [rateForm, setRateForm] = useState(() => ({
     person: 'naomi',
     basis: 'hourly',
@@ -520,9 +631,21 @@ export default function MoneyTab() {
     [benefitTasksById]
   )
   const filteredMoneyTracker = useMemo(() => {
-    if (benefitSourceFilter === 'all') return moneyTracker
-    return moneyTracker.filter((item) => (BENEFIT_SOURCE_BY_ID[item.id] || 'kawasaki') === benefitSourceFilter)
-  }, [benefitSourceFilter])
+    return moneyTracker.filter((item) => {
+      const source = BENEFIT_SOURCE_BY_ID[item.id] || 'kawasaki'
+      if (benefitSourceFilter !== 'all' && source !== benefitSourceFilter) return false
+
+      const owner = normalizeBenefitOwner(BENEFIT_OWNER_BY_ID[item.id] || 'family')
+      if (benefitOwnerFilter !== 'all' && owner !== benefitOwnerFilter) return false
+
+      const claimed = Boolean(moneyClaimed[item.id])
+      if (benefitStatusFilter === 'claimed' && !claimed) return false
+      if (benefitStatusFilter === 'pending' && claimed) return false
+      if (benefitStatusFilter === 'ask' && (!BENEFIT_ASK_REQUIRED_BY_ID[item.id] || claimed)) return false
+
+      return true
+    })
+  }, [benefitSourceFilter, benefitOwnerFilter, benefitStatusFilter, moneyClaimed])
   const visibleMoneyTotal = useMemo(
     () => filteredMoneyTracker.reduce((acc, item) => acc + item.amount, 0),
     [filteredMoneyTracker]
@@ -534,6 +657,23 @@ export default function MoneyTab() {
   const familyBenefitsDoneCount = useMemo(
     () => FAMILY_BENEFIT_ITEMS.filter(item => familyBenefitsClaimed[item.id]).length,
     [familyBenefitsClaimed]
+  )
+  const filteredFamilyBenefits = useMemo(() => {
+    return FAMILY_BENEFIT_ITEMS.filter((item) => {
+      const group = String(item?.group || 'household').trim().toLowerCase()
+      if (familyBenefitGroupFilter !== 'all' && familyBenefitGroupFilter !== group) return false
+
+      const claimed = Boolean(familyBenefitsClaimed[item.id])
+      if (familyBenefitStatusFilter === 'claimed' && !claimed) return false
+      if (familyBenefitStatusFilter === 'pending' && claimed) return false
+      if (familyBenefitStatusFilter === 'ask' && (!item.askRequired || claimed)) return false
+
+      return true
+    })
+  }, [familyBenefitGroupFilter, familyBenefitStatusFilter, familyBenefitsClaimed])
+  const visibleFamilyBenefitsDoneCount = useMemo(
+    () => filteredFamilyBenefits.filter(item => familyBenefitsClaimed[item.id]).length,
+    [filteredFamilyBenefits, familyBenefitsClaimed]
   )
 
   useEffect(() => {
@@ -655,6 +795,21 @@ export default function MoneyTab() {
     }))
   }
 
+  const addBenefitFollowUp = (item) => {
+    const today = toIsoDate()
+    const where = String(item?.where || '').trim()
+    const timing = String(BENEFIT_TIMING_HINT_BY_ID[item?.id] || item?.deadline || '').trim()
+    addPlan(today, {
+      time: '',
+      title: `Claim: ${item.label}`,
+      location: where ? where.split('\n')[0] : '',
+      notes: timing
+        ? `Timing: ${timing}${where ? `\nWhere: ${where}` : ''}`
+        : (where || 'Benefit follow-up'),
+      done: false,
+    })
+  }
+
   const addFamilyBenefitFollowUp = (item) => {
     const today = toIsoDate()
     const when = String(item?.timing || '').trim()
@@ -666,6 +821,11 @@ export default function MoneyTab() {
       notes: when ? `Timing: ${when}` : 'Follow-up action',
       done: false,
     })
+  }
+
+  const addVisibleFamilyFollowUps = () => {
+    const pending = filteredFamilyBenefits.filter(item => !familyBenefitsClaimed[item.id]).slice(0, 8)
+    pending.forEach((item) => addFamilyBenefitFollowUp(item))
   }
 
   const canMoveToNextTaxStep = (() => {
@@ -839,29 +999,74 @@ export default function MoneyTab() {
                 </button>
               ))}
             </div>
+            <div className="glass-tabs salary-mini-tabs">
+              {BENEFIT_OWNER_FILTERS.map(option => (
+                <button
+                  key={`owner-${option.id}`}
+                  type="button"
+                  className={`glass-tab ${benefitOwnerFilter === option.id ? 'active' : ''}`}
+                  onClick={() => setBenefitOwnerFilter(option.id)}
+                >
+                  <span>{option.label}</span>
+                </button>
+              ))}
+            </div>
+            <div className="glass-tabs salary-mini-tabs">
+              {BENEFIT_STATUS_FILTERS.map(option => (
+                <button
+                  key={`status-${option.id}`}
+                  type="button"
+                  className={`glass-tab ${benefitStatusFilter === option.id ? 'active' : ''}`}
+                  onClick={() => setBenefitStatusFilter(option.id)}
+                >
+                  <span>{option.label}</span>
+                </button>
+              ))}
+            </div>
+            <p className="section-note">
+              Showing {filteredMoneyTracker.length} item(s). Claimed in this view: {filteredMoneyTracker.filter(item => moneyClaimed[item.id]).length}.
+            </p>
             <ul>
-              {filteredMoneyTracker.map(item => (
-                <li key={item.id} className={`glass-card money-card ${moneyClaimed[item.id] ? 'done' : ''}`}>
-                  <div className="money-card-top">
-                    <span className="checkbox glass-inner" onClick={() => toggleMoney(item.id)}>
-                      {moneyClaimed[item.id] ? '\u2713' : ''}
-                    </span>
-                    <span className={`item-text ${moneyClaimed[item.id] ? 'claimed' : ''}`}>{item.label}</span>
-                    <span className="money-amount">{formatYen(item.amount)}</span>
-                    {BENEFIT_ASK_REQUIRED_BY_ID[item.id] && !moneyClaimed[item.id] && (
-                      <span className="badge ask-badge">ASK</span>
-                    )}
-                    <button className="info-btn glass-inner" onClick={(event) => toggleExpand(item.id, event)}>
-                      {expandedItem === item.id ? 'Hide' : 'i'}
-                    </button>
-                  </div>
+              {filteredMoneyTracker.map(item => {
+                const owner = normalizeBenefitOwner(BENEFIT_OWNER_BY_ID[item.id] || 'family')
+                const ownerLabel = getBenefitOwnerLabel(owner)
+                const claimed = Boolean(moneyClaimed[item.id])
+                return (
+                  <li key={item.id} className={`glass-card money-card ${claimed ? 'done' : ''}`}>
+                    <div className="money-card-top">
+                      <span className="checkbox glass-inner" onClick={() => toggleMoney(item.id)}>
+                        {claimed ? '\u2713' : ''}
+                      </span>
+                      <span className={`item-text ${claimed ? 'claimed' : ''}`}>{item.label}</span>
+                      <span className={`badge owner-badge owner-${owner}`}>{ownerLabel}</span>
+                      <span className="money-amount">{formatYen(item.amount)}</span>
+                      {BENEFIT_ASK_REQUIRED_BY_ID[item.id] && !claimed && (
+                        <span className="badge ask-badge">ASK</span>
+                      )}
+                      <button className="info-btn glass-inner" onClick={(event) => toggleExpand(item.id, event)}>
+                        {expandedItem === item.id ? 'Hide' : 'i'}
+                      </button>
+                    </div>
 
-                  {expandedItem === item.id && item.howTo && (
-                    <div className="money-detail">
-                      <div className="detail-section">
-                        <div className="detail-label">How to claim:</div>
-                        <div className="detail-text">{item.howTo}</div>
-                      </div>
+                    {expandedItem === item.id && item.howTo && (
+                      <div className="money-detail">
+                        <div className="detail-section">
+                          <div className="detail-label">Claim owner:</div>
+                          <div className="detail-text">{ownerLabel}</div>
+                        </div>
+                        <div className="detail-section">
+                          <div className="detail-label">How to claim:</div>
+                          <div className="detail-text">{item.howTo}</div>
+                        </div>
+                        <div className="detail-section">
+                          <button
+                            type="button"
+                            className="tax-preset-btn glass-inner"
+                            onClick={() => addBenefitFollowUp(item)}
+                          >
+                            Add claim follow-up to Home calendar
+                          </button>
+                        </div>
                       {item.where && (
                         <div className="detail-section">
                           <div className="detail-label">Where:</div>
@@ -898,18 +1103,22 @@ export default function MoneyTab() {
                           <div className="detail-text">Not always auto-granted. Ask directly at counter/HR so this benefit is not missed.</div>
                         </div>
                       )}
-                      {Array.isArray(benefitTasksById[item.id]) && benefitTasksById[item.id].length > 0 && (
-                        <div className="detail-section">
-                          <div className="detail-label">Related tasks in checklist:</div>
-                          <div className="detail-text">
-                            {benefitTasksById[item.id].map((task) => (
-                              <div key={`${item.id}-task-${task.id}`}>
-                                <strong>{task.id.toUpperCase()}</strong> - {task.text} ({task.phaseTitle})
-                              </div>
-                            ))}
+                        {Array.isArray(benefitTasksById[item.id]) && benefitTasksById[item.id].length > 0 && (
+                          <div className="detail-section">
+                            <div className="detail-label">Checklist flow:</div>
+                            <div className="detail-text">
+                              {benefitTasksById[item.id].map((task) => {
+                                const done = Boolean(checked?.[task.id])
+                                return (
+                                  <div key={`${item.id}-task-${task.id}`} className="benefit-task-row">
+                                    <strong>{task.id.toUpperCase()}</strong> - {task.text} ({task.phaseTitle})
+                                    <span className={`badge ${done ? 'done-badge' : 'pending-badge'}`}>{done ? 'Done' : 'Pending'}</span>
+                                  </div>
+                                )
+                              })}
+                            </div>
                           </div>
-                        </div>
-                      )}
+                        )}
                       {item.verifiedAt && (
                         <div className="detail-section">
                           <div className="detail-label">Last verified:</div>
@@ -950,11 +1159,15 @@ export default function MoneyTab() {
                           </div>
                         </div>
                       )}
-                    </div>
-                  )}
-                </li>
-              ))}
+                      </div>
+                    )}
+                  </li>
+                )
+              })}
             </ul>
+            {filteredMoneyTracker.length === 0 && (
+              <p className="section-note">No benefits match current source/owner/status filters.</p>
+            )}
           </section>
 
           <section className="glass-section">
@@ -962,11 +1175,16 @@ export default function MoneyTab() {
               <span className="section-icon"><UiIcon icon={APP_ICONS.work} /></span>
               <div>
                 <h2>Father / Family Lane (Draft)</h2>
-                <span className="section-count">{familyBenefitsDoneCount}/{FAMILY_BENEFIT_ITEMS.length} checked</span>
+                <span className="section-count">
+                  {visibleFamilyBenefitsDoneCount}/{filteredFamilyBenefits.length || FAMILY_BENEFIT_ITEMS.length} checked
+                </span>
               </div>
             </div>
             <p className="section-note">
               Optional Shinji-side support lane (kaisha/hoken). Naomi flow above stays unchanged.
+            </p>
+            <p className="section-note">
+              Full progress: {familyBenefitsDoneCount}/{FAMILY_BENEFIT_ITEMS.length} checked.
             </p>
             <div className="glass-tabs salary-mini-tabs">
               <button
@@ -978,10 +1196,46 @@ export default function MoneyTab() {
               </button>
             </div>
             {familyBenefitsOpen && (
-              <ul>
-                {FAMILY_BENEFIT_ITEMS.map((item) => {
+              <>
+                <div className="glass-tabs salary-mini-tabs">
+                  {FAMILY_BENEFIT_GROUP_FILTERS.map((group) => (
+                    <button
+                      key={`family-group-${group.id}`}
+                      type="button"
+                      className={`glass-tab ${familyBenefitGroupFilter === group.id ? 'active' : ''}`}
+                      onClick={() => setFamilyBenefitGroupFilter(group.id)}
+                    >
+                      <span>{group.label}</span>
+                    </button>
+                  ))}
+                </div>
+                <div className="glass-tabs salary-mini-tabs">
+                  {BENEFIT_STATUS_FILTERS.map((status) => (
+                    <button
+                      key={`family-status-${status.id}`}
+                      type="button"
+                      className={`glass-tab ${familyBenefitStatusFilter === status.id ? 'active' : ''}`}
+                      onClick={() => setFamilyBenefitStatusFilter(status.id)}
+                    >
+                      <span>{status.label}</span>
+                    </button>
+                  ))}
+                </div>
+                <div className="backup-cloud-actions" style={{ marginBottom: '0.45rem' }}>
+                  <button
+                    type="button"
+                    className="btn-glass-secondary"
+                    onClick={addVisibleFamilyFollowUps}
+                    disabled={!filteredFamilyBenefits.some(item => !familyBenefitsClaimed[item.id])}
+                  >
+                    Add pending follow-ups to Home calendar
+                  </button>
+                </div>
+                <ul>
+                  {filteredFamilyBenefits.map((item) => {
                   const detailId = `family-${item.id}`
                   const claimed = Boolean(familyBenefitsClaimed[item.id])
+                  const owner = normalizeBenefitOwner(item.owner || 'family')
                   return (
                     <li key={item.id} className={`glass-card money-card ${claimed ? 'done' : ''}`}>
                       <div className="money-card-top">
@@ -989,6 +1243,7 @@ export default function MoneyTab() {
                           {claimed ? '\u2713' : ''}
                         </span>
                         <span className={`item-text ${claimed ? 'claimed' : ''}`}>{item.label}</span>
+                        <span className={`badge owner-badge owner-${owner}`}>{getBenefitOwnerLabel(owner)}</span>
                         <span className="money-amount">{item.estimateLabel}</span>
                         {item.askRequired && !claimed && <span className="badge ask-badge">ASK</span>}
                         <button className="info-btn glass-inner" onClick={(event) => toggleExpand(detailId, event)}>
@@ -1000,6 +1255,10 @@ export default function MoneyTab() {
                           <div className="detail-section">
                             <div className="detail-label">Action:</div>
                             <div className="detail-text">{item.howTo}</div>
+                          </div>
+                          <div className="detail-section">
+                            <div className="detail-label">Claim owner:</div>
+                            <div className="detail-text">{getBenefitOwnerLabel(owner)}</div>
                           </div>
                           <div className="detail-section">
                             <div className="detail-label">Where:</div>
@@ -1035,7 +1294,11 @@ export default function MoneyTab() {
                     </li>
                   )
                 })}
-              </ul>
+                </ul>
+                {filteredFamilyBenefits.length === 0 && (
+                  <p className="section-note">No family-lane items match current filters.</p>
+                )}
+              </>
             )}
           </section>
 

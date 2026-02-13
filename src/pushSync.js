@@ -10,10 +10,10 @@ const PUSH_TIMEOUT_MS = 12000
 const SW_LOOKUP_TIMEOUT_MS = 2500
 const SW_REGISTER_TIMEOUT_MS = 12000
 const SW_READY_TIMEOUT_MS = 10000
-const SW_ACTIVE_WAIT_MS = 10000
+const SW_ACTIVE_WAIT_MS = 20000
 const PUSH_SUB_READ_TIMEOUT_MS = 5000
-const PUSH_SUBSCRIBE_TIMEOUT_MS = 12000
-const CLOUD_UPSERT_TIMEOUT_MS = 10000
+const PUSH_SUBSCRIBE_TIMEOUT_MS = 25000
+const CLOUD_UPSERT_TIMEOUT_MS = 15000
 
 function withTimeout(promise, timeoutMs = PUSH_TIMEOUT_MS, label = 'operation') {
   const ms = Math.max(1000, Number(timeoutMs) || PUSH_TIMEOUT_MS)
@@ -82,6 +82,14 @@ function hasPushManagerGlobalSupport() {
   } catch {
     return false
   }
+}
+
+function hasRegistrationPushManager(registration) {
+  return Boolean(
+    registration?.pushManager
+    && typeof registration.pushManager.subscribe === 'function'
+    && typeof registration.pushManager.getSubscription === 'function',
+  )
 }
 
 async function resolveServiceWorkerRegistration() {
@@ -292,14 +300,14 @@ export function getPushDeviceId() {
 async function readCurrentSubscription() {
   if (!isPushSupported()) return null
   const baseRegistration = await resolveServiceWorkerRegistration()
-  const registration = baseRegistration?.pushManager
+  const registration = hasRegistrationPushManager(baseRegistration)
     ? baseRegistration
     : await withTimeout(
       navigator.serviceWorker.ready,
       SW_READY_TIMEOUT_MS,
       'service worker ready for readCurrentSubscription',
     ).catch(() => null)
-  if (!registration?.pushManager) return null
+  if (!hasRegistrationPushManager(registration)) return null
   return withTimeout(
     registration.pushManager.getSubscription(),
     PUSH_SUB_READ_TIMEOUT_MS,
@@ -338,7 +346,7 @@ export async function upsertCurrentPushSubscription(session, { notifEnabled = tr
     log('sw-wait-active', `Wait result: active=${!!activeRegistration?.active}`)
   }
 
-  if (!activeRegistration && registration?.pushManager) {
+  if (!activeRegistration && hasRegistrationPushManager(registration)) {
     log('sw-fallback', 'Using non-active registration with pushManager')
     activeRegistration = registration
   }
@@ -348,20 +356,43 @@ export async function upsertCurrentPushSubscription(session, { notifEnabled = tr
     return { status: 'skipped', reason: 'service-worker-unavailable' }
   }
 
-  if (!activeRegistration?.pushManager) {
+  if (!hasRegistrationPushManager(activeRegistration)) {
     log('pm-ready', 'pushManager missing, waiting for navigator.serviceWorker.ready...')
     const readyRegistration = await withTimeout(
       navigator.serviceWorker.ready,
       SW_READY_TIMEOUT_MS,
       'service worker ready with push manager',
     ).catch(() => null)
-    if (readyRegistration?.active && readyRegistration?.pushManager) {
+    if (readyRegistration?.active && hasRegistrationPushManager(readyRegistration)) {
       activeRegistration = readyRegistration
       log('pm-ready', 'Got pushManager from ready registration')
     }
   }
 
-  if (!activeRegistration?.pushManager) {
+  if (!hasRegistrationPushManager(activeRegistration)) {
+    log('pm-scan', 'pushManager still missing; scanning all registrations for compatible scope...')
+    const allRegs = await withTimeout(
+      navigator.serviceWorker.getRegistrations(),
+      SW_LOOKUP_TIMEOUT_MS,
+      'service worker getRegistrations pushManager scan',
+    ).catch(() => [])
+    const currentOrigin = typeof window !== 'undefined' ? window.location.origin : ''
+    const base = getBasePath()
+    const candidate = Array.isArray(allRegs)
+      ? allRegs.find((reg) => {
+        if (!hasRegistrationPushManager(reg)) return false
+        const scope = String(reg?.scope || '')
+        if (!scope || !currentOrigin) return true
+        return scope.startsWith(`${currentOrigin}${base}`)
+      })
+      : null
+    if (candidate) {
+      activeRegistration = candidate
+      log('pm-scan', `Found pushManager via registration scan, scope=${candidate.scope || 'n/a'}`)
+    }
+  }
+
+  if (!hasRegistrationPushManager(activeRegistration)) {
     log('pm-fail', 'pushManager still unavailable after all attempts')
     return { status: 'skipped', reason: 'push-manager-unavailable' }
   }
@@ -491,8 +522,21 @@ export async function getPushDiagnosticsAsync() {
   let swState = 'unknown'
   let swScope = 'none'
   let subEndpoint = 'none'
+  let scopedRegistrations = 0
   try {
-    const reg = await navigator.serviceWorker.getRegistration(sync.basePath)
+    const allRegs = await navigator.serviceWorker.getRegistrations().catch(() => [])
+    const currentOrigin = typeof window !== 'undefined' ? window.location.origin : ''
+    const scoped = Array.isArray(allRegs)
+      ? allRegs.filter((reg) => {
+        const scope = String(reg?.scope || '')
+        if (!scope || !currentOrigin) return true
+        return scope.startsWith(`${currentOrigin}${sync.basePath}`)
+      })
+      : []
+    scopedRegistrations = scoped.length
+
+    const byScope = await navigator.serviceWorker.getRegistration(sync.basePath)
+    const reg = byScope || scoped[0] || null
     if (reg) {
       swScope = reg.scope || 'none'
       swState = reg.active ? 'active' : reg.waiting ? 'waiting' : reg.installing ? 'installing' : 'no-worker'
@@ -506,7 +550,7 @@ export async function getPushDiagnosticsAsync() {
   } catch (e) {
     swState = `error: ${e?.message || 'unknown'}`
   }
-  return { ...sync, swState, swScope, subEndpoint }
+  return { ...sync, swState, swScope, subEndpoint, scopedRegistrations }
 }
 
 export async function disableCurrentPushSubscription(session, { unsubscribeLocal = false } = {}) {

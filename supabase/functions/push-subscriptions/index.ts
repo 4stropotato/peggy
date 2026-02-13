@@ -191,7 +191,7 @@ Deno.serve(async (req) => {
 
     let query = client
       .from('push_subscriptions')
-      .select('id, device_id, endpoint, subscription, app_base_url')
+      .select('id, device_id, endpoint, subscription, app_base_url, enabled, notif_enabled, last_seen_at')
       .eq('user_id', user.id)
     if (targetDeviceId) {
       // Manual test from a specific device should still work even when reminder toggles are OFF.
@@ -206,7 +206,27 @@ Deno.serve(async (req) => {
     const { data, error } = await query
 
     if (error) return jsonResponse(400, { error: error.message })
-    const rows = (Array.isArray(data) ? data : []) as PushRow[]
+    let rows = (Array.isArray(data) ? data : []) as (PushRow & {
+      enabled?: boolean
+      notif_enabled?: boolean
+      last_seen_at?: string | null
+    })[]
+
+    let fallbackUsed = false
+    if (targetDeviceId && rows.length === 0) {
+      const fallback = await client
+        .from('push_subscriptions')
+        .select('id, device_id, endpoint, subscription, app_base_url, enabled, notif_enabled, last_seen_at')
+        .eq('user_id', user.id)
+        .eq('enabled', true)
+        .eq('notif_enabled', true)
+        .order('last_seen_at', { ascending: false })
+        .limit(3)
+      if (!fallback.error && Array.isArray(fallback.data) && fallback.data.length > 0) {
+        rows = fallback.data as typeof rows
+        fallbackUsed = true
+      }
+    }
 
     const staleIds: string[] = []
     let sent = 0
@@ -249,6 +269,7 @@ Deno.serve(async (req) => {
       failed,
       errors,
       targetDeviceId: targetDeviceId || null,
+      fallbackUsed,
     })
   }
 
