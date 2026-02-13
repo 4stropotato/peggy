@@ -1039,6 +1039,9 @@ ul { list-style: none; }
   flex: 1;
   min-width: 130px;
 }
+.task-schedule-row .btn-glass-mini {
+  flex: 1 1 120px;
+}
 .task-schedule-note {
   margin-top: 0.35rem;
   font-size: 0.72rem;

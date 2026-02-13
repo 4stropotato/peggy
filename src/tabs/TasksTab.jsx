@@ -60,6 +60,51 @@ const ASK_REQUIRED_TASK_IDS = new Set([
   'b2',  // ask support second consultation payout
 ])
 
+const DAYTIME_TIME_SLOTS = ['09:00', '09:30', '10:00', '10:30', '11:00', '13:00', '13:30', '14:00', '14:30', '15:00', '15:30', '16:00']
+const DAYTIME_DEFAULT_TIME = '10:00'
+
+function parseIsoDate(dateISO) {
+  const raw = String(dateISO || '').trim()
+  if (!raw) return null
+  const date = new Date(`${raw}T00:00:00`)
+  if (Number.isNaN(date.getTime())) return null
+  return date
+}
+
+function toIsoDate(date = new Date()) {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
+}
+
+function addDaysToISO(dateISO, days = 0) {
+  const parsed = parseIsoDate(dateISO)
+  if (!parsed) return ''
+  parsed.setDate(parsed.getDate() + Number(days || 0))
+  return toIsoDate(parsed)
+}
+
+function isWeekendISO(dateISO) {
+  const parsed = parseIsoDate(dateISO)
+  if (!parsed) return false
+  const day = parsed.getDay()
+  return day === 0 || day === 6
+}
+
+function clampToDaytime(value) {
+  const raw = String(value || '').trim()
+  if (!/^\d{2}:\d{2}$/.test(raw)) return DAYTIME_DEFAULT_TIME
+  if (DAYTIME_TIME_SLOTS.includes(raw)) return raw
+  const [hoursText, minutesText] = raw.split(':')
+  const hours = Number(hoursText)
+  const minutes = Number(minutesText)
+  if (!Number.isFinite(hours) || !Number.isFinite(minutes)) return DAYTIME_DEFAULT_TIME
+  if (hours < 9 || hours > 16) return DAYTIME_DEFAULT_TIME
+  if (hours === 16 && minutes > 0) return DAYTIME_DEFAULT_TIME
+  const roundedMinutes = minutes >= 30 ? 30 : 0
+  const rounded = `${String(hours).padStart(2, '0')}:${String(roundedMinutes).padStart(2, '0')}`
+  if (DAYTIME_TIME_SLOTS.includes(rounded)) return rounded
+  return DAYTIME_DEFAULT_TIME
+}
+
 function isAskRequiredTask(item) {
   if (!item || typeof item !== 'object') return false
   if (ASK_REQUIRED_TASK_IDS.has(String(item.id || ''))) return true
@@ -81,6 +126,7 @@ export default function TasksTab() {
     toggle,
     planner,
     addPlan,
+    dueDate,
     taskBundleFilter,
     setTaskBundleFilter,
   } = useApp()
@@ -145,6 +191,17 @@ export default function TasksTab() {
     return map
   }, [planner])
 
+  const pendingPlansByDate = useMemo(() => {
+    const out = {}
+    const safePlanner = planner && typeof planner === 'object' ? planner : {}
+    Object.entries(safePlanner).forEach(([dateISO, plans]) => {
+      if (!Array.isArray(plans)) return
+      const pending = plans.filter(plan => plan && !plan.done)
+      if (pending.length) out[dateISO] = pending
+    })
+    return out
+  }, [planner])
+
   const visiblePhases = useMemo(() => {
     return phases
       .map((phase) => {
@@ -201,6 +258,105 @@ export default function TasksTab() {
       title: toCompactTitle(itemText),
       location: '',
       notes: '',
+      done: false,
+      taskIds: [itemId],
+    })
+  }
+
+  const moveToValidDate = (dateISO, requireWeekday = false) => {
+    let cursor = String(dateISO || '').trim() || todayISO
+    for (let i = 0; i < 20; i += 1) {
+      if (!requireWeekday || !isWeekendISO(cursor)) return cursor
+      cursor = addDaysToISO(cursor, 1) || cursor
+    }
+    return cursor
+  }
+
+  const getTaxSeasonAnchorISO = () => {
+    const now = new Date()
+    const month = now.getMonth() + 1
+    const year = month <= 3 ? now.getFullYear() : now.getFullYear() + 1
+    return `${year}-02-10`
+  }
+
+  const getUsedDaytimeSlotsForDate = (dateISO, localReserved = null) => {
+    const used = new Set()
+    const entries = Array.isArray(pendingPlansByDate?.[dateISO]) ? pendingPlansByDate[dateISO] : []
+    entries.forEach((plan) => {
+      const raw = String(plan?.time || '').trim()
+      if (!/^\d{2}:\d{2}$/.test(raw)) return
+      used.add(clampToDaytime(raw))
+    })
+    if (localReserved instanceof Set) {
+      localReserved.forEach(time => used.add(String(time || '').trim()))
+    }
+    return used
+  }
+
+  const pickAvailableDaytimeTime = (dateISO, preferredTime, slotShift = 0, localReserved = null) => {
+    const used = getUsedDaytimeSlotsForDate(dateISO, localReserved)
+    const normalizedPreferred = clampToDaytime(preferredTime)
+    const preferredIndex = Math.max(0, DAYTIME_TIME_SLOTS.indexOf(normalizedPreferred))
+    const shift = Math.max(0, Number(slotShift) || 0)
+    for (let i = 0; i < DAYTIME_TIME_SLOTS.length; i += 1) {
+      const idx = (preferredIndex + shift + i) % DAYTIME_TIME_SLOTS.length
+      const candidate = DAYTIME_TIME_SLOTS[idx]
+      if (!used.has(candidate)) return candidate
+    }
+    return normalizedPreferred
+  }
+
+  const getPreferredTimeByBundleTone = (bundles, itemText) => {
+    const tones = new Set((Array.isArray(bundles) ? bundles : []).map(bundle => String(bundle?.tone || '').trim().toLowerCase()))
+    if (tones.has('employer')) return '11:00'
+    if (tones.has('birth')) return '13:30'
+    if (tones.has('tax')) return '10:30'
+    if (tones.has('ward')) return '10:00'
+    const text = String(itemText || '').toLowerCase()
+    if (/(hospital|byoin|clinic|checkup)/.test(text)) return '13:30'
+    if (/(tax|kakutei|receipt|medical expense)/.test(text)) return '10:30'
+    if (/(hr|employer|hello work)/.test(text)) return '11:00'
+    return DAYTIME_DEFAULT_TIME
+  }
+
+  const getSmartBaseDateForTask = (itemId, itemText, bundles) => {
+    const id = String(itemId || '').trim().toLowerCase()
+    const safeDue = parseIsoDate(dueDate) ? String(dueDate) : ''
+    const tones = new Set((Array.isArray(bundles) ? bundles : []).map(bundle => String(bundle?.tone || '').trim().toLowerCase()))
+    const text = String(itemText || '').toLowerCase()
+
+    if (tones.has('tax') || /kakutei|tax|receipt/.test(text) || id === 'o4') return getTaxSeasonAnchorISO()
+    if (id.startsWith('p')) return addDaysToISO(todayISO, 2) || todayISO
+    if (id.startsWith('d')) return safeDue ? (addDaysToISO(safeDue, -30) || todayISO) : (addDaysToISO(todayISO, 7) || todayISO)
+    if (id.startsWith('b')) return safeDue ? (addDaysToISO(safeDue, 10) || todayISO) : (addDaysToISO(todayISO, 14) || todayISO)
+    if (id.startsWith('o')) return addDaysToISO(todayISO, 20) || todayISO
+    return addDaysToISO(todayISO, 4) || todayISO
+  }
+
+  const shouldRequireWeekday = (itemText, bundles) => {
+    const tones = new Set((Array.isArray(bundles) ? bundles : []).map(bundle => String(bundle?.tone || '').trim().toLowerCase()))
+    if (tones.has('ward') || tones.has('employer') || tones.has('birth') || tones.has('tax')) return true
+    return /(ward|office|city hall|kuyakusho|hr|employer|tax|hospital|clinic|hello work|registration)/i.test(String(itemText || ''))
+  }
+
+  const getSmartScheduleForTask = (itemId, itemText, bundles, slotShift = 0, localReserved = null) => {
+    const requireWeekday = shouldRequireWeekday(itemText, bundles)
+    const baseDate = moveToValidDate(getSmartBaseDateForTask(itemId, itemText, bundles), requireWeekday)
+    const preferredTime = getPreferredTimeByBundleTone(bundles, itemText)
+    const time = pickAvailableDaytimeTime(baseDate, preferredTime, slotShift, localReserved)
+    return { dateISO: baseDate, time }
+  }
+
+  const autoSmartScheduleTaskToCalendar = (itemId, itemText, bundles) => {
+    const smart = getSmartScheduleForTask(itemId, itemText, bundles)
+    const dateISO = smart.dateISO
+    const time = smart.time
+    upsertScheduleDraft(itemId, { date: dateISO, time })
+    addPlan?.(dateISO, {
+      time,
+      title: toCompactTitle(itemText),
+      location: '',
+      notes: 'Auto smart schedule (Tasks tab)',
       done: false,
       taskIds: [itemId],
     })
@@ -329,6 +485,7 @@ export default function TasksTab() {
                 const moneyIds = Array.isArray(item.moneyIds) ? item.moneyIds : []
                 const moneyTotal = moneyIds.reduce((acc, id) => acc + (moneyById[id]?.amount || 0), 0)
                 const bundles = Array.isArray(TASK_BUNDLES_BY_ID[item.id]) ? TASK_BUNDLES_BY_ID[item.id] : []
+                const smartSchedule = getSmartScheduleForTask(item.id, item.text, bundles)
                 const primaryBundleTone = bundles[0]?.tone || ''
                 const schedule = taskScheduleMap[item.id]
                 const scheduleLabel = schedule ? formatShortDate(schedule.dateISO) : ''
@@ -399,14 +556,21 @@ export default function TasksTab() {
                           <div className="task-schedule-row">
                             <input
                               type="date"
-                              value={scheduleDraft?.[item.id]?.date || schedule?.dateISO || todayISO}
+                              value={scheduleDraft?.[item.id]?.date || schedule?.dateISO || smartSchedule.dateISO || todayISO}
                               onChange={(e) => upsertScheduleDraft(item.id, { date: e.target.value })}
                             />
                             <input
                               type="time"
-                              value={scheduleDraft?.[item.id]?.time || schedule?.time || ''}
+                              value={scheduleDraft?.[item.id]?.time || schedule?.time || smartSchedule.time}
                               onChange={(e) => upsertScheduleDraft(item.id, { time: e.target.value })}
                             />
+                            <button
+                              type="button"
+                              className="btn-glass-mini secondary"
+                              onClick={() => autoSmartScheduleTaskToCalendar(item.id, item.text, bundles, schedule)}
+                            >
+                              Auto Smart
+                            </button>
                             <button
                               type="button"
                               className="btn-glass-mini primary"
@@ -421,7 +585,7 @@ export default function TasksTab() {
                             </div>
                           ) : (
                             <div className="task-schedule-note">
-                              Tip: pick a date and tap Add. When you mark that plan as done, this task will auto-check.
+                              Smart suggestion: {formatShortDate(smartSchedule.dateISO)} {smartSchedule.time}. Auto Smart avoids night time and calendar conflicts.
                             </div>
                           )}
                         </div>
