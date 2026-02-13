@@ -1175,16 +1175,44 @@ ul { list-style: none; }
 }
 
 .ceiling-table { margin-top: 0.5rem; }
+.projection-mode-tabs {
+  margin-top: 0.45rem;
+}
+.projection-assumption-strip {
+  margin-top: 0.45rem;
+  border: 1px solid var(--glass-border);
+  border-radius: 10px;
+  padding: 0.45rem 0.55rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.45rem;
+}
+.projection-assumption-strip span {
+  font-size: 0.7rem;
+  color: var(--text2);
+}
+.projection-assumption-strip strong {
+  font-size: 0.72rem;
+  color: var(--text);
+}
 .ceil-row {
   display: flex;
   justify-content: space-between;
   padding: 0.6rem;
   margin-bottom: 0.3rem;
   font-size: 0.8rem;
+  gap: 0.55rem;
+}
+.ceil-row span:first-child {
+  flex: 1;
+  min-width: 0;
 }
 .ceil-row span:last-child {
   font-weight: 700;
   color: var(--gold);
+  flex-shrink: 0;
+  text-align: right;
 }
 .ceil-row.total {
   padding-top: 0.8rem;
@@ -1194,6 +1222,70 @@ ul { list-style: none; }
 .ceil-row.total span:last-child {
   color: var(--green);
   font-size: 1.1rem;
+}
+.projection-compare-row span:last-child {
+  color: #6fd2a4;
+}
+.support-optional-list {
+  margin-top: 0.5rem;
+  border: 1px solid var(--glass-border);
+  border-radius: 10px;
+  padding: 0.5rem 0.55rem;
+  background: var(--glass-highlight);
+}
+.stretch-playbook {
+  margin-top: 0.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+}
+.stretch-step {
+  border: 1px solid var(--glass-border);
+  border-radius: 10px;
+  padding: 0.55rem 0.6rem;
+}
+.stretch-step-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 0.5rem;
+}
+.stretch-step-title {
+  font-size: 0.8rem;
+  font-weight: 800;
+  color: var(--text);
+}
+.stretch-step-meta {
+  margin-top: 0.18rem;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.32rem;
+}
+.stretch-step-meta span {
+  font-size: 0.64rem;
+  color: var(--text2);
+  border: 1px solid var(--glass-border);
+  border-radius: 999px;
+  padding: 0.16rem 0.45rem;
+  background: var(--glass-highlight);
+}
+.stretch-step-note {
+  margin-top: 0.35rem;
+  font-size: 0.72rem;
+  line-height: 1.45;
+  color: var(--text2);
+}
+.stretch-step-note strong {
+  color: var(--text);
+}
+.stretch-step-badges {
+  margin-top: 0.38rem;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+}
+.stretch-step-actions {
+  margin-top: 0.45rem;
 }
 
 /* ===== Supplement Countdown Cards ===== */

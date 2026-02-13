@@ -128,9 +128,17 @@ const FAMILY_BENEFITS_OPEN_KEY = 'baby-prep-family-benefits-open'
 const FAMILY_BENEFITS_CLAIMED_KEY = 'baby-prep-family-benefits-claimed'
 const BENEFIT_TOOLS_OPEN_KEY = 'baby-prep-benefit-tools-open'
 const FAMILY_LANE_TOOLS_OPEN_KEY = 'baby-prep-family-lane-tools-open'
+const SUPPORT_PROJECTION_SCENARIO_KEY = 'baby-prep-support-projection-scenario'
+const SUPPORT_PROJECTION_CHILD_MODEL_KEY = 'baby-prep-support-projection-child-model'
+const SUPPORT_PLAYBOOK_OPEN_KEY = 'baby-prep-support-playbook-open'
 
 const CHILD_ALLOWANCE_18Y_ONE_CHILD = 2340000
 const CHILD_ALLOWANCE_18Y_TWO_CHILD = 4680000
+const SUPPORT_DIRECT_STRICT_IDS = ['m1', 'm4', 'm5']
+const SUPPORT_DIRECT_STRETCH_ONLY_IDS = ['m6', 'm7', 'm10', 'm15']
+const SUPPORT_INCOME_REPLACEMENT_IDS = ['m11', 'm12']
+const SUPPORT_COST_SAVINGS_IDS = ['m2', 'm3', 'm13', 'm14', 'm16']
+const SUPPORT_TAX_ID = 'm9'
 
 const FAMILY_BENEFIT_GROUP_FILTERS = [
   { id: 'all', label: 'All Tracks' },
@@ -255,6 +263,69 @@ const FAMILY_BENEFIT_ITEMS = [
   },
 ]
 
+const STRETCH_PLAYBOOK_STEPS = [
+  {
+    id: 'sp1',
+    title: 'Ward office maximize sweep (ask all optional programs)',
+    daysFromNow: 2,
+    time: '10:00',
+    location: 'Kawasaki Ward Office',
+    focus: 'Capture ask-required and campaign-style support in one visit.',
+    target: 'Ask for municipal baby gift, cost-of-living support, and premium reduction windows.',
+    benefitIds: ['m10', 'm15', 'm16'],
+  },
+  {
+    id: 'sp2',
+    title: 'Hospital billing route + delivery refund check',
+    daysFromNow: 4,
+    time: '14:00',
+    location: 'Delivery hospital billing desk',
+    focus: 'Prevent losing refund due to wrong submission route.',
+    target: 'Confirm direct payment setup and refund path if invoice is below childbirth lump-sum.',
+    benefitIds: ['m4', 'm6'],
+  },
+  {
+    id: 'sp3',
+    title: 'HR benefits bundle (Naomi + Shinji side)',
+    daysFromNow: 6,
+    time: '11:00',
+    location: 'Employer HR / payroll',
+    focus: 'Lock in leave-related income replacement and employer add-ons.',
+    target: 'Confirm maternity/childcare leave pay, social insurance exemption, and fuka kyuufu.',
+    benefitIds: ['m7', 'm11', 'm12', 'm13'],
+  },
+  {
+    id: 'sp4',
+    title: 'Birth registration bundle execution plan',
+    daysFromNow: 10,
+    time: '09:30',
+    location: 'Kawasaki Ward Office',
+    focus: 'Stack post-birth submissions in one process flow.',
+    target: 'Sequence birth support payment, child allowance, and child medical subsidy with no deadline miss.',
+    benefitIds: ['m5', 'm8', 'm14'],
+  },
+  {
+    id: 'sp5',
+    title: 'Medical receipts + transport log system',
+    daysFromNow: 1,
+    time: '',
+    location: 'Home admin setup',
+    focus: 'Sustain yearly tax refund quality.',
+    target: 'Set monthly archive routine for receipts + transport records before tax season.',
+    benefitIds: ['m2', 'm9'],
+  },
+  {
+    id: 'sp6',
+    title: 'Annual support re-check cadence',
+    daysFromNow: 30,
+    time: '20:30',
+    location: 'Home calendar review',
+    focus: 'Catch new city campaigns and rule updates every fiscal year.',
+    target: 'Review Kawasaki and national pages, then add follow-ups for active windows.',
+    benefitIds: ['m9', 'm10', 'm15'],
+  },
+]
+
 function readStorageBool(key, fallback = false) {
   if (typeof window === 'undefined') return Boolean(fallback)
   const raw = String(window.localStorage.getItem(key) || '').trim().toLowerCase()
@@ -285,6 +356,19 @@ function writeStorageMap(key, value) {
   if (typeof window === 'undefined') return
   const safe = value && typeof value === 'object' && !Array.isArray(value) ? value : {}
   window.localStorage.setItem(key, JSON.stringify(safe))
+}
+
+function readStorageChoice(key, fallback = '') {
+  if (typeof window === 'undefined') return String(fallback || '')
+  const raw = window.localStorage.getItem(key)
+  if (!raw) return String(fallback || '')
+  const normalized = String(raw).trim()
+  return normalized || String(fallback || '')
+}
+
+function writeStorageChoice(key, value) {
+  if (typeof window === 'undefined') return
+  window.localStorage.setItem(key, String(value || ''))
 }
 
 function formatYen(value) {
@@ -567,6 +651,12 @@ function toIsoDate(date = new Date()) {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
 }
 
+function toIsoDateWithOffset(daysFromNow = 0) {
+  const date = new Date()
+  date.setDate(date.getDate() + Number(daysFromNow || 0))
+  return toIsoDate(date)
+}
+
 export default function MoneyTab() {
   const {
     checked,
@@ -580,6 +670,7 @@ export default function MoneyTab() {
     setTaxInputs,
     attendance,
     husbandAttendance,
+    planner,
     familyConfig,
     financeConfig,
     setFinanceConfig,
@@ -613,6 +704,15 @@ export default function MoneyTab() {
   const [familyBenefitsClaimed, setFamilyBenefitsClaimed] = useState(() => readStorageMap(FAMILY_BENEFITS_CLAIMED_KEY))
   const [benefitToolsOpen, setBenefitToolsOpen] = useState(() => readStorageBool(BENEFIT_TOOLS_OPEN_KEY, false))
   const [familyLaneToolsOpen, setFamilyLaneToolsOpen] = useState(() => readStorageBool(FAMILY_LANE_TOOLS_OPEN_KEY, false))
+  const [supportProjectionScenario, setSupportProjectionScenario] = useState(() => {
+    const saved = readStorageChoice(SUPPORT_PROJECTION_SCENARIO_KEY, 'strict')
+    return saved === 'stretch' ? 'stretch' : 'strict'
+  })
+  const [supportProjectionChildModel, setSupportProjectionChildModel] = useState(() => {
+    const saved = readStorageChoice(SUPPORT_PROJECTION_CHILD_MODEL_KEY, 'one')
+    return saved === 'two' ? 'two' : 'one'
+  })
+  const [supportPlaybookOpen, setSupportPlaybookOpen] = useState(() => readStorageBool(SUPPORT_PLAYBOOK_OPEN_KEY, false))
   const [familyBenefitGroupFilter, setFamilyBenefitGroupFilter] = useState('all')
   const [familyBenefitStatusFilter, setFamilyBenefitStatusFilter] = useState('all')
   const [rateForm, setRateForm] = useState(() => ({
@@ -701,25 +801,73 @@ export default function MoneyTab() {
     () => filteredFamilyBenefits.filter(item => familyBenefitsClaimed[item.id]).length,
     [filteredFamilyBenefits, familyBenefitsClaimed]
   )
-  const supportCeiling = useMemo(() => {
+  const benefitLabelById = useMemo(
+    () => Object.fromEntries(moneyTracker.map(item => [item.id, item.label])),
+    []
+  )
+  const plannerStretchTitles = useMemo(() => {
+    const set = new Set()
+    const safePlanner = planner && typeof planner === 'object' ? planner : {}
+    Object.values(safePlanner).forEach((entries) => {
+      if (!Array.isArray(entries)) return
+      entries.forEach((entry) => {
+        const title = String(entry?.title || '').trim().toLowerCase()
+        if (!title) return
+        if (title.startsWith('stretch:')) set.add(title)
+      })
+    })
+    return set
+  }, [planner])
+  const supportProjection = useMemo(() => {
     const byId = Object.fromEntries(moneyTracker.map(item => [item.id, Math.max(0, Number(item.amount) || 0)]))
-    const directCashBirth = (byId.m1 || 0) + (byId.m4 || 0) + (byId.m5 || 0) + (byId.m6 || 0) + (byId.m7 || 0) + (byId.m10 || 0) + (byId.m15 || 0)
-    const incomeReplacementCash = (byId.m11 || 0) + (byId.m12 || 0)
-    const costSavingsConfigured = (byId.m2 || 0) + (byId.m3 || 0) + (byId.m13 || 0) + (byId.m14 || 0) + (byId.m16 || 0)
-    const taxAnnualEstimate = byId.m9 || 0
+    const sumByIds = (ids) => ids.reduce((acc, id) => acc + (byId[id] || 0), 0)
+    const directCashStrict = sumByIds(SUPPORT_DIRECT_STRICT_IDS)
+    const directCashStretchOnly = sumByIds(SUPPORT_DIRECT_STRETCH_ONLY_IDS)
+    const directCashStretch = directCashStrict + directCashStretchOnly
+    const incomeReplacementCash = sumByIds(SUPPORT_INCOME_REPLACEMENT_IDS)
+    const costSavingsConfigured = sumByIds(SUPPORT_COST_SAVINGS_IDS)
+    const taxAnnualEstimate = byId[SUPPORT_TAX_ID] || 0
     const taxOver18y = taxAnnualEstimate * 18
-    const support18yOneChild = directCashBirth + incomeReplacementCash + costSavingsConfigured + taxOver18y + CHILD_ALLOWANCE_18Y_ONE_CHILD
-    const support18yTwoChildren = directCashBirth + incomeReplacementCash + costSavingsConfigured + taxOver18y + CHILD_ALLOWANCE_18Y_TWO_CHILD
+    const strictOneChild = directCashStrict + incomeReplacementCash + costSavingsConfigured + taxOver18y + CHILD_ALLOWANCE_18Y_ONE_CHILD
+    const strictTwoChildren = directCashStrict + incomeReplacementCash + costSavingsConfigured + taxOver18y + CHILD_ALLOWANCE_18Y_TWO_CHILD
+    const stretchOneChild = strictOneChild + directCashStretchOnly
+    const stretchTwoChildren = strictTwoChildren + directCashStretchOnly
+    const stretchOnlyRows = SUPPORT_DIRECT_STRETCH_ONLY_IDS
+      .map(id => ({
+        id,
+        label: benefitLabelById[id] || id.toUpperCase(),
+        amount: byId[id] || 0,
+      }))
+      .filter(row => row.amount > 0)
+
     return {
-      directCashBirth,
+      directCashStrict,
+      directCashStretchOnly,
+      directCashStretch,
       incomeReplacementCash,
       costSavingsConfigured,
       taxAnnualEstimate,
       taxOver18y,
-      support18yOneChild,
-      support18yTwoChildren,
+      strictOneChild,
+      strictTwoChildren,
+      stretchOneChild,
+      stretchTwoChildren,
+      stretchOnlyRows,
     }
-  }, [])
+  }, [benefitLabelById])
+  const activeChildAllowance = supportProjectionChildModel === 'two'
+    ? CHILD_ALLOWANCE_18Y_TWO_CHILD
+    : CHILD_ALLOWANCE_18Y_ONE_CHILD
+  const strictTotalByChildModel = supportProjectionChildModel === 'two'
+    ? supportProjection.strictTwoChildren
+    : supportProjection.strictOneChild
+  const stretchTotalByChildModel = supportProjectionChildModel === 'two'
+    ? supportProjection.stretchTwoChildren
+    : supportProjection.stretchOneChild
+  const activeProjectionTotal = supportProjectionScenario === 'stretch'
+    ? stretchTotalByChildModel
+    : strictTotalByChildModel
+  const stretchUpside = Math.max(0, stretchTotalByChildModel - strictTotalByChildModel)
 
   useEffect(() => {
     if (!includeHusband && workView === 'husband') setWorkView('wife')
@@ -736,6 +884,18 @@ export default function MoneyTab() {
   useEffect(() => {
     writeStorageBool(FAMILY_LANE_TOOLS_OPEN_KEY, familyLaneToolsOpen)
   }, [familyLaneToolsOpen])
+
+  useEffect(() => {
+    writeStorageChoice(SUPPORT_PROJECTION_SCENARIO_KEY, supportProjectionScenario)
+  }, [supportProjectionScenario])
+
+  useEffect(() => {
+    writeStorageChoice(SUPPORT_PROJECTION_CHILD_MODEL_KEY, supportProjectionChildModel)
+  }, [supportProjectionChildModel])
+
+  useEffect(() => {
+    writeStorageBool(SUPPORT_PLAYBOOK_OPEN_KEY, supportPlaybookOpen)
+  }, [supportPlaybookOpen])
 
   useEffect(() => {
     writeStorageMap(FAMILY_BENEFITS_CLAIMED_KEY, familyBenefitsClaimed)
@@ -879,6 +1039,45 @@ export default function MoneyTab() {
   const addVisibleFamilyFollowUps = () => {
     const pending = filteredFamilyBenefits.filter(item => !familyBenefitsClaimed[item.id]).slice(0, 8)
     pending.forEach((item) => addFamilyBenefitFollowUp(item))
+  }
+
+  const hasStretchStepPlan = (step) => {
+    const title = `stretch: ${String(step?.title || '').trim().toLowerCase()}`
+    return plannerStretchTitles.has(title)
+  }
+
+  const addStretchStepToCalendar = (step) => {
+    if (!step || hasStretchStepPlan(step)) return
+    const dateISO = toIsoDateWithOffset(step.daysFromNow)
+    const relatedIds = Array.isArray(step.benefitIds) ? step.benefitIds : []
+    const relatedBenefitText = relatedIds
+      .map((id) => `${String(id || '').toUpperCase()} - ${benefitLabelById[id] || id}`)
+      .join('\n')
+    const relatedTaskIds = Array.from(new Set(
+      relatedIds
+        .flatMap((id) => (Array.isArray(benefitTasksById[id]) ? benefitTasksById[id].map(task => task.id) : []))
+        .filter(Boolean)
+    ))
+    const notes = [
+      `Focus: ${step.focus}`,
+      `Target: ${step.target}`,
+      relatedBenefitText ? `Related benefits:\n${relatedBenefitText}` : '',
+    ]
+      .filter(Boolean)
+      .join('\n')
+
+    addPlan(dateISO, {
+      time: String(step.time || '').trim(),
+      title: `Stretch: ${step.title}`,
+      location: String(step.location || '').trim(),
+      notes,
+      done: false,
+      taskIds: relatedTaskIds,
+    })
+  }
+
+  const addStretchPlaybookBatch = () => {
+    STRETCH_PLAYBOOK_STEPS.forEach((step) => addStretchStepToCalendar(step))
   }
 
   const canMoveToNextTaxStep = (() => {
@@ -1394,42 +1593,171 @@ export default function MoneyTab() {
               <div><h2>18-Year Support Projection</h2></div>
             </div>
             <p className="section-note">
-              Accurate breakdown from current configured benefits. Previous huge ranges were scenario estimates; this panel now uses deterministic math only.
+              Strict mode is conservative baseline. Stretch mode adds optional/campaign capture items with an explicit playbook.
             </p>
+            <div className="glass-tabs salary-mini-tabs projection-mode-tabs">
+              {[
+                { id: 'strict', label: 'Strict Baseline' },
+                { id: 'stretch', label: 'Stretch Scenario' },
+              ].map(option => (
+                <button
+                  key={`support-scenario-${option.id}`}
+                  type="button"
+                  className={`glass-tab ${supportProjectionScenario === option.id ? 'active' : ''}`}
+                  onClick={() => setSupportProjectionScenario(option.id)}
+                >
+                  <span>{option.label}</span>
+                </button>
+              ))}
+            </div>
+            <div className="glass-tabs salary-mini-tabs projection-mode-tabs">
+              {[
+                { id: 'one', label: '1 Child Model' },
+                { id: 'two', label: '2 Child Model' },
+              ].map(option => (
+                <button
+                  key={`support-child-${option.id}`}
+                  type="button"
+                  className={`glass-tab ${supportProjectionChildModel === option.id ? 'active' : ''}`}
+                  onClick={() => setSupportProjectionChildModel(option.id)}
+                >
+                  <span>{option.label}</span>
+                </button>
+              ))}
+            </div>
+            <div className="projection-assumption-strip glass-inner">
+              <span>
+                {supportProjectionScenario === 'strict'
+                  ? 'Strict excludes optional refund/campaign/ask-only cash.'
+                  : 'Stretch includes optional refund/campaign/ask-only cash capture.'}
+              </span>
+              <strong>{supportProjectionScenario === 'strict' ? 'Conservative' : 'Maximize'}</strong>
+            </div>
             <div className="ceiling-table">
               <div className="ceil-row glass-inner">
-                <span>Direct cash around birth (configured)</span>
-                <span>{formatYen(supportCeiling.directCashBirth)}</span>
+                <span>Direct cash around birth ({supportProjectionScenario === 'strict' ? 'strict baseline' : 'strict + stretch extras'})</span>
+                <span>{formatYen(
+                  supportProjectionScenario === 'strict'
+                    ? supportProjection.directCashStrict
+                    : supportProjection.directCashStretch
+                )}</span>
               </div>
+              {supportProjectionScenario === 'stretch' && (
+                <div className="ceil-row glass-inner">
+                  <span>Stretch-only optional cash pool (refund/ask/campaign)</span>
+                  <span>+ {formatYen(supportProjection.directCashStretchOnly)}</span>
+                </div>
+              )}
+              {supportProjectionScenario === 'strict' && (
+                <div className="ceil-row glass-inner">
+                  <span>Optional cash not counted in strict baseline</span>
+                  <span>{formatYen(supportProjection.directCashStretchOnly)}</span>
+                </div>
+              )}
               <div className="ceil-row glass-inner">
                 <span>Income replacement cash (leave benefits)</span>
-                <span>{formatYen(supportCeiling.incomeReplacementCash)}</span>
+                <span>{formatYen(supportProjection.incomeReplacementCash)}</span>
               </div>
               <div className="ceil-row glass-inner">
                 <span>Cost savings (medical/education, configured)</span>
-                <span>{formatYen(supportCeiling.costSavingsConfigured)}</span>
+                <span>{formatYen(supportProjection.costSavingsConfigured)}</span>
               </div>
               <div className="ceil-row glass-inner">
                 <span>Tax benefits over time (18 years)</span>
-                <span>{formatYen(supportCeiling.taxOver18y)} ({formatYen(supportCeiling.taxAnnualEstimate)}/year)</span>
+                <span>{formatYen(supportProjection.taxOver18y)} ({formatYen(supportProjection.taxAnnualEstimate)}/year)</span>
               </div>
               <div className="ceil-row glass-inner">
-                <span>Child allowance (18y model, 1 child)</span>
-                <span>{formatYen(CHILD_ALLOWANCE_18Y_ONE_CHILD)}</span>
-              </div>
-              <div className="ceil-row glass-inner">
-                <span>Child allowance (18y model, 2 children)</span>
-                <span>{formatYen(CHILD_ALLOWANCE_18Y_TWO_CHILD)}</span>
+                <span>Child allowance ({supportProjectionChildModel === 'two' ? '2-child model' : '1-child model'})</span>
+                <span>{formatYen(activeChildAllowance)}</span>
               </div>
               <div className="ceil-row total glass-inner">
-                <span>Total 18-year projection (1 child)</span>
-                <span>{formatYen(supportCeiling.support18yOneChild)}</span>
+                <span>Total 18-year projection ({supportProjectionScenario === 'strict' ? 'strict' : 'stretch'})</span>
+                <span>{formatYen(activeProjectionTotal)}</span>
               </div>
-              <div className="ceil-row total glass-inner">
-                <span>Total 18-year projection (2-child model)</span>
-                <span>{formatYen(supportCeiling.support18yTwoChildren)}</span>
+              <div className="ceil-row glass-inner projection-compare-row">
+                <span>Strict vs Stretch delta ({supportProjectionChildModel === 'two' ? '2-child' : '1-child'})</span>
+                <span>+ {formatYen(stretchUpside)}</span>
               </div>
             </div>
+            {supportProjection.stretchOnlyRows.length > 0 && (
+              <div className="support-optional-list">
+                <div className="detail-label">Stretch-only benefit sources</div>
+                <div className="detail-text">
+                  {supportProjection.stretchOnlyRows.map((row) => (
+                    <div key={`stretch-only-${row.id}`} className="benefit-task-row">
+                      <strong>{row.id.toUpperCase()}</strong> - {row.label}
+                      <span className="badge money-badge">{formatYenCompact(row.amount)}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+            <button
+              type="button"
+              className="cal-collapse-btn"
+              onClick={() => setSupportPlaybookOpen(prev => !prev)}
+              aria-expanded={supportPlaybookOpen}
+            >
+              {supportPlaybookOpen ? 'Hide Stretch Maximizer' : 'Show Stretch Maximizer'}
+            </button>
+            {supportPlaybookOpen && (
+              <div className="stretch-playbook">
+                <p className="section-note">
+                  Detailed maximize flow: each step is actionable and can be pushed to Home calendar with related checklist links.
+                </p>
+                <div className="backup-cloud-actions" style={{ marginBottom: '0.25rem' }}>
+                  <button
+                    type="button"
+                    className="btn-glass-secondary"
+                    onClick={addStretchPlaybookBatch}
+                    disabled={STRETCH_PLAYBOOK_STEPS.every(step => hasStretchStepPlan(step))}
+                  >
+                    Add all missing stretch steps to Home calendar
+                  </button>
+                </div>
+                {STRETCH_PLAYBOOK_STEPS.map((step) => {
+                  const relatedBenefitIds = Array.isArray(step.benefitIds) ? step.benefitIds : []
+                  const linkedAmount = relatedBenefitIds.reduce((acc, id) => {
+                    const benefit = moneyTracker.find(item => item.id === id)
+                    return acc + Math.max(0, Number(benefit?.amount) || 0)
+                  }, 0)
+                  return (
+                    <div key={step.id} className="stretch-step glass-inner">
+                      <div className="stretch-step-top">
+                        <div>
+                          <div className="stretch-step-title">{step.title}</div>
+                          <div className="stretch-step-meta">
+                            <span>D+{step.daysFromNow}</span>
+                            {step.time && <span>{step.time}</span>}
+                            {step.location && <span>{step.location}</span>}
+                          </div>
+                        </div>
+                        <span className="badge money-badge">{formatYenCompact(linkedAmount)} pool</span>
+                      </div>
+                      <div className="stretch-step-note"><strong>Focus:</strong> {step.focus}</div>
+                      <div className="stretch-step-note"><strong>Target:</strong> {step.target}</div>
+                      <div className="stretch-step-badges">
+                        {relatedBenefitIds.map((benefitId) => (
+                          <span key={`${step.id}-${benefitId}`} className="badge owner-badge owner-family">
+                            {benefitId.toUpperCase()}
+                          </span>
+                        ))}
+                      </div>
+                      <div className="stretch-step-actions">
+                        <button
+                          type="button"
+                          className="tax-preset-btn glass-inner"
+                          onClick={() => addStretchStepToCalendar(step)}
+                          disabled={hasStretchStepPlan(step)}
+                        >
+                          {hasStretchStepPlan(step) ? 'Already in Home calendar' : 'Add to Home calendar'}
+                        </button>
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            )}
           </section>
         </>
       )}
