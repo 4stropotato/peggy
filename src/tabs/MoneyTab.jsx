@@ -273,6 +273,7 @@ const STRETCH_PLAYBOOK_STEPS = [
     focus: 'Capture ask-required and campaign-style support in one visit.',
     target: 'Ask for municipal baby gift, cost-of-living support, and premium reduction windows.',
     benefitIds: ['m10', 'm15', 'm16'],
+    taskIds: ['p2', 'p3', 'p4', 'p5', 'p6', 'p7', 'p8', 'p13', 'p14', 'o7'],
   },
   {
     id: 'sp2',
@@ -283,6 +284,7 @@ const STRETCH_PLAYBOOK_STEPS = [
     focus: 'Prevent losing refund due to wrong submission route.',
     target: 'Confirm direct payment setup and refund path if invoice is below childbirth lump-sum.',
     benefitIds: ['m4', 'm6'],
+    taskIds: ['d1', 'b6'],
   },
   {
     id: 'sp3',
@@ -293,6 +295,7 @@ const STRETCH_PLAYBOOK_STEPS = [
     focus: 'Lock in leave-related income replacement and employer add-ons.',
     target: 'Confirm maternity/childcare leave pay, social insurance exemption, and fuka kyuufu.',
     benefitIds: ['m7', 'm11', 'm12', 'm13'],
+    taskIds: ['p10', 'd6', 'd7'],
   },
   {
     id: 'sp4',
@@ -303,6 +306,7 @@ const STRETCH_PLAYBOOK_STEPS = [
     focus: 'Stack post-birth submissions in one process flow.',
     target: 'Sequence birth support payment, child allowance, and child medical subsidy with no deadline miss.',
     benefitIds: ['m5', 'm8', 'm14'],
+    taskIds: ['b1', 'b2', 'b3', 'b4', 'b5'],
   },
   {
     id: 'sp5',
@@ -313,6 +317,7 @@ const STRETCH_PLAYBOOK_STEPS = [
     focus: 'Sustain yearly tax refund quality.',
     target: 'Set monthly archive routine for receipts + transport records before tax season.',
     benefitIds: ['m2', 'm9'],
+    taskIds: ['p11', 'o1', 'o2', 'o4'],
   },
   {
     id: 'sp6',
@@ -323,6 +328,29 @@ const STRETCH_PLAYBOOK_STEPS = [
     focus: 'Catch new city campaigns and rule updates every fiscal year.',
     target: 'Review Kawasaki and national pages, then add follow-ups for active windows.',
     benefitIds: ['m9', 'm10', 'm15'],
+    taskIds: ['o7'],
+  },
+  {
+    id: 'sp7',
+    title: 'Prenatal voucher usage planning',
+    daysFromNow: 3,
+    time: '09:45',
+    location: 'OB-GYN + ward office docs check',
+    focus: 'Maximize voucher usage by sequencing visits early.',
+    target: 'Set prenatal visit cadence so all vouchers are consumed within valid windows.',
+    benefitIds: ['m2'],
+    taskIds: ['p1', 'p2', 'p11'],
+  },
+  {
+    id: 'sp8',
+    title: 'Tax filing execution window lock',
+    daysFromNow: 40,
+    time: '19:30',
+    location: 'Home e-Tax prep',
+    focus: 'Avoid missing tax refund timing.',
+    target: 'Prepare and submit Kakutei Shinkoku in filing season with complete medical/transport records.',
+    benefitIds: ['m9'],
+    taskIds: ['o4'],
   },
 ]
 
@@ -657,6 +685,16 @@ function toIsoDateWithOffset(daysFromNow = 0) {
   return toIsoDate(date)
 }
 
+function toCompactTitle(text, maxLen = 96) {
+  const raw = String(text || '').trim()
+  if (raw.length <= maxLen) return raw
+  return `${raw.slice(0, Math.max(0, maxLen - 3))}...`
+}
+
+function buildStretchMarker(stepId) {
+  return `[stretch-step:${String(stepId || '').trim().toLowerCase()}]`
+}
+
 export default function MoneyTab() {
   const {
     checked,
@@ -666,6 +704,7 @@ export default function MoneyTab() {
     addPayRate,
     removePayRate,
     addPlan,
+    removePlan,
     taxInputs,
     setTaxInputs,
     attendance,
@@ -805,18 +844,73 @@ export default function MoneyTab() {
     () => Object.fromEntries(moneyTracker.map(item => [item.id, item.label])),
     []
   )
-  const plannerStretchTitles = useMemo(() => {
-    const set = new Set()
-    const safePlanner = planner && typeof planner === 'object' ? planner : {}
-    Object.values(safePlanner).forEach((entries) => {
-      if (!Array.isArray(entries)) return
-      entries.forEach((entry) => {
-        const title = String(entry?.title || '').trim().toLowerCase()
-        if (!title) return
-        if (title.startsWith('stretch:')) set.add(title)
+  const taskById = useMemo(() => {
+    const out = {}
+    phases.forEach((phase) => {
+      phase.items.forEach((item) => {
+        out[item.id] = {
+          id: item.id,
+          text: item.text,
+          phaseTitle: phase.title,
+        }
       })
     })
-    return set
+    return out
+  }, [])
+  const pendingTaskSchedulesByTaskId = useMemo(() => {
+    const out = {}
+    const safePlanner = planner && typeof planner === 'object' ? planner : {}
+    Object.entries(safePlanner).forEach(([dateISO, entries]) => {
+      if (!Array.isArray(entries)) return
+      entries.forEach((entry) => {
+        if (!entry || entry.done) return
+        const taskIds = Array.isArray(entry.taskIds) ? entry.taskIds : []
+        if (!taskIds.length) return
+        taskIds.forEach((taskIdRaw) => {
+          const taskId = String(taskIdRaw || '').trim()
+          if (!taskId) return
+          if (!out[taskId]) out[taskId] = []
+          out[taskId].push({
+            dateISO,
+            planId: entry.id,
+            time: String(entry.time || '').trim(),
+            title: String(entry.title || '').trim(),
+          })
+        })
+      })
+    })
+    return out
+  }, [planner])
+  const stretchPlanEntriesByStep = useMemo(() => {
+    const out = {}
+    STRETCH_PLAYBOOK_STEPS.forEach((step) => {
+      out[step.id] = []
+    })
+    const titleToStepId = {}
+    STRETCH_PLAYBOOK_STEPS.forEach((step) => {
+      titleToStepId[`stretch: ${String(step.title || '').trim().toLowerCase()}`] = step.id
+    })
+    const safePlanner = planner && typeof planner === 'object' ? planner : {}
+    Object.entries(safePlanner).forEach(([dateISO, entries]) => {
+      if (!Array.isArray(entries)) return
+      entries.forEach((entry) => {
+        if (!entry) return
+        const title = String(entry.title || '').trim()
+        const titleLower = title.toLowerCase()
+        const notes = String(entry.notes || '')
+        const markerMatch = notes.match(/\[stretch-step:([a-z0-9_-]+)\]/i)
+        let stepId = markerMatch ? String(markerMatch[1] || '').trim().toLowerCase() : ''
+        if (!stepId && titleToStepId[titleLower]) stepId = titleToStepId[titleLower]
+        if (!stepId || !out[stepId]) return
+        const kind = titleLower.startsWith('stretch:') ? 'step' : 'task'
+        out[stepId].push({
+          dateISO,
+          planId: String(entry.id || '').trim(),
+          kind,
+        })
+      })
+    })
+    return out
   }, [planner])
   const supportProjection = useMemo(() => {
     const byId = Object.fromEntries(moneyTracker.map(item => [item.id, Math.max(0, Number(item.amount) || 0)]))
@@ -1041,24 +1135,64 @@ export default function MoneyTab() {
     pending.forEach((item) => addFamilyBenefitFollowUp(item))
   }
 
+  const getStretchStepEntries = (step, kind = 'all') => {
+    const stepId = String(step?.id || '').trim().toLowerCase()
+    if (!stepId) return []
+    const entries = Array.isArray(stretchPlanEntriesByStep?.[stepId]) ? stretchPlanEntriesByStep[stepId] : []
+    if (kind === 'all') return entries
+    return entries.filter(entry => entry.kind === kind)
+  }
+
+  const removePlanEntries = (entries) => {
+    entries.forEach((entry) => {
+      const dateISO = String(entry?.dateISO || '').trim()
+      const planId = String(entry?.planId || '').trim()
+      if (!dateISO || !planId) return
+      removePlan(dateISO, planId)
+    })
+  }
+
+  const resolveStepTaskIds = (step) => {
+    const relatedIds = Array.isArray(step?.benefitIds) ? step.benefitIds : []
+    const mappedTaskIds = relatedIds
+      .flatMap((id) => (Array.isArray(benefitTasksById[id]) ? benefitTasksById[id].map(task => task.id) : []))
+    const explicitTaskIds = Array.isArray(step?.taskIds) ? step.taskIds : []
+    return Array.from(new Set(
+      [...mappedTaskIds, ...explicitTaskIds]
+        .map(taskId => String(taskId || '').trim())
+        .filter(taskId => Boolean(taskById[taskId]))
+    ))
+  }
+
+  const getBestDateISOForStep = (step) => toIsoDateWithOffset(step?.daysFromNow)
+
   const hasStretchStepPlan = (step) => {
-    const title = `stretch: ${String(step?.title || '').trim().toLowerCase()}`
-    return plannerStretchTitles.has(title)
+    return getStretchStepEntries(step, 'step').length > 0
+  }
+
+  const hasStretchTaskPlans = (step) => getStretchStepEntries(step, 'task').length > 0
+
+  const getSchedulableMissingTaskCount = (step) => {
+    const stepTaskIds = resolveStepTaskIds(step)
+    return stepTaskIds.reduce((acc, taskId) => {
+      if (checked?.[taskId]) return acc
+      const hasPendingSchedule = Array.isArray(pendingTaskSchedulesByTaskId?.[taskId]) && pendingTaskSchedulesByTaskId[taskId].length > 0
+      if (hasPendingSchedule) return acc
+      return acc + 1
+    }, 0)
   }
 
   const addStretchStepToCalendar = (step) => {
     if (!step || hasStretchStepPlan(step)) return
-    const dateISO = toIsoDateWithOffset(step.daysFromNow)
+    const dateISO = getBestDateISOForStep(step)
     const relatedIds = Array.isArray(step.benefitIds) ? step.benefitIds : []
+    const stepTaskIds = resolveStepTaskIds(step)
     const relatedBenefitText = relatedIds
       .map((id) => `${String(id || '').toUpperCase()} - ${benefitLabelById[id] || id}`)
       .join('\n')
-    const relatedTaskIds = Array.from(new Set(
-      relatedIds
-        .flatMap((id) => (Array.isArray(benefitTasksById[id]) ? benefitTasksById[id].map(task => task.id) : []))
-        .filter(Boolean)
-    ))
+    const marker = buildStretchMarker(step.id)
     const notes = [
+      marker,
       `Focus: ${step.focus}`,
       `Target: ${step.target}`,
       relatedBenefitText ? `Related benefits:\n${relatedBenefitText}` : '',
@@ -1072,12 +1206,58 @@ export default function MoneyTab() {
       location: String(step.location || '').trim(),
       notes,
       done: false,
-      taskIds: relatedTaskIds,
+      taskIds: stepTaskIds,
     })
+  }
+
+  const removeStretchStepFromCalendar = (step) => {
+    removePlanEntries(getStretchStepEntries(step, 'step'))
+  }
+
+  const autoScheduleStretchTasksForStep = (step) => {
+    if (!step) return
+    const dateISO = getBestDateISOForStep(step)
+    const stepTaskIds = resolveStepTaskIds(step)
+    const marker = buildStretchMarker(step.id)
+    stepTaskIds.forEach((taskId) => {
+      if (checked?.[taskId]) return
+      const hasPendingSchedule = Array.isArray(pendingTaskSchedulesByTaskId?.[taskId]) && pendingTaskSchedulesByTaskId[taskId].length > 0
+      if (hasPendingSchedule) return
+      const task = taskById[taskId]
+      if (!task) return
+      addPlan(dateISO, {
+        time: String(step.time || '').trim(),
+        title: toCompactTitle(task.text, 88),
+        location: String(step.location || '').trim(),
+        notes: `${marker}\nAuto-scheduled from Stretch Maximizer (${step.title}).`,
+        done: false,
+        taskIds: [taskId],
+      })
+    })
+  }
+
+  const removeStretchTaskSchedulesForStep = (step) => {
+    removePlanEntries(getStretchStepEntries(step, 'task'))
   }
 
   const addStretchPlaybookBatch = () => {
     STRETCH_PLAYBOOK_STEPS.forEach((step) => addStretchStepToCalendar(step))
+  }
+
+  const autoScheduleStretchTaskBatch = () => {
+    STRETCH_PLAYBOOK_STEPS.forEach((step) => autoScheduleStretchTasksForStep(step))
+  }
+
+  const removeAllStretchEntries = () => {
+    const all = STRETCH_PLAYBOOK_STEPS.flatMap((step) => getStretchStepEntries(step, 'all'))
+    const seen = new Set()
+    const unique = all.filter((entry) => {
+      const key = `${String(entry?.dateISO || '').trim()}::${String(entry?.planId || '').trim()}`
+      if (!key || seen.has(key)) return false
+      seen.add(key)
+      return true
+    })
+    removePlanEntries(unique)
   }
 
   const canMoveToNextTaxStep = (() => {
@@ -1703,7 +1883,7 @@ export default function MoneyTab() {
             {supportPlaybookOpen && (
               <div className="stretch-playbook">
                 <p className="section-note">
-                  Detailed maximize flow: each step is actionable and can be pushed to Home calendar with related checklist links.
+                  Detailed maximize flow: may undo/remove na bawat step, plus one-click auto schedule papunta sa task calendar flow.
                 </p>
                 <div className="backup-cloud-actions" style={{ marginBottom: '0.25rem' }}>
                   <button
@@ -1714,9 +1894,30 @@ export default function MoneyTab() {
                   >
                     Add all missing stretch steps to Home calendar
                   </button>
+                  <button
+                    type="button"
+                    className="btn-glass-secondary"
+                    onClick={autoScheduleStretchTaskBatch}
+                    disabled={STRETCH_PLAYBOOK_STEPS.every(step => getSchedulableMissingTaskCount(step) === 0)}
+                  >
+                    One-click: auto-schedule linked tasks (best dates)
+                  </button>
+                  <button
+                    type="button"
+                    className="btn-glass-secondary"
+                    onClick={removeAllStretchEntries}
+                    disabled={STRETCH_PLAYBOOK_STEPS.every(step => getStretchStepEntries(step, 'all').length === 0)}
+                  >
+                    Undo all stretch adds (calendar + task schedules)
+                  </button>
                 </div>
                 {STRETCH_PLAYBOOK_STEPS.map((step) => {
                   const relatedBenefitIds = Array.isArray(step.benefitIds) ? step.benefitIds : []
+                  const relatedTaskIds = resolveStepTaskIds(step)
+                  const hasStepCard = hasStretchStepPlan(step)
+                  const hasTaskSchedules = hasStretchTaskPlans(step)
+                  const missingTaskCount = getSchedulableMissingTaskCount(step)
+                  const bestDateISO = getBestDateISOForStep(step)
                   const linkedAmount = relatedBenefitIds.reduce((acc, id) => {
                     const benefit = moneyTracker.find(item => item.id === id)
                     return acc + Math.max(0, Number(benefit?.amount) || 0)
@@ -1727,7 +1928,7 @@ export default function MoneyTab() {
                         <div>
                           <div className="stretch-step-title">{step.title}</div>
                           <div className="stretch-step-meta">
-                            <span>D+{step.daysFromNow}</span>
+                            <span>Best date: {bestDateISO}</span>
                             {step.time && <span>{step.time}</span>}
                             {step.location && <span>{step.location}</span>}
                           </div>
@@ -1742,15 +1943,27 @@ export default function MoneyTab() {
                             {benefitId.toUpperCase()}
                           </span>
                         ))}
+                        {relatedTaskIds.map((taskId) => (
+                          <span key={`${step.id}-task-${taskId}`} className="badge owner-badge owner-naomi">
+                            {taskId.toUpperCase()}
+                          </span>
+                        ))}
                       </div>
                       <div className="stretch-step-actions">
                         <button
                           type="button"
                           className="tax-preset-btn glass-inner"
-                          onClick={() => addStretchStepToCalendar(step)}
-                          disabled={hasStretchStepPlan(step)}
+                          onClick={() => (hasStepCard ? removeStretchStepFromCalendar(step) : addStretchStepToCalendar(step))}
                         >
-                          {hasStretchStepPlan(step) ? 'Already in Home calendar' : 'Add to Home calendar'}
+                          {hasStepCard ? 'Remove step from Home calendar' : 'Add step to Home calendar'}
+                        </button>
+                        <button
+                          type="button"
+                          className="tax-preset-btn glass-inner"
+                          onClick={() => (hasTaskSchedules ? removeStretchTaskSchedulesForStep(step) : autoScheduleStretchTasksForStep(step))}
+                          disabled={!hasTaskSchedules && missingTaskCount === 0}
+                        >
+                          {hasTaskSchedules ? 'Undo auto task schedules' : `Auto-schedule tasks (${missingTaskCount})`}
                         </button>
                       </div>
                     </div>

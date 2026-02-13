@@ -1286,6 +1286,13 @@ ul { list-style: none; }
 }
 .stretch-step-actions {
   margin-top: 0.45rem;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+.stretch-step-actions .tax-preset-btn {
+  flex: 1;
+  min-width: 170px;
 }
 
 /* ===== Supplement Countdown Cards ===== */
