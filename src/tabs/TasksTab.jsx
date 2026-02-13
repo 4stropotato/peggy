@@ -60,8 +60,16 @@ const ASK_REQUIRED_TASK_IDS = new Set([
   'b2',  // ask support second consultation payout
 ])
 
-const DAYTIME_TIME_SLOTS = ['09:00', '09:30', '10:00', '10:30', '11:00', '13:00', '13:30', '14:00', '14:30', '15:00', '15:30', '16:00']
 const DAYTIME_DEFAULT_TIME = '10:00'
+
+const OFFICE_PROFILES = {
+  ward: { id: 'ward', label: 'Ward Office', start: '08:30', end: '16:00', preferred: '10:00', weekdayOnly: true },
+  employer: { id: 'employer', label: 'Employer / HR', start: '10:00', end: '16:30', preferred: '11:00', weekdayOnly: true },
+  hospital: { id: 'hospital', label: 'Hospital / Clinic', start: '09:30', end: '15:30', preferred: '13:30', weekdayOnly: true },
+  tax: { id: 'tax', label: 'Tax Office', start: '08:30', end: '16:00', preferred: '10:30', weekdayOnly: true },
+  home: { id: 'home', label: 'Home admin', start: '09:00', end: '18:00', preferred: '10:30', weekdayOnly: false },
+  general: { id: 'general', label: 'Office hours', start: '09:00', end: '16:00', preferred: '10:00', weekdayOnly: true },
+}
 
 function parseIsoDate(dateISO) {
   const raw = String(dateISO || '').trim()
@@ -92,17 +100,50 @@ function isWeekendISO(dateISO) {
 function clampToDaytime(value) {
   const raw = String(value || '').trim()
   if (!/^\d{2}:\d{2}$/.test(raw)) return DAYTIME_DEFAULT_TIME
-  if (DAYTIME_TIME_SLOTS.includes(raw)) return raw
   const [hoursText, minutesText] = raw.split(':')
   const hours = Number(hoursText)
   const minutes = Number(minutesText)
   if (!Number.isFinite(hours) || !Number.isFinite(minutes)) return DAYTIME_DEFAULT_TIME
-  if (hours < 9 || hours > 16) return DAYTIME_DEFAULT_TIME
-  if (hours === 16 && minutes > 0) return DAYTIME_DEFAULT_TIME
+  if (hours < 8 || hours > 18) return DAYTIME_DEFAULT_TIME
+  if (hours === 18 && minutes > 0) return DAYTIME_DEFAULT_TIME
   const roundedMinutes = minutes >= 30 ? 30 : 0
   const rounded = `${String(hours).padStart(2, '0')}:${String(roundedMinutes).padStart(2, '0')}`
-  if (DAYTIME_TIME_SLOTS.includes(rounded)) return rounded
-  return DAYTIME_DEFAULT_TIME
+  return rounded
+}
+
+function toMinutes(value) {
+  const raw = String(value || '').trim()
+  if (!/^\d{2}:\d{2}$/.test(raw)) return -1
+  const [hoursText, minutesText] = raw.split(':')
+  const hours = Number(hoursText)
+  const minutes = Number(minutesText)
+  if (!Number.isFinite(hours) || !Number.isFinite(minutes)) return -1
+  if (hours < 0 || hours > 23 || minutes < 0 || minutes > 59) return -1
+  return (hours * 60) + minutes
+}
+
+function toTimeString(minutes) {
+  const safe = Math.max(0, Math.min(23 * 60 + 59, Number(minutes) || 0))
+  const hours = Math.floor(safe / 60)
+  const mins = safe % 60
+  return `${String(hours).padStart(2, '0')}:${String(mins).padStart(2, '0')}`
+}
+
+function roundToHalfHour(value) {
+  const mins = toMinutes(value)
+  if (mins < 0) return toMinutes(DAYTIME_DEFAULT_TIME)
+  return Math.round(mins / 30) * 30
+}
+
+function buildHalfHourSlots(start, end) {
+  const startMins = roundToHalfHour(start)
+  const endMins = roundToHalfHour(end)
+  if (startMins < 0 || endMins < 0 || endMins < startMins) return [DAYTIME_DEFAULT_TIME]
+  const out = []
+  for (let cursor = startMins; cursor <= endMins; cursor += 30) {
+    out.push(toTimeString(cursor))
+  }
+  return out.length ? out : [DAYTIME_DEFAULT_TIME]
 }
 
 function isAskRequiredTask(item) {
@@ -279,7 +320,18 @@ export default function TasksTab() {
     return `${year}-02-10`
   }
 
-  const getUsedDaytimeSlotsForDate = (dateISO, localReserved = null) => {
+  const getOfficeProfile = (itemText, bundles) => {
+    const tones = new Set((Array.isArray(bundles) ? bundles : []).map(bundle => String(bundle?.tone || '').trim().toLowerCase()))
+    const text = String(itemText || '').toLowerCase()
+    if (tones.has('tax') || /kakutei|tax|receipt/.test(text)) return OFFICE_PROFILES.tax
+    if (tones.has('employer') || /(hr|employer|hello work)/.test(text)) return OFFICE_PROFILES.employer
+    if (/(hospital|byoin|clinic|ob-gyn|checkup|pediatric)/.test(text)) return OFFICE_PROFILES.hospital
+    if (tones.has('ward') || tones.has('birth') || /(ward|office|city hall|kuyakusho|registration)/.test(text)) return OFFICE_PROFILES.ward
+    if (/(home|review|admin|log|folder|organize)/.test(text)) return OFFICE_PROFILES.home
+    return OFFICE_PROFILES.general
+  }
+
+  const getUsedSlotsForDate = (dateISO, localReserved = null) => {
     const used = new Set()
     const entries = Array.isArray(pendingPlansByDate?.[dateISO]) ? pendingPlansByDate[dateISO] : []
     entries.forEach((plan) => {
@@ -293,30 +345,21 @@ export default function TasksTab() {
     return used
   }
 
-  const pickAvailableDaytimeTime = (dateISO, preferredTime, slotShift = 0, localReserved = null) => {
-    const used = getUsedDaytimeSlotsForDate(dateISO, localReserved)
+  const pickAvailableTimeInProfile = (dateISO, preferredTime, profile, slotShift = 0, localReserved = null) => {
+    const used = getUsedSlotsForDate(dateISO, localReserved)
+    const slots = buildHalfHourSlots(profile?.start || '09:00', profile?.end || '16:00')
     const normalizedPreferred = clampToDaytime(preferredTime)
-    const preferredIndex = Math.max(0, DAYTIME_TIME_SLOTS.indexOf(normalizedPreferred))
+    const fallbackPreferred = slots.includes(normalizedPreferred)
+      ? normalizedPreferred
+      : (slots.includes(profile?.preferred) ? profile.preferred : slots[0])
+    const preferredIndex = Math.max(0, slots.indexOf(fallbackPreferred))
     const shift = Math.max(0, Number(slotShift) || 0)
-    for (let i = 0; i < DAYTIME_TIME_SLOTS.length; i += 1) {
-      const idx = (preferredIndex + shift + i) % DAYTIME_TIME_SLOTS.length
-      const candidate = DAYTIME_TIME_SLOTS[idx]
+    for (let i = 0; i < slots.length; i += 1) {
+      const idx = (preferredIndex + shift + i) % slots.length
+      const candidate = slots[idx]
       if (!used.has(candidate)) return candidate
     }
-    return normalizedPreferred
-  }
-
-  const getPreferredTimeByBundleTone = (bundles, itemText) => {
-    const tones = new Set((Array.isArray(bundles) ? bundles : []).map(bundle => String(bundle?.tone || '').trim().toLowerCase()))
-    if (tones.has('employer')) return '11:00'
-    if (tones.has('birth')) return '13:30'
-    if (tones.has('tax')) return '10:30'
-    if (tones.has('ward')) return '10:00'
-    const text = String(itemText || '').toLowerCase()
-    if (/(hospital|byoin|clinic|checkup)/.test(text)) return '13:30'
-    if (/(tax|kakutei|receipt|medical expense)/.test(text)) return '10:30'
-    if (/(hr|employer|hello work)/.test(text)) return '11:00'
-    return DAYTIME_DEFAULT_TIME
+    return fallbackPreferred
   }
 
   const getSmartBaseDateForTask = (itemId, itemText, bundles) => {
@@ -333,18 +376,13 @@ export default function TasksTab() {
     return addDaysToISO(todayISO, 4) || todayISO
   }
 
-  const shouldRequireWeekday = (itemText, bundles) => {
-    const tones = new Set((Array.isArray(bundles) ? bundles : []).map(bundle => String(bundle?.tone || '').trim().toLowerCase()))
-    if (tones.has('ward') || tones.has('employer') || tones.has('birth') || tones.has('tax')) return true
-    return /(ward|office|city hall|kuyakusho|hr|employer|tax|hospital|clinic|hello work|registration)/i.test(String(itemText || ''))
-  }
-
   const getSmartScheduleForTask = (itemId, itemText, bundles, slotShift = 0, localReserved = null) => {
-    const requireWeekday = shouldRequireWeekday(itemText, bundles)
+    const profile = getOfficeProfile(itemText, bundles)
+    const requireWeekday = Boolean(profile?.weekdayOnly)
     const baseDate = moveToValidDate(getSmartBaseDateForTask(itemId, itemText, bundles), requireWeekday)
-    const preferredTime = getPreferredTimeByBundleTone(bundles, itemText)
-    const time = pickAvailableDaytimeTime(baseDate, preferredTime, slotShift, localReserved)
-    return { dateISO: baseDate, time }
+    const preferredTime = String(profile?.preferred || DAYTIME_DEFAULT_TIME)
+    const time = pickAvailableTimeInProfile(baseDate, preferredTime, profile, slotShift, localReserved)
+    return { dateISO: baseDate, time, profile }
   }
 
   const autoSmartScheduleTaskToCalendar = (itemId, itemText, bundles) => {
@@ -567,7 +605,7 @@ export default function TasksTab() {
                             <button
                               type="button"
                               className="btn-glass-mini secondary"
-                              onClick={() => autoSmartScheduleTaskToCalendar(item.id, item.text, bundles, schedule)}
+                              onClick={() => autoSmartScheduleTaskToCalendar(item.id, item.text, bundles)}
                             >
                               Auto Smart
                             </button>
@@ -585,7 +623,9 @@ export default function TasksTab() {
                             </div>
                           ) : (
                             <div className="task-schedule-note">
-                              Smart suggestion: {formatShortDate(smartSchedule.dateISO)} {smartSchedule.time}. Auto Smart avoids night time and calendar conflicts.
+                              Smart suggestion ({smartSchedule.profile?.label || 'Office hours'} {smartSchedule.profile?.start || '09:00'}-{smartSchedule.profile?.end || '16:00'}):
+                              {' '}
+                              {formatShortDate(smartSchedule.dateISO)} {smartSchedule.time}. Auto Smart avoids night time and calendar conflicts.
                             </div>
                           )}
                         </div>
