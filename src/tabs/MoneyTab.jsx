@@ -139,6 +139,8 @@ const SUPPORT_DIRECT_STRETCH_ONLY_IDS = ['m6', 'm7', 'm10', 'm15']
 const SUPPORT_INCOME_REPLACEMENT_IDS = ['m11', 'm12']
 const SUPPORT_COST_SAVINGS_IDS = ['m2', 'm3', 'm13', 'm14', 'm16']
 const SUPPORT_TAX_ID = 'm9'
+const DAYTIME_TIME_SLOTS = ['09:00', '09:30', '10:00', '10:30', '11:00', '13:00', '13:30', '14:00', '14:30', '15:00', '15:30', '16:00']
+const DAYTIME_DEFAULT_TIME = '10:00'
 
 const FAMILY_BENEFIT_GROUP_FILTERS = [
   { id: 'all', label: 'All Tracks' },
@@ -312,7 +314,7 @@ const STRETCH_PLAYBOOK_STEPS = [
     id: 'sp5',
     title: 'Medical receipts + transport log system',
     daysFromNow: 1,
-    time: '',
+    time: '10:30',
     location: 'Home admin setup',
     focus: 'Sustain yearly tax refund quality.',
     target: 'Set monthly archive routine for receipts + transport records before tax season.',
@@ -323,7 +325,7 @@ const STRETCH_PLAYBOOK_STEPS = [
     id: 'sp6',
     title: 'Annual support re-check cadence',
     daysFromNow: 30,
-    time: '20:30',
+    time: '10:30',
     location: 'Home calendar review',
     focus: 'Catch new city campaigns and rule updates every fiscal year.',
     target: 'Review Kawasaki and national pages, then add follow-ups for active windows.',
@@ -345,7 +347,7 @@ const STRETCH_PLAYBOOK_STEPS = [
     id: 'sp8',
     title: 'Tax filing execution window lock',
     daysFromNow: 40,
-    time: '19:30',
+    time: '10:30',
     location: 'Home e-Tax prep',
     focus: 'Avoid missing tax refund timing.',
     target: 'Prepare and submit Kakutei Shinkoku in filing season with complete medical/transport records.',
@@ -695,6 +697,49 @@ function buildStretchMarker(stepId) {
   return `[stretch-step:${String(stepId || '').trim().toLowerCase()}]`
 }
 
+function parseIsoDate(dateISO) {
+  const raw = String(dateISO || '').trim()
+  if (!raw) return null
+  const date = new Date(`${raw}T00:00:00`)
+  if (Number.isNaN(date.getTime())) return null
+  return date
+}
+
+function addDaysToISO(dateISO, days = 0) {
+  const parsed = parseIsoDate(dateISO)
+  if (!parsed) return ''
+  parsed.setDate(parsed.getDate() + Number(days || 0))
+  return toIsoDate(parsed)
+}
+
+function isWeekendISO(dateISO) {
+  const parsed = parseIsoDate(dateISO)
+  if (!parsed) return false
+  const day = parsed.getDay()
+  return day === 0 || day === 6
+}
+
+function toDaytimeTime(value) {
+  const raw = String(value || '').trim()
+  if (!/^\d{2}:\d{2}$/.test(raw)) return DAYTIME_DEFAULT_TIME
+  if (DAYTIME_TIME_SLOTS.includes(raw)) return raw
+  const [hoursText, minutesText] = raw.split(':')
+  const hours = Number(hoursText)
+  const minutes = Number(minutesText)
+  if (!Number.isFinite(hours) || !Number.isFinite(minutes)) return DAYTIME_DEFAULT_TIME
+  if (hours < 9 || hours > 16) return DAYTIME_DEFAULT_TIME
+  if (hours === 16 && minutes > 0) return DAYTIME_DEFAULT_TIME
+  const roundedMinutes = minutes >= 30 ? 30 : 0
+  const rounded = `${String(hours).padStart(2, '0')}:${String(roundedMinutes).padStart(2, '0')}`
+  if (DAYTIME_TIME_SLOTS.includes(rounded)) return rounded
+  return DAYTIME_DEFAULT_TIME
+}
+
+function isOfficeHourStep(step) {
+  const text = `${String(step?.title || '')} ${String(step?.location || '')} ${String(step?.target || '')}`.toLowerCase()
+  return /(ward|office|kuyakusho|city hall|hr|hospital|byoin|hello work|tax|clinic|ob-gyn|kawasaki)/.test(text)
+}
+
 export default function MoneyTab() {
   const {
     checked,
@@ -710,6 +755,7 @@ export default function MoneyTab() {
     attendance,
     husbandAttendance,
     planner,
+    dueDate,
     familyConfig,
     financeConfig,
     setFinanceConfig,
@@ -754,6 +800,7 @@ export default function MoneyTab() {
   const [supportPlaybookOpen, setSupportPlaybookOpen] = useState(() => readStorageBool(SUPPORT_PLAYBOOK_OPEN_KEY, false))
   const [familyBenefitGroupFilter, setFamilyBenefitGroupFilter] = useState('all')
   const [familyBenefitStatusFilter, setFamilyBenefitStatusFilter] = useState('all')
+  const [benefitScheduleDraft, setBenefitScheduleDraft] = useState({})
   const [rateForm, setRateForm] = useState(() => ({
     person: 'naomi',
     basis: 'hourly',
@@ -878,6 +925,16 @@ export default function MoneyTab() {
           })
         })
       })
+    })
+    return out
+  }, [planner])
+  const pendingPlansByDate = useMemo(() => {
+    const out = {}
+    const safePlanner = planner && typeof planner === 'object' ? planner : {}
+    Object.entries(safePlanner).forEach(([dateISO, entries]) => {
+      if (!Array.isArray(entries)) return
+      const pending = entries.filter(entry => entry && !entry.done)
+      if (pending.length) out[dateISO] = pending
     })
     return out
   }, [planner])
@@ -1102,21 +1159,6 @@ export default function MoneyTab() {
     }))
   }
 
-  const addBenefitFollowUp = (item) => {
-    const today = toIsoDate()
-    const where = String(item?.where || '').trim()
-    const timing = String(BENEFIT_TIMING_HINT_BY_ID[item?.id] || item?.deadline || '').trim()
-    addPlan(today, {
-      time: '',
-      title: `Claim: ${item.label}`,
-      location: where ? where.split('\n')[0] : '',
-      notes: timing
-        ? `Timing: ${timing}${where ? `\nWhere: ${where}` : ''}`
-        : (where || 'Benefit follow-up'),
-      done: false,
-    })
-  }
-
   const addFamilyBenefitFollowUp = (item) => {
     const today = toIsoDate()
     const when = String(item?.timing || '').trim()
@@ -1164,7 +1206,96 @@ export default function MoneyTab() {
     ))
   }
 
-  const getBestDateISOForStep = (step) => toIsoDateWithOffset(step?.daysFromNow)
+  const moveToValidDate = (dateISO, requireWeekday = false) => {
+    let cursor = String(dateISO || '').trim() || toIsoDate()
+    for (let i = 0; i < 20; i += 1) {
+      if (!requireWeekday || !isWeekendISO(cursor)) return cursor
+      cursor = addDaysToISO(cursor, 1) || cursor
+    }
+    return cursor
+  }
+
+  const getUsedDaytimeSlotsForDate = (dateISO, localReserved = null) => {
+    const used = new Set()
+    const entries = Array.isArray(pendingPlansByDate?.[dateISO]) ? pendingPlansByDate[dateISO] : []
+    entries.forEach((entry) => {
+      const raw = String(entry?.time || '').trim()
+      if (!/^\d{2}:\d{2}$/.test(raw)) return
+      used.add(toDaytimeTime(raw))
+    })
+    if (localReserved instanceof Set) {
+      localReserved.forEach(time => used.add(String(time || '').trim()))
+    }
+    return used
+  }
+
+  const pickAvailableDaytimeTime = (dateISO, preferredTime, slotShift = 0, localReserved = null) => {
+    const used = getUsedDaytimeSlotsForDate(dateISO, localReserved)
+    const normalizedPreferred = toDaytimeTime(preferredTime)
+    const preferredIndex = Math.max(0, DAYTIME_TIME_SLOTS.indexOf(normalizedPreferred))
+    const shift = Math.max(0, Number(slotShift) || 0)
+    for (let i = 0; i < DAYTIME_TIME_SLOTS.length; i += 1) {
+      const idx = (preferredIndex + shift + i) % DAYTIME_TIME_SLOTS.length
+      const candidate = DAYTIME_TIME_SLOTS[idx]
+      if (!used.has(candidate)) return candidate
+    }
+    return normalizedPreferred
+  }
+
+  const getTaxSeasonAnchorISO = () => {
+    const now = new Date()
+    const month = now.getMonth() + 1
+    const year = month <= 3 ? now.getFullYear() : now.getFullYear() + 1
+    return `${year}-02-10`
+  }
+
+  const getSmartBenefitBaseDateISO = (item) => {
+    const id = String(item?.id || '').trim()
+    const safeDue = parseIsoDate(dueDate) ? String(dueDate) : ''
+    if (id === 'm4') {
+      if (safeDue) return addDaysToISO(safeDue, -30) || toIsoDateWithOffset(3)
+      return toIsoDateWithOffset(3)
+    }
+    if (id === 'm5' || id === 'm8' || id === 'm14') {
+      if (safeDue) return addDaysToISO(safeDue, 10) || toIsoDateWithOffset(10)
+      return toIsoDateWithOffset(10)
+    }
+    if (id === 'm6') {
+      if (safeDue) return addDaysToISO(safeDue, 30) || toIsoDateWithOffset(30)
+      return toIsoDateWithOffset(30)
+    }
+    if (id === 'm9') return getTaxSeasonAnchorISO()
+    return toIsoDateWithOffset(4)
+  }
+
+  const getSmartBenefitPreferredTime = (item) => {
+    const id = String(item?.id || '').trim()
+    if (id === 'm4' || id === 'm6') return '13:30'
+    if (id === 'm7' || id === 'm11' || id === 'm12' || id === 'm13') return '10:30'
+    if (id === 'm9') return '10:00'
+    return '10:00'
+  }
+
+  const getSmartBenefitSchedule = (item, slotShift = 0, localReserved = null) => {
+    const baseDate = moveToValidDate(getSmartBenefitBaseDateISO(item), true)
+    const time = pickAvailableDaytimeTime(baseDate, getSmartBenefitPreferredTime(item), slotShift, localReserved)
+    return { dateISO: baseDate, time }
+  }
+
+  const getBestDateISOForStep = (step) => {
+    const id = String(step?.id || '').trim()
+    const safeDue = parseIsoDate(dueDate) ? String(dueDate) : ''
+    let base = toIsoDateWithOffset(step?.daysFromNow)
+    if (id === 'sp4' && safeDue) base = addDaysToISO(safeDue, 10) || base
+    if (id === 'sp8') base = getTaxSeasonAnchorISO()
+    const requireWeekday = isOfficeHourStep(step)
+    return moveToValidDate(base, requireWeekday)
+  }
+
+  const getBestStepTime = (step, slotShift = 0, localReserved = null) => {
+    const dateISO = getBestDateISOForStep(step)
+    return pickAvailableDaytimeTime(dateISO, String(step?.time || DAYTIME_DEFAULT_TIME), slotShift, localReserved)
+  }
 
   const hasStretchStepPlan = (step) => {
     return getStretchStepEntries(step, 'step').length > 0
@@ -1182,9 +1313,54 @@ export default function MoneyTab() {
     }, 0)
   }
 
+  const upsertBenefitScheduleDraft = (benefitId, patch) => {
+    const id = String(benefitId || '').trim()
+    if (!id) return
+    setBenefitScheduleDraft(prev => ({
+      ...(prev && typeof prev === 'object' ? prev : {}),
+      [id]: {
+        ...(prev?.[id] && typeof prev[id] === 'object' ? prev[id] : {}),
+        ...patch,
+      },
+    }))
+  }
+
+  const addBenefitFollowUp = (item, options = {}) => {
+    if (!item || typeof item !== 'object') return
+    const relatedTasks = Array.isArray(benefitTasksById[item.id]) ? benefitTasksById[item.id] : []
+    const taskIds = Array.from(new Set(relatedTasks.map(task => String(task?.id || '').trim()).filter(Boolean)))
+    const smartSchedule = getSmartBenefitSchedule(item)
+    const rawDate = String(options?.dateISO || '').trim() || smartSchedule.dateISO
+    const dateISO = moveToValidDate(rawDate, true)
+    const rawTime = String(options?.time || '').trim() || smartSchedule.time
+    const time = pickAvailableDaytimeTime(dateISO, rawTime)
+    const where = String(item?.where || '').trim()
+    const timing = String(BENEFIT_TIMING_HINT_BY_ID[item?.id] || item?.deadline || '').trim()
+    addPlan(dateISO, {
+      time,
+      title: toCompactTitle(`Claim: ${item.label}`, 94),
+      location: where ? where.split('\n')[0] : '',
+      notes: timing
+        ? `Timing: ${timing}${where ? `\nWhere: ${where}` : ''}`
+        : (where || 'Benefit follow-up'),
+      done: false,
+      taskIds,
+    })
+  }
+
+  const autoScheduleBenefit = (item) => {
+    const smart = getSmartBenefitSchedule(item)
+    upsertBenefitScheduleDraft(item?.id, {
+      dateISO: smart.dateISO,
+      time: smart.time,
+    })
+    addBenefitFollowUp(item, smart)
+  }
+
   const addStretchStepToCalendar = (step) => {
     if (!step || hasStretchStepPlan(step)) return
     const dateISO = getBestDateISOForStep(step)
+    const time = getBestStepTime(step, 0)
     const relatedIds = Array.isArray(step.benefitIds) ? step.benefitIds : []
     const stepTaskIds = resolveStepTaskIds(step)
     const relatedBenefitText = relatedIds
@@ -1201,7 +1377,7 @@ export default function MoneyTab() {
       .join('\n')
 
     addPlan(dateISO, {
-      time: String(step.time || '').trim(),
+      time,
       title: `Stretch: ${step.title}`,
       location: String(step.location || '').trim(),
       notes,
@@ -1218,15 +1394,18 @@ export default function MoneyTab() {
     if (!step) return
     const dateISO = getBestDateISOForStep(step)
     const stepTaskIds = resolveStepTaskIds(step)
+    const localReserved = new Set()
     const marker = buildStretchMarker(step.id)
-    stepTaskIds.forEach((taskId) => {
+    stepTaskIds.forEach((taskId, index) => {
       if (checked?.[taskId]) return
       const hasPendingSchedule = Array.isArray(pendingTaskSchedulesByTaskId?.[taskId]) && pendingTaskSchedulesByTaskId[taskId].length > 0
       if (hasPendingSchedule) return
       const task = taskById[taskId]
       if (!task) return
+      const time = pickAvailableDaytimeTime(dateISO, String(step.time || DAYTIME_DEFAULT_TIME), index, localReserved)
+      localReserved.add(time)
       addPlan(dateISO, {
-        time: String(step.time || '').trim(),
+        time,
         title: toCompactTitle(task.text, 88),
         location: String(step.location || '').trim(),
         notes: `${marker}\nAuto-scheduled from Stretch Maximizer (${step.title}).`,
@@ -1475,6 +1654,12 @@ export default function MoneyTab() {
                 const owner = normalizeBenefitOwner(BENEFIT_OWNER_BY_ID[item.id] || 'family')
                 const ownerLabel = getBenefitOwnerLabel(owner)
                 const claimed = Boolean(moneyClaimed[item.id])
+                const smartBenefitSchedule = getSmartBenefitSchedule(item)
+                const draft = benefitScheduleDraft?.[item.id] && typeof benefitScheduleDraft[item.id] === 'object'
+                  ? benefitScheduleDraft[item.id]
+                  : {}
+                const selectedDateISO = String(draft.dateISO || smartBenefitSchedule.dateISO || '').trim() || toIsoDate()
+                const selectedTime = String(draft.time || smartBenefitSchedule.time || '').trim() || DAYTIME_DEFAULT_TIME
                 return (
                   <li key={item.id} className={`glass-card money-card ${claimed ? 'done' : ''}`}>
                     <div className="money-card-top">
@@ -1507,13 +1692,38 @@ export default function MoneyTab() {
                           <div className="detail-text">{item.howTo}</div>
                         </div>
                         <div className="detail-section">
-                          <button
-                            type="button"
-                            className="tax-preset-btn glass-inner"
-                            onClick={() => addBenefitFollowUp(item)}
-                          >
-                            Add claim follow-up to Home calendar
-                          </button>
+                          <div className="detail-label">Schedule claim action:</div>
+                          <div className="task-schedule-row">
+                            <input
+                              type="date"
+                              value={selectedDateISO}
+                              onChange={(event) => upsertBenefitScheduleDraft(item.id, { dateISO: event.target.value })}
+                            />
+                            <input
+                              type="time"
+                              value={selectedTime}
+                              onChange={(event) => upsertBenefitScheduleDraft(item.id, { time: event.target.value })}
+                            />
+                          </div>
+                          <div className="task-schedule-note">
+                            Smart suggestion: {smartBenefitSchedule.dateISO} {smartBenefitSchedule.time}
+                          </div>
+                          <div className="stretch-step-actions">
+                            <button
+                              type="button"
+                              className="tax-preset-btn glass-inner"
+                              onClick={() => autoScheduleBenefit(item)}
+                            >
+                              Auto smart schedule
+                            </button>
+                            <button
+                              type="button"
+                              className="tax-preset-btn glass-inner"
+                              onClick={() => addBenefitFollowUp(item, { dateISO: selectedDateISO, time: selectedTime })}
+                            >
+                              Add with selected date/time
+                            </button>
+                          </div>
                         </div>
                       {item.where && (
                         <div className="detail-section">
