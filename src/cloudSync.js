@@ -410,6 +410,27 @@ export async function cloudDisablePushSubscription(payload, session) {
   return result;
 }
 
+export async function cloudSyncPendingReminders(reminders, deviceId, session) {
+  const body = {
+    action: 'sync_reminders',
+    deviceId: String(deviceId || '').trim(),
+    reminders: Array.isArray(reminders) ? reminders : [],
+  }
+
+  const { result } = await withSessionRetry(session, async (workingSession) => {
+    return cloudFetch(
+      '/functions/v1/push-subscriptions',
+      {
+        method: 'POST',
+        body
+      },
+      workingSession.accessToken
+    )
+  })
+
+  return result
+}
+
 export async function cloudSendPushTest(session, options = {}) {
   const body = {
     action: 'send_test',

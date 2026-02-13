@@ -1,6 +1,8 @@
-import { useEffect } from 'react'
+import { useEffect, useRef } from 'react'
 import { useApp } from '../AppContext'
 import { babyNamesInfo } from '../infoData'
+import { getCloudSession, isCloudConfigured, cloudSyncPendingReminders } from '../cloudSync'
+import { getPushDeviceId, isPushSupported } from '../pushSync'
 import {
   appendSmartNotifInbox,
   buildDailyTip,
@@ -177,8 +179,122 @@ async function fireNotificationReliable(payload) {
   fireNotification(payload)
 }
 
+const SYNC_MIN_INTERVAL_MS = 2 * 60 * 1000 // 2 minutes — fast re-sync when state changes
+
+const SUPP_DISPLAY = {
+  prenatal: 'Prenatal', dha: 'DHA', calcium: 'Calcium',
+  chlorella: 'Chlorella', choline: 'Choline', vitd: 'Vitamin D',
+}
+
+function computeSyncHash(reminders) {
+  if (!reminders || !reminders.length) return 'EMPTY'
+  return reminders
+    .map(r => `${r.type}|${r.tag}|${r.fireAt || ''}|${r.notificationTitle}`)
+    .join(';;')
+}
+
+// Build a schedule of upcoming reminders with exact fireAt times.
+// The server cron sends each one when its time arrives — like an alarm.
+function computeUpcomingSchedule(suppSchedule, dailySupp, attendance, planner, moods, now) {
+  const upcoming = []
+  const dateStr = now.toDateString()
+  const dateISO = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`
+  const twoHoursAgo = now.getTime() - 2 * 60 * 60 * 1000
+
+  // --- Supplements: group untaken doses by their scheduled time ---
+  const timeGroups = {}
+  for (const suppId of Object.keys(suppSchedule || {})) {
+    const sched = suppSchedule[suppId]
+    if (!sched?.enabled) continue
+    const times = Array.isArray(sched.times) ? sched.times : []
+    times.forEach((time, doseIndex) => {
+      const key = `${suppId}-${doseIndex}-${dateStr}`
+      if (dailySupp[key] === true) return // already taken
+      if (!timeGroups[time]) timeGroups[time] = []
+      timeGroups[time].push(SUPP_DISPLAY[suppId] || suppId)
+    })
+  }
+  for (const time of Object.keys(timeGroups)) {
+    const names = timeGroups[time]
+    const parts = time.split(':').map(Number)
+    const fireAt = new Date(now.getFullYear(), now.getMonth(), now.getDate(), parts[0], parts[1] || 0, 0)
+    if (fireAt.getTime() < twoHoursAgo) continue
+    const isOverdue = fireAt.getTime() <= now.getTime()
+    const tone = getNotifTone('supp', isOverdue ? 'urgent' : 'gentle')
+    const label = isOverdue ? 'Overdue supplements' : 'Supplement time'
+    upcoming.push({
+      type: 'supp', level: isOverdue ? 'urgent' : 'gentle',
+      notificationTitle: `${tone.titlePrefix} ${label}`.trim(),
+      notificationBody: `${tone.bodyPrefix} Take ${names.join(', ')}`.trim(),
+      tag: `supp-${dateISO}-${time}`, fireAt: fireAt.toISOString(), priorityScore: isOverdue ? 90 : 70,
+    })
+  }
+
+  // --- Work: weekday + not yet logged → nudge at 11 AM, urgent at 5 PM ---
+  const isWeekday = now.getDay() >= 1 && now.getDay() <= 5
+  const hasAttendance = attendance && attendance[dateISO]
+  if (isWeekday && !hasAttendance) {
+    for (const { hour, level } of [{ hour: 11, level: 'gentle' }, { hour: 17, level: 'urgent' }]) {
+      const fireAt = new Date(now.getFullYear(), now.getMonth(), now.getDate(), hour, 0, 0)
+      if (fireAt.getTime() < twoHoursAgo) continue
+      const tone = getNotifTone('work', level)
+      upcoming.push({
+        type: 'work', level,
+        notificationTitle: `${tone.titlePrefix} Work attendance`.trim(),
+        notificationBody: `${tone.bodyPrefix} Log today's work attendance`.trim(),
+        tag: `work-${dateISO}-${hour}`, fireAt: fireAt.toISOString(), priorityScore: level === 'urgent' ? 75 : 50,
+      })
+    }
+  }
+
+  // --- Mood: windows at 12, 17, 20 (if not logged today) ---
+  const hasMoodToday = Array.isArray(moods) && moods.some(m => String(m?.date || m?.createdAt || '').startsWith(dateISO))
+  if (!hasMoodToday) {
+    for (const { hour, label, level } of [
+      { hour: 12, label: 'Kumusta feeling mo today?', level: 'gentle' },
+      { hour: 17, label: 'Afternoon mood check-in', level: 'nudge' },
+      { hour: 20, label: 'Evening mood check-in', level: 'urgent' },
+    ]) {
+      const fireAt = new Date(now.getFullYear(), now.getMonth(), now.getDate(), hour, 0, 0)
+      if (fireAt.getTime() < twoHoursAgo) continue
+      upcoming.push({
+        type: 'mood', level,
+        notificationTitle: '\uD83D\uDE0A Mood check',
+        notificationBody: label,
+        tag: `mood-${dateISO}-${hour}`, fireAt: fireAt.toISOString(), priorityScore: level === 'urgent' ? 65 : 40,
+      })
+    }
+  }
+
+  // --- Planner: pending plans with time → notify 15 min before ---
+  const todayPlans = Array.isArray(planner?.[dateISO]) ? planner[dateISO] : []
+  for (const plan of todayPlans) {
+    if (plan.done) continue
+    const planTime = String(plan.time || '').trim()
+    if (!planTime) continue
+    const tp = planTime.split(':').map(Number)
+    if (!Number.isFinite(tp[0])) continue
+    const eventAt = new Date(now.getFullYear(), now.getMonth(), now.getDate(), tp[0], tp[1] || 0, 0)
+    const notifyAt = new Date(eventAt.getTime() - 15 * 60 * 1000)
+    if (notifyAt.getTime() < twoHoursAgo) continue
+    const tone = getNotifTone('plan', 'gentle')
+    upcoming.push({
+      type: 'plan', level: 'gentle',
+      notificationTitle: `${tone.titlePrefix} ${String(plan.title || 'Upcoming event').trim()}`.trim(),
+      notificationBody: `${tone.bodyPrefix} ${planTime} — ${String(plan.title || '').trim()}`.trim(),
+      tag: `plan-${dateISO}-${plan.id || planTime}`, fireAt: notifyAt.toISOString(), priorityScore: 85,
+    })
+  }
+
+  upcoming.sort((a, b) => new Date(a.fireAt).getTime() - new Date(b.fireAt).getTime())
+  return upcoming
+}
+
 export default function SmartReminderAgent() {
   const { dailySupp, suppSchedule, attendance, planner, moods } = useApp()
+  const lastSyncHashRef = useRef('')
+  const lastSyncTimeRef = useRef(0)
+  const syncBusyRef = useRef(false)
 
   useEffect(() => {
     if (typeof window === 'undefined' || typeof Notification === 'undefined') return undefined
@@ -218,6 +334,28 @@ export default function SmartReminderAgent() {
       if (calendarChannelOn && planCtx?.candidate?.planId) {
         const planReminder = buildPlannerReminder(planCtx, now, 'notify')
         if (planReminder) actionableCandidates.push(planReminder)
+      }
+
+      // --- Cloud sync: push SCHEDULED reminders with fireAt times to Supabase ---
+      // Server cron sends each one at the right time — like an alarm.
+      // Re-syncs when state changes (dose taken, mood logged) to remove delivered items.
+      if (isCloudConfigured() && isPushSupported()) {
+        const schedule = computeUpcomingSchedule(suppSchedule, dailySupp, attendance, planner, moods, now)
+        const hash = computeSyncHash(schedule)
+        const elapsed = Date.now() - lastSyncTimeRef.current
+        if (hash !== lastSyncHashRef.current && elapsed >= SYNC_MIN_INTERVAL_MS && !syncBusyRef.current) {
+          const session = getCloudSession()
+          if (session?.accessToken) {
+            syncBusyRef.current = true
+            cloudSyncPendingReminders(schedule, getPushDeviceId(), session)
+              .then(() => {
+                lastSyncHashRef.current = hash
+                lastSyncTimeRef.current = Date.now()
+              })
+              .catch(() => {})
+              .finally(() => { syncBusyRef.current = false })
+          }
+        }
       }
 
       const actionable = actionableCandidates
