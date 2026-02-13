@@ -1,6 +1,6 @@
 // Cache version bump: change this whenever static assets (icons, CSS, JS) change
 // so installed PWAs pick up updates reliably.
-const CACHE_NAME = 'peggy-v20';
+const CACHE_NAME = 'peggy-v21';
 const CACHE_PREFIXES = ['peggy-', 'baby-prep-'];
 
 function resolveBasePath() {
@@ -132,6 +132,14 @@ self.addEventListener('fetch', (event) => {
   );
 });
 
+function getTypeEmoji(type) {
+  if (type === 'supp') return '\uD83D\uDC8A';
+  if (type === 'work') return '\uD83E\uDDFE';
+  if (type === 'mood') return '\uD83D\uDE0A';
+  if (type === 'plan') return '\uD83D\uDCC5';
+  return '\uD83D\uDD14';
+}
+
 self.addEventListener('push', (event) => {
   let payload = {};
   try {
@@ -141,9 +149,51 @@ self.addEventListener('push', (event) => {
   }
 
   const icon = `${BASE}icon-192.png`;
+  const targetUrl = toAbsoluteUrl(payload.url || BASE);
+
+  // --- Actual reminders array from cloud sync ---
+  if (Array.isArray(payload.reminders) && payload.reminders.length > 0) {
+    const notifications = payload.reminders.slice(0, 4).map((r) => {
+      const emoji = getTypeEmoji(r.type);
+      const title = `${emoji} Peggy reminder: ${String(r.title || r.type || 'Reminder').trim()}`;
+      const body = String(r.body || '').trim() || 'Open Peggy for details.';
+      const isUrgent = r.level === 'urgent';
+      const tag = String(r.tag || `peggy-${r.type}-${Date.now()}`).trim();
+      return {
+        title,
+        options: {
+          body,
+          icon,
+          badge: icon,
+          tag,
+          renotify: isUrgent,
+          requireInteraction: isUrgent,
+          data: { url: targetUrl, actionUrls: {} },
+        },
+      };
+    });
+
+    event.waitUntil(
+      Promise.all([
+        ...notifications.map((n) => self.registration.showNotification(n.title, n.options)),
+        notifyClients({
+          type: 'peggy-sw-push',
+          payload: {
+            title: notifications[0]?.title || 'Peggy reminder',
+            body: `${notifications.length} reminder(s)`,
+            tag: 'peggy-push-reminders',
+            url: targetUrl,
+            createdAt: new Date().toISOString(),
+          },
+        }),
+      ])
+    );
+    return;
+  }
+
+  // --- Fallback: single generic notification (backward compatible) ---
   const title = payload.title || 'Peggy reminder';
   const body = payload.body || 'Open Peggy to check your latest reminders.';
-  const targetUrl = toAbsoluteUrl(payload.url || BASE);
   const actionUrls = (payload?.data && typeof payload.data === 'object' && payload.data.actionUrls && typeof payload.data.actionUrls === 'object')
     ? payload.data.actionUrls
     : {};
