@@ -538,6 +538,7 @@ export default function MoreTab() {
   const [pushDebugLog, setPushDebugLog] = useState([])
   const [showPushDiag, setShowPushDiag] = useState(false)
   const [pushDiagData, setPushDiagData] = useState(null)
+  const [showAdvanced, setShowAdvanced] = useState(false)
   const [cloudBusy, setCloudBusy] = useState(false)
   const [cloudEmail, setCloudEmail] = useState('')
   const [cloudPassword, setCloudPassword] = useState('')
@@ -1746,82 +1747,94 @@ export default function MoreTab() {
               <p className="section-note">
                 Mood reminder slots: 12:00, 17:00, 20:00 (only if today has no mood log yet).
               </p>
-              <p className="section-note">
-                iPhone note: local test can be silent while app is open. For real lock-screen check, use <strong>Send Test Push</strong> and lock phone for 5-10 seconds.
-              </p>
-              <div className="backup-cloud-actions notif-test-actions">
-                <button
-                  type="button"
-                  className="btn-glass-secondary"
-                  onClick={handleLocalNotifTest}
-                >
-                  Send Local Test
-                </button>
-                <button
-                  type="button"
-                  className="btn-glass-secondary"
-                  onClick={handlePushTest}
-                  disabled={cloudBusy || !cloudSession}
-                >
-                  Send Test Push
-                </button>
-              </div>
-              {!cloudSession && (
-                <p className="section-note">Sign in to Cloud Sync first to enable Send Test Push.</p>
-              )}
               {notifStatus && <p className="section-note">{notifStatus}</p>}
               {pushStatus && <p className="section-note">{pushStatus}</p>}
-              {pushDebugLog.length > 0 && (
-                <details className="push-debug-log" open>
-                  <summary>Push Debug Log ({pushDebugLog.length} steps)</summary>
-                  <pre style={{fontSize:'11px',whiteSpace:'pre-wrap',wordBreak:'break-all',background:'rgba(0,0,0,0.3)',padding:'8px',borderRadius:'6px',maxHeight:'200px',overflow:'auto',margin:'6px 0'}}>
-                    {pushDebugLog.join('\n')}
-                  </pre>
-                  <button
-                    type="button"
-                    className="btn-glass-secondary"
-                    style={{fontSize:'11px',padding:'4px 10px',marginTop:'4px'}}
-                    onClick={() => {
-                      const text = pushDebugLog.join('\n')
-                      if (navigator.clipboard?.writeText) {
-                        navigator.clipboard.writeText(text).then(() => setPushStatus('Debug log copied!')).catch(() => {})
-                      } else {
-                        const ta = document.createElement('textarea')
-                        ta.value = text
-                        document.body.appendChild(ta)
-                        ta.select()
-                        document.execCommand('copy')
-                        document.body.removeChild(ta)
-                        setPushStatus('Debug log copied!')
-                      }
-                    }}
-                  >
-                    Copy Log
-                  </button>
-                </details>
-              )}
               <button
                 type="button"
                 className="btn-glass-secondary"
-                style={{marginTop:'8px',fontSize:'12px'}}
-                onClick={async () => {
-                  setShowPushDiag(!showPushDiag)
-                  if (!showPushDiag) {
-                    try {
-                      const d = await getPushDiagnosticsAsync()
-                      setPushDiagData(d)
-                    } catch (e) {
-                      setPushDiagData({ error: e?.message || 'unknown' })
-                    }
-                  }
-                }}
+                style={{marginTop:'8px',fontSize:'12px',opacity:0.7}}
+                onClick={() => setShowAdvanced(!showAdvanced)}
               >
-                {showPushDiag ? 'Hide' : 'Show'} Push Diagnostics
+                {showAdvanced ? 'Hide' : 'Show'} Advanced
               </button>
-              {showPushDiag && pushDiagData && (
-                <pre style={{fontSize:'11px',whiteSpace:'pre-wrap',wordBreak:'break-all',background:'rgba(0,0,0,0.3)',padding:'8px',borderRadius:'6px',maxHeight:'250px',overflow:'auto',margin:'6px 0'}}>
-                  {JSON.stringify(pushDiagData, null, 2)}
-                </pre>
+              {showAdvanced && (
+                <>
+                  <p className="section-note" style={{marginTop:'8px'}}>
+                    iPhone note: local test can be silent while app is open. For real lock-screen check, use <strong>Send Test Push</strong> and lock phone for 5-10 seconds.
+                  </p>
+                  <div className="backup-cloud-actions notif-test-actions">
+                    <button
+                      type="button"
+                      className="btn-glass-secondary"
+                      onClick={handleLocalNotifTest}
+                    >
+                      Send Local Test
+                    </button>
+                    <button
+                      type="button"
+                      className="btn-glass-secondary"
+                      onClick={handlePushTest}
+                      disabled={cloudBusy || !cloudSession}
+                    >
+                      Send Test Push
+                    </button>
+                  </div>
+                  {!cloudSession && (
+                    <p className="section-note">Sign in to Cloud Sync first to enable Send Test Push.</p>
+                  )}
+                  {pushDebugLog.length > 0 && (
+                    <details className="push-debug-log" open>
+                      <summary>Push Debug Log ({pushDebugLog.length} steps)</summary>
+                      <pre style={{fontSize:'11px',whiteSpace:'pre-wrap',wordBreak:'break-all',background:'rgba(0,0,0,0.3)',padding:'8px',borderRadius:'6px',maxHeight:'200px',overflow:'auto',margin:'6px 0'}}>
+                        {pushDebugLog.join('\n')}
+                      </pre>
+                      <button
+                        type="button"
+                        className="btn-glass-secondary"
+                        style={{fontSize:'11px',padding:'4px 10px',marginTop:'4px'}}
+                        onClick={() => {
+                          const text = pushDebugLog.join('\n')
+                          if (navigator.clipboard?.writeText) {
+                            navigator.clipboard.writeText(text).then(() => setPushStatus('Debug log copied!')).catch(() => {})
+                          } else {
+                            const ta = document.createElement('textarea')
+                            ta.value = text
+                            document.body.appendChild(ta)
+                            ta.select()
+                            document.execCommand('copy')
+                            document.body.removeChild(ta)
+                            setPushStatus('Debug log copied!')
+                          }
+                        }}
+                      >
+                        Copy Log
+                      </button>
+                    </details>
+                  )}
+                  <button
+                    type="button"
+                    className="btn-glass-secondary"
+                    style={{marginTop:'8px',fontSize:'12px'}}
+                    onClick={async () => {
+                      setShowPushDiag(!showPushDiag)
+                      if (!showPushDiag) {
+                        try {
+                          const d = await getPushDiagnosticsAsync()
+                          setPushDiagData(d)
+                        } catch (e) {
+                          setPushDiagData({ error: e?.message || 'unknown' })
+                        }
+                      }
+                    }}
+                  >
+                    {showPushDiag ? 'Hide' : 'Show'} Push Diagnostics
+                  </button>
+                  {showPushDiag && pushDiagData && (
+                    <pre style={{fontSize:'11px',whiteSpace:'pre-wrap',wordBreak:'break-all',background:'rgba(0,0,0,0.3)',padding:'8px',borderRadius:'6px',maxHeight:'250px',overflow:'auto',margin:'6px 0'}}>
+                      {JSON.stringify(pushDiagData, null, 2)}
+                    </pre>
+                  )}
+                </>
               )}
             </div>
 
@@ -1913,45 +1926,63 @@ export default function MoreTab() {
 
                     {cloudSession && (
                       <div className="backup-cloud-actions">
-                        <button className="btn-glass-primary" onClick={handleCloudUpload} disabled={cloudBusy}>Force Upload</button>
-                        <button className="btn-glass-secondary" onClick={handleCloudDownload} disabled={cloudBusy}>Force Download</button>
-                        <button className="btn-glass-secondary" onClick={handlePushTest} disabled={cloudBusy}>Send Test Push</button>
                         <button className="btn-glass-secondary" onClick={handleCloudSignOut} disabled={cloudBusy}>Sign Out</button>
                       </div>
                     )}
-                    <p className="section-note">
-                      Push status: {pushSupported ? (pushVapidReady ? 'Ready for Web Push setup.' : 'Missing VAPID key in frontend env.') : 'Not supported on this browser.'}
-                    </p>
-                    <p className="section-note">iPhone note: install Peggy to Home Screen, then allow notifications when prompted.</p>
-                    {pushStatus && <p className="section-note">{pushStatus}</p>}
-                    {pushDebugLog.length > 0 && (
-                      <details className="push-debug-log">
-                        <summary style={{fontSize:'12px',cursor:'pointer'}}>Debug Log ({pushDebugLog.length} steps)</summary>
-                        <pre style={{fontSize:'11px',whiteSpace:'pre-wrap',wordBreak:'break-all',background:'rgba(0,0,0,0.3)',padding:'8px',borderRadius:'6px',maxHeight:'200px',overflow:'auto',margin:'6px 0'}}>
-                          {pushDebugLog.join('\n')}
-                        </pre>
+                    {cloudSession && (
+                      <>
                         <button
                           type="button"
                           className="btn-glass-secondary"
-                          style={{fontSize:'11px',padding:'4px 10px',marginTop:'4px'}}
-                          onClick={() => {
-                            const text = pushDebugLog.join('\n')
-                            if (navigator.clipboard?.writeText) {
-                              navigator.clipboard.writeText(text).then(() => setPushStatus('Debug log copied!')).catch(() => {})
-                            } else {
-                              const ta = document.createElement('textarea')
-                              ta.value = text
-                              document.body.appendChild(ta)
-                              ta.select()
-                              document.execCommand('copy')
-                              document.body.removeChild(ta)
-                              setPushStatus('Debug log copied!')
-                            }
-                          }}
+                          style={{marginTop:'8px',fontSize:'12px',opacity:0.7}}
+                          onClick={() => setShowAdvanced(!showAdvanced)}
                         >
-                          Copy Log
+                          {showAdvanced ? 'Hide' : 'Show'} Advanced
                         </button>
-                      </details>
+                        {showAdvanced && (
+                          <div style={{marginTop:'8px'}}>
+                            <div className="backup-cloud-actions">
+                              <button className="btn-glass-primary" onClick={handleCloudUpload} disabled={cloudBusy}>Force Upload</button>
+                              <button className="btn-glass-secondary" onClick={handleCloudDownload} disabled={cloudBusy}>Force Download</button>
+                              <button className="btn-glass-secondary" onClick={handlePushTest} disabled={cloudBusy}>Send Test Push</button>
+                            </div>
+                            <p className="section-note" style={{marginTop:'6px'}}>
+                              Push status: {pushSupported ? (pushVapidReady ? 'Ready for Web Push setup.' : 'Missing VAPID key in frontend env.') : 'Not supported on this browser.'}
+                            </p>
+                            <p className="section-note">iPhone note: install Peggy to Home Screen, then allow notifications when prompted.</p>
+                            {pushStatus && <p className="section-note">{pushStatus}</p>}
+                            {pushDebugLog.length > 0 && (
+                              <details className="push-debug-log">
+                                <summary style={{fontSize:'12px',cursor:'pointer'}}>Debug Log ({pushDebugLog.length} steps)</summary>
+                                <pre style={{fontSize:'11px',whiteSpace:'pre-wrap',wordBreak:'break-all',background:'rgba(0,0,0,0.3)',padding:'8px',borderRadius:'6px',maxHeight:'200px',overflow:'auto',margin:'6px 0'}}>
+                                  {pushDebugLog.join('\n')}
+                                </pre>
+                                <button
+                                  type="button"
+                                  className="btn-glass-secondary"
+                                  style={{fontSize:'11px',padding:'4px 10px',marginTop:'4px'}}
+                                  onClick={() => {
+                                    const text = pushDebugLog.join('\n')
+                                    if (navigator.clipboard?.writeText) {
+                                      navigator.clipboard.writeText(text).then(() => setPushStatus('Debug log copied!')).catch(() => {})
+                                    } else {
+                                      const ta = document.createElement('textarea')
+                                      ta.value = text
+                                      document.body.appendChild(ta)
+                                      ta.select()
+                                      document.execCommand('copy')
+                                      document.body.removeChild(ta)
+                                      setPushStatus('Debug log copied!')
+                                    }
+                                  }}
+                                >
+                                  Copy Log
+                                </button>
+                              </details>
+                            )}
+                          </div>
+                        )}
+                      </>
                     )}
                   </>
                 )}
