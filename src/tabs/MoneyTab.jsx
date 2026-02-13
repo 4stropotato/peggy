@@ -703,20 +703,23 @@ export default function MoneyTab() {
   )
   const supportCeiling = useMemo(() => {
     const byId = Object.fromEntries(moneyTracker.map(item => [item.id, Math.max(0, Number(item.amount) || 0)]))
-    const birthCore = (byId.m4 || 0) + (byId.m1 || 0) + (byId.m5 || 0)
-    const birthPotential = birthCore + (byId.m6 || 0) + (byId.m7 || 0) + (byId.m10 || 0)
-    const trackedFirstYear = totalMoney
-    const allowanceYearOne = byId.m8 || 0
-    const support18yOneChild = Math.max(0, trackedFirstYear - allowanceYearOne + CHILD_ALLOWANCE_18Y_ONE_CHILD)
-    const support18yTwoChildren = Math.max(0, trackedFirstYear - allowanceYearOne + CHILD_ALLOWANCE_18Y_TWO_CHILD)
+    const directCashBirth = (byId.m1 || 0) + (byId.m4 || 0) + (byId.m5 || 0) + (byId.m6 || 0) + (byId.m7 || 0) + (byId.m10 || 0) + (byId.m15 || 0)
+    const incomeReplacementCash = (byId.m11 || 0) + (byId.m12 || 0)
+    const costSavingsConfigured = (byId.m2 || 0) + (byId.m3 || 0) + (byId.m13 || 0) + (byId.m14 || 0) + (byId.m16 || 0)
+    const taxAnnualEstimate = byId.m9 || 0
+    const taxOver18y = taxAnnualEstimate * 18
+    const support18yOneChild = directCashBirth + incomeReplacementCash + costSavingsConfigured + taxOver18y + CHILD_ALLOWANCE_18Y_ONE_CHILD
+    const support18yTwoChildren = directCashBirth + incomeReplacementCash + costSavingsConfigured + taxOver18y + CHILD_ALLOWANCE_18Y_TWO_CHILD
     return {
-      birthCore,
-      birthPotential,
-      trackedFirstYear,
+      directCashBirth,
+      incomeReplacementCash,
+      costSavingsConfigured,
+      taxAnnualEstimate,
+      taxOver18y,
       support18yOneChild,
       support18yTwoChildren,
     }
-  }, [totalMoney])
+  }, [])
 
   useEffect(() => {
     if (!includeHusband && workView === 'husband') setWorkView('wife')
@@ -1391,23 +1394,39 @@ export default function MoneyTab() {
               <div><h2>18-Year Support Projection</h2></div>
             </div>
             <p className="section-note">
-              Updated model using current tracked benefit amounts + official child allowance formula (¥15,000/month age 0-3, then ¥10,000/month to 18 for first/second child).
+              Accurate breakdown from current configured benefits. Previous huge ranges were scenario estimates; this panel now uses deterministic math only.
             </p>
             <div className="ceiling-table">
               <div className="ceil-row glass-inner">
-                <span>Direct cash around birth (core to potential)</span>
-                <span>{formatYen(supportCeiling.birthCore)} - {formatYen(supportCeiling.birthPotential)}</span>
+                <span>Direct cash around birth (configured)</span>
+                <span>{formatYen(supportCeiling.directCashBirth)}</span>
               </div>
               <div className="ceil-row glass-inner">
-                <span>Tracked first-year support total (current data)</span>
-                <span>{formatYen(supportCeiling.trackedFirstYear)}</span>
+                <span>Income replacement cash (leave benefits)</span>
+                <span>{formatYen(supportCeiling.incomeReplacementCash)}</span>
               </div>
               <div className="ceil-row glass-inner">
-                <span>18-year projection (new baby only)</span>
+                <span>Cost savings (medical/education, configured)</span>
+                <span>{formatYen(supportCeiling.costSavingsConfigured)}</span>
+              </div>
+              <div className="ceil-row glass-inner">
+                <span>Tax benefits over time (18 years)</span>
+                <span>{formatYen(supportCeiling.taxOver18y)} ({formatYen(supportCeiling.taxAnnualEstimate)}/year)</span>
+              </div>
+              <div className="ceil-row glass-inner">
+                <span>Child allowance (18y model, 1 child)</span>
+                <span>{formatYen(CHILD_ALLOWANCE_18Y_ONE_CHILD)}</span>
+              </div>
+              <div className="ceil-row glass-inner">
+                <span>Child allowance (18y model, 2 children)</span>
+                <span>{formatYen(CHILD_ALLOWANCE_18Y_TWO_CHILD)}</span>
+              </div>
+              <div className="ceil-row total glass-inner">
+                <span>Total 18-year projection (1 child)</span>
                 <span>{formatYen(supportCeiling.support18yOneChild)}</span>
               </div>
               <div className="ceil-row total glass-inner">
-                <span>18-year projection (2-child allowance model)</span>
+                <span>Total 18-year projection (2-child model)</span>
                 <span>{formatYen(supportCeiling.support18yTwoChildren)}</span>
               </div>
             </div>
