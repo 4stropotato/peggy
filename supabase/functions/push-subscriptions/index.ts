@@ -149,6 +149,43 @@ Deno.serve(async (req) => {
     return jsonResponse(200, { ok: true, updated: Array.isArray(data) ? data.length : 0 })
   }
 
+  if (action === 'sync_reminders') {
+    const deviceId = String(body?.deviceId || '').trim()
+    if (!deviceId) {
+      return jsonResponse(400, { error: 'Missing deviceId.' })
+    }
+
+    const rawReminders = Array.isArray(body?.reminders) ? body.reminders : []
+    const sanitized = rawReminders.slice(0, 12).map((r: Record<string, unknown>) => ({
+      type: String(r?.type || 'general').slice(0, 30),
+      level: String(r?.level || 'gentle').slice(0, 20),
+      title: String(r?.notificationTitle || r?.title || '').slice(0, 120),
+      body: String(r?.notificationBody || r?.body || '').slice(0, 300),
+      tag: String(r?.tag || '').slice(0, 80),
+      fireAt: String(r?.fireAt || '').slice(0, 30),
+      priorityScore: Number(r?.priorityScore) || 0,
+    }))
+
+    const nowIso = new Date().toISOString()
+    const { data, error } = await client
+      .from('push_subscriptions')
+      .update({
+        pending_reminders: sanitized.length > 0 ? sanitized : null,
+        reminders_synced_at: nowIso,
+        last_seen_at: nowIso,
+      })
+      .eq('user_id', user.id)
+      .eq('device_id', deviceId)
+      .select('id, device_id')
+
+    if (error) return jsonResponse(400, { error: error.message })
+    return jsonResponse(200, {
+      ok: true,
+      synced: sanitized.length,
+      updated: Array.isArray(data) ? data.length : 0,
+    })
+  }
+
   if (action === 'send_test') {
     const targetDeviceId = String(body?.deviceId || '').trim()
 

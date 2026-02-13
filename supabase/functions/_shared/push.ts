@@ -23,7 +23,11 @@ export function isSubscriptionGoneStatus(statusCode: number) {
 export async function sendWebPush(subscription: Record<string, unknown>, payload: Record<string, unknown>) {
   ensureVapidConfig()
   try {
-    await webpush.sendNotification(subscription, JSON.stringify(payload))
+    await webpush.sendNotification(subscription, JSON.stringify(payload), {
+      TTL: 86400,
+      urgency: 'high',
+      topic: 'peggy-reminder',
+    })
     return { ok: true, statusCode: 201 }
   } catch (error) {
     const statusCode = Number((error as { statusCode?: number })?.statusCode || 0)
