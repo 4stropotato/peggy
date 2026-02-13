@@ -1060,17 +1060,29 @@ ul { list-style: none; }
 .money-card-top {
   display: flex;
   align-items: flex-start;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   gap: 0.5rem;
   cursor: pointer;
   -webkit-tap-highlight-color: transparent;
 }
-.money-card-top .item-text {
+.money-card-main {
   flex: 1;
   min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+.money-card-badges {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.32rem;
+}
+.money-card-top .item-text {
   font-size: 0.85rem;
   line-height: 1.4;
-  overflow-wrap: anywhere;
+  overflow-wrap: break-word;
+  word-break: normal;
 }
 .money-card-top .money-amount {
   font-weight: 700;
@@ -1142,6 +1154,9 @@ ul { list-style: none; }
 }
 .benefit-task-row:last-child {
   margin-bottom: 0;
+}
+.money-card-badges .money-badge {
+  white-space: nowrap;
 }
 .deadline-text {
   color: var(--red);
@@ -4196,11 +4211,14 @@ input[type="range"]:focus {
     gap: 0.2rem;
   }
 
-  .money-card-top .item-text {
-    flex-basis: 100%;
+  .money-card-top {
+    align-items: flex-start;
   }
-  .money-card-top .money-amount {
-    margin-left: 0;
+  .money-card-main {
+    min-width: 0;
+  }
+  .money-card-badges {
+    gap: 0.24rem;
   }
 
   .info-panel .info-phase-header {

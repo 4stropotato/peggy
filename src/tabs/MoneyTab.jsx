@@ -126,6 +126,11 @@ const BENEFIT_ASK_REQUIRED_BY_ID = {
 
 const FAMILY_BENEFITS_OPEN_KEY = 'baby-prep-family-benefits-open'
 const FAMILY_BENEFITS_CLAIMED_KEY = 'baby-prep-family-benefits-claimed'
+const BENEFIT_TOOLS_OPEN_KEY = 'baby-prep-benefit-tools-open'
+const FAMILY_LANE_TOOLS_OPEN_KEY = 'baby-prep-family-lane-tools-open'
+
+const CHILD_ALLOWANCE_18Y_ONE_CHILD = 2340000
+const CHILD_ALLOWANCE_18Y_TWO_CHILD = 4680000
 
 const FAMILY_BENEFIT_GROUP_FILTERS = [
   { id: 'all', label: 'All Tracks' },
@@ -284,6 +289,25 @@ function writeStorageMap(key, value) {
 
 function formatYen(value) {
   return `${YEN}${Number(value || 0).toLocaleString()}`
+}
+
+function formatYenCompact(value) {
+  const safe = Math.max(0, Number(value) || 0)
+  if (safe >= 1000000) {
+    const millions = safe / 1000000
+    const text = millions >= 10
+      ? Math.round(millions).toString()
+      : millions.toFixed(2).replace(/\.?0+$/, '')
+    return `${YEN}${text}M`
+  }
+  if (safe >= 1000) {
+    const thousands = safe / 1000
+    const text = thousands >= 100
+      ? Math.round(thousands).toString()
+      : thousands.toFixed(1).replace(/\.?0+$/, '')
+    return `${YEN}${text}K`
+  }
+  return `${YEN}${safe}`
 }
 
 function formatHoursAndMinutes(value) {
@@ -587,6 +611,8 @@ export default function MoneyTab() {
   const [recentIncomeMode, setRecentIncomeMode] = useState('work')
   const [familyBenefitsOpen, setFamilyBenefitsOpen] = useState(() => readStorageBool(FAMILY_BENEFITS_OPEN_KEY, false))
   const [familyBenefitsClaimed, setFamilyBenefitsClaimed] = useState(() => readStorageMap(FAMILY_BENEFITS_CLAIMED_KEY))
+  const [benefitToolsOpen, setBenefitToolsOpen] = useState(() => readStorageBool(BENEFIT_TOOLS_OPEN_KEY, false))
+  const [familyLaneToolsOpen, setFamilyLaneToolsOpen] = useState(() => readStorageBool(FAMILY_LANE_TOOLS_OPEN_KEY, false))
   const [familyBenefitGroupFilter, setFamilyBenefitGroupFilter] = useState('all')
   const [familyBenefitStatusFilter, setFamilyBenefitStatusFilter] = useState('all')
   const [rateForm, setRateForm] = useState(() => ({
@@ -675,6 +701,22 @@ export default function MoneyTab() {
     () => filteredFamilyBenefits.filter(item => familyBenefitsClaimed[item.id]).length,
     [filteredFamilyBenefits, familyBenefitsClaimed]
   )
+  const supportCeiling = useMemo(() => {
+    const byId = Object.fromEntries(moneyTracker.map(item => [item.id, Math.max(0, Number(item.amount) || 0)]))
+    const birthCore = (byId.m4 || 0) + (byId.m1 || 0) + (byId.m5 || 0)
+    const birthPotential = birthCore + (byId.m6 || 0) + (byId.m7 || 0) + (byId.m10 || 0)
+    const trackedFirstYear = totalMoney
+    const allowanceYearOne = byId.m8 || 0
+    const support18yOneChild = Math.max(0, trackedFirstYear - allowanceYearOne + CHILD_ALLOWANCE_18Y_ONE_CHILD)
+    const support18yTwoChildren = Math.max(0, trackedFirstYear - allowanceYearOne + CHILD_ALLOWANCE_18Y_TWO_CHILD)
+    return {
+      birthCore,
+      birthPotential,
+      trackedFirstYear,
+      support18yOneChild,
+      support18yTwoChildren,
+    }
+  }, [totalMoney])
 
   useEffect(() => {
     if (!includeHusband && workView === 'husband') setWorkView('wife')
@@ -683,6 +725,14 @@ export default function MoneyTab() {
   useEffect(() => {
     writeStorageBool(FAMILY_BENEFITS_OPEN_KEY, familyBenefitsOpen)
   }, [familyBenefitsOpen])
+
+  useEffect(() => {
+    writeStorageBool(BENEFIT_TOOLS_OPEN_KEY, benefitToolsOpen)
+  }, [benefitToolsOpen])
+
+  useEffect(() => {
+    writeStorageBool(FAMILY_LANE_TOOLS_OPEN_KEY, familyLaneToolsOpen)
+  }, [familyLaneToolsOpen])
 
   useEffect(() => {
     writeStorageMap(FAMILY_BENEFITS_CLAIMED_KEY, familyBenefitsClaimed)
@@ -977,55 +1027,67 @@ export default function MoneyTab() {
             <p className="section-note">
               Tap checkbox to mark as claimed. Tap info for claim flow, related tasks, and what to batch together.
             </p>
-            <p className="section-note">
-              {unmappedBenefitIds.length === 0
-                ? 'Coverage check: all Benefits items are linked to checklist tasks.'
-                : `Coverage warning: ${unmappedBenefitIds.join(', ')} not linked to checklist yet.`}
-            </p>
-            <div className="glass-tabs salary-mini-tabs">
-              {[
-                { id: 'all', label: 'All' },
-                { id: 'national', label: 'National' },
-                { id: 'kawasaki', label: 'Kawasaki' },
-                { id: 'employer', label: 'Employer' },
-              ].map(option => (
-                <button
-                  key={option.id}
-                  type="button"
-                  className={`glass-tab ${benefitSourceFilter === option.id ? 'active' : ''}`}
-                  onClick={() => setBenefitSourceFilter(option.id)}
-                >
-                  <span>{option.label}</span>
-                </button>
-              ))}
-            </div>
-            <div className="glass-tabs salary-mini-tabs">
-              {BENEFIT_OWNER_FILTERS.map(option => (
-                <button
-                  key={`owner-${option.id}`}
-                  type="button"
-                  className={`glass-tab ${benefitOwnerFilter === option.id ? 'active' : ''}`}
-                  onClick={() => setBenefitOwnerFilter(option.id)}
-                >
-                  <span>{option.label}</span>
-                </button>
-              ))}
-            </div>
-            <div className="glass-tabs salary-mini-tabs">
-              {BENEFIT_STATUS_FILTERS.map(option => (
-                <button
-                  key={`status-${option.id}`}
-                  type="button"
-                  className={`glass-tab ${benefitStatusFilter === option.id ? 'active' : ''}`}
-                  onClick={() => setBenefitStatusFilter(option.id)}
-                >
-                  <span>{option.label}</span>
-                </button>
-              ))}
-            </div>
-            <p className="section-note">
-              Showing {filteredMoneyTracker.length} item(s). Claimed in this view: {filteredMoneyTracker.filter(item => moneyClaimed[item.id]).length}.
-            </p>
+            <button
+              type="button"
+              className="cal-collapse-btn"
+              onClick={() => setBenefitToolsOpen(prev => !prev)}
+              aria-expanded={benefitToolsOpen}
+            >
+              {benefitToolsOpen ? 'Hide coverage + filters' : 'Show coverage + filters'}
+            </button>
+            {benefitToolsOpen && (
+              <>
+                <p className="section-note">
+                  {unmappedBenefitIds.length === 0
+                    ? 'Coverage check: all Benefits items are linked to checklist tasks.'
+                    : `Coverage warning: ${unmappedBenefitIds.join(', ')} not linked to checklist yet.`}
+                </p>
+                <div className="glass-tabs salary-mini-tabs">
+                  {[
+                    { id: 'all', label: 'All' },
+                    { id: 'national', label: 'National' },
+                    { id: 'kawasaki', label: 'Kawasaki' },
+                    { id: 'employer', label: 'Employer' },
+                  ].map(option => (
+                    <button
+                      key={option.id}
+                      type="button"
+                      className={`glass-tab ${benefitSourceFilter === option.id ? 'active' : ''}`}
+                      onClick={() => setBenefitSourceFilter(option.id)}
+                    >
+                      <span>{option.label}</span>
+                    </button>
+                  ))}
+                </div>
+                <div className="glass-tabs salary-mini-tabs">
+                  {BENEFIT_OWNER_FILTERS.map(option => (
+                    <button
+                      key={`owner-${option.id}`}
+                      type="button"
+                      className={`glass-tab ${benefitOwnerFilter === option.id ? 'active' : ''}`}
+                      onClick={() => setBenefitOwnerFilter(option.id)}
+                    >
+                      <span>{option.label}</span>
+                    </button>
+                  ))}
+                </div>
+                <div className="glass-tabs salary-mini-tabs">
+                  {BENEFIT_STATUS_FILTERS.map(option => (
+                    <button
+                      key={`status-${option.id}`}
+                      type="button"
+                      className={`glass-tab ${benefitStatusFilter === option.id ? 'active' : ''}`}
+                      onClick={() => setBenefitStatusFilter(option.id)}
+                    >
+                      <span>{option.label}</span>
+                    </button>
+                  ))}
+                </div>
+                <p className="section-note">
+                  Showing {filteredMoneyTracker.length} item(s). Claimed in this view: {filteredMoneyTracker.filter(item => moneyClaimed[item.id]).length}.
+                </p>
+              </>
+            )}
             <ul>
               {filteredMoneyTracker.map(item => {
                 const owner = normalizeBenefitOwner(BENEFIT_OWNER_BY_ID[item.id] || 'family')
@@ -1037,12 +1099,16 @@ export default function MoneyTab() {
                       <span className="checkbox glass-inner" onClick={() => toggleMoney(item.id)}>
                         {claimed ? '\u2713' : ''}
                       </span>
-                      <span className={`item-text ${claimed ? 'claimed' : ''}`}>{item.label}</span>
-                      <span className={`badge owner-badge owner-${owner}`}>{ownerLabel}</span>
-                      <span className="money-amount">{formatYen(item.amount)}</span>
-                      {BENEFIT_ASK_REQUIRED_BY_ID[item.id] && !claimed && (
-                        <span className="badge ask-badge">ASK</span>
-                      )}
+                      <div className="money-card-main">
+                        <div className="money-card-badges">
+                          <span className={`badge owner-badge owner-${owner}`}>{ownerLabel}</span>
+                          <span className="badge money-badge">{formatYenCompact(item.amount)}</span>
+                          {BENEFIT_ASK_REQUIRED_BY_ID[item.id] && !claimed && (
+                            <span className="badge ask-badge">ASK</span>
+                          )}
+                        </div>
+                        <span className={`item-text ${claimed ? 'claimed' : ''}`}>{item.label}</span>
+                      </div>
                       <button className="info-btn glass-inner" onClick={(event) => toggleExpand(item.id, event)}>
                         {expandedItem === item.id ? 'Hide' : 'i'}
                       </button>
@@ -1194,43 +1260,56 @@ export default function MoneyTab() {
               >
                 <span>{familyBenefitsOpen ? 'Hide lane' : 'Show lane'}</span>
               </button>
+              {familyBenefitsOpen && (
+                <button
+                  type="button"
+                  className={`glass-tab ${familyLaneToolsOpen ? 'active' : ''}`}
+                  onClick={() => setFamilyLaneToolsOpen(prev => !prev)}
+                >
+                  <span>{familyLaneToolsOpen ? 'Hide filters' : 'Show filters'}</span>
+                </button>
+              )}
             </div>
             {familyBenefitsOpen && (
               <>
-                <div className="glass-tabs salary-mini-tabs">
-                  {FAMILY_BENEFIT_GROUP_FILTERS.map((group) => (
-                    <button
-                      key={`family-group-${group.id}`}
-                      type="button"
-                      className={`glass-tab ${familyBenefitGroupFilter === group.id ? 'active' : ''}`}
-                      onClick={() => setFamilyBenefitGroupFilter(group.id)}
-                    >
-                      <span>{group.label}</span>
-                    </button>
-                  ))}
-                </div>
-                <div className="glass-tabs salary-mini-tabs">
-                  {BENEFIT_STATUS_FILTERS.map((status) => (
-                    <button
-                      key={`family-status-${status.id}`}
-                      type="button"
-                      className={`glass-tab ${familyBenefitStatusFilter === status.id ? 'active' : ''}`}
-                      onClick={() => setFamilyBenefitStatusFilter(status.id)}
-                    >
-                      <span>{status.label}</span>
-                    </button>
-                  ))}
-                </div>
-                <div className="backup-cloud-actions" style={{ marginBottom: '0.45rem' }}>
-                  <button
-                    type="button"
-                    className="btn-glass-secondary"
-                    onClick={addVisibleFamilyFollowUps}
-                    disabled={!filteredFamilyBenefits.some(item => !familyBenefitsClaimed[item.id])}
-                  >
-                    Add pending follow-ups to Home calendar
-                  </button>
-                </div>
+                {familyLaneToolsOpen && (
+                  <>
+                    <div className="glass-tabs salary-mini-tabs">
+                      {FAMILY_BENEFIT_GROUP_FILTERS.map((group) => (
+                        <button
+                          key={`family-group-${group.id}`}
+                          type="button"
+                          className={`glass-tab ${familyBenefitGroupFilter === group.id ? 'active' : ''}`}
+                          onClick={() => setFamilyBenefitGroupFilter(group.id)}
+                        >
+                          <span>{group.label}</span>
+                        </button>
+                      ))}
+                    </div>
+                    <div className="glass-tabs salary-mini-tabs">
+                      {BENEFIT_STATUS_FILTERS.map((status) => (
+                        <button
+                          key={`family-status-${status.id}`}
+                          type="button"
+                          className={`glass-tab ${familyBenefitStatusFilter === status.id ? 'active' : ''}`}
+                          onClick={() => setFamilyBenefitStatusFilter(status.id)}
+                        >
+                          <span>{status.label}</span>
+                        </button>
+                      ))}
+                    </div>
+                    <div className="backup-cloud-actions" style={{ marginBottom: '0.45rem' }}>
+                      <button
+                        type="button"
+                        className="btn-glass-secondary"
+                        onClick={addVisibleFamilyFollowUps}
+                        disabled={!filteredFamilyBenefits.some(item => !familyBenefitsClaimed[item.id])}
+                      >
+                        Add pending follow-ups to Home calendar
+                      </button>
+                    </div>
+                  </>
+                )}
                 <ul>
                   {filteredFamilyBenefits.map((item) => {
                   const detailId = `family-${item.id}`
@@ -1242,10 +1321,14 @@ export default function MoneyTab() {
                         <span className="checkbox glass-inner" onClick={() => toggleFamilyBenefit(item.id)}>
                           {claimed ? '\u2713' : ''}
                         </span>
-                        <span className={`item-text ${claimed ? 'claimed' : ''}`}>{item.label}</span>
-                        <span className={`badge owner-badge owner-${owner}`}>{getBenefitOwnerLabel(owner)}</span>
-                        <span className="money-amount">{item.estimateLabel}</span>
-                        {item.askRequired && !claimed && <span className="badge ask-badge">ASK</span>}
+                        <div className="money-card-main">
+                          <div className="money-card-badges">
+                            <span className={`badge owner-badge owner-${owner}`}>{getBenefitOwnerLabel(owner)}</span>
+                            <span className="badge money-badge">{item.estimateLabel}</span>
+                            {item.askRequired && !claimed && <span className="badge ask-badge">ASK</span>}
+                          </div>
+                          <span className={`item-text ${claimed ? 'claimed' : ''}`}>{item.label}</span>
+                        </div>
                         <button className="info-btn glass-inner" onClick={(event) => toggleExpand(detailId, event)}>
                           {expandedItem === detailId ? 'Hide' : 'i'}
                         </button>
@@ -1305,14 +1388,28 @@ export default function MoneyTab() {
           <section className="glass-section">
             <div className="section-header">
               <span className="section-icon"><UiIcon icon={APP_ICONS.tax} /></span>
-              <div><h2>18-Year Support Ceiling</h2></div>
+              <div><h2>18-Year Support Projection</h2></div>
             </div>
+            <p className="section-note">
+              Updated model using current tracked benefit amounts + official child allowance formula (¥15,000/month age 0-3, then ¥10,000/month to 18 for first/second child).
+            </p>
             <div className="ceiling-table">
-              <div className="ceil-row glass-inner"><span>Direct cash at birth</span><span>{YEN}610K - 1.04M</span></div>
-              <div className="ceil-row glass-inner"><span>Child allowance (2 kids, 18 years)</span><span>{YEN}3.54M - 4.68M</span></div>
-              <div className="ceil-row glass-inner"><span>Cost savings (medical, education)</span><span>{YEN}3M - 5M+</span></div>
-              <div className="ceil-row glass-inner"><span>Tax benefits over time</span><span>{YEN}500K - 1.5M</span></div>
-              <div className="ceil-row total glass-inner"><span>Total Ceiling</span><span>{YEN}7.6M - 15.7M</span></div>
+              <div className="ceil-row glass-inner">
+                <span>Direct cash around birth (core to potential)</span>
+                <span>{formatYen(supportCeiling.birthCore)} - {formatYen(supportCeiling.birthPotential)}</span>
+              </div>
+              <div className="ceil-row glass-inner">
+                <span>Tracked first-year support total (current data)</span>
+                <span>{formatYen(supportCeiling.trackedFirstYear)}</span>
+              </div>
+              <div className="ceil-row glass-inner">
+                <span>18-year projection (new baby only)</span>
+                <span>{formatYen(supportCeiling.support18yOneChild)}</span>
+              </div>
+              <div className="ceil-row total glass-inner">
+                <span>18-year projection (2-child allowance model)</span>
+                <span>{formatYen(supportCeiling.support18yTwoChildren)}</span>
+              </div>
             </div>
           </section>
         </>
