@@ -132,14 +132,6 @@ self.addEventListener('fetch', (event) => {
   );
 });
 
-function getTypeEmoji(type) {
-  if (type === 'supp') return '\uD83D\uDC8A';
-  if (type === 'work') return '\uD83E\uDDFE';
-  if (type === 'mood') return '\uD83D\uDE0A';
-  if (type === 'plan') return '\uD83D\uDCC5';
-  return '\uD83D\uDD14';
-}
-
 self.addEventListener('push', (event) => {
   let payload = {};
   try {
@@ -152,10 +144,11 @@ self.addEventListener('push', (event) => {
   const targetUrl = toAbsoluteUrl(payload.url || BASE);
 
   // --- Actual reminders array from cloud sync ---
+  // Title and body are pre-formatted by SmartReminderAgent using the same
+  // getNotifTone() as local notifications — show them as-is for seamless UX.
   if (Array.isArray(payload.reminders) && payload.reminders.length > 0) {
     const notifications = payload.reminders.slice(0, 4).map((r) => {
-      const emoji = getTypeEmoji(r.type);
-      const title = `${emoji} Peggy reminder: ${String(r.title || r.type || 'Reminder').trim()}`;
+      const title = String(r.title || 'Peggy reminder').trim();
       const body = String(r.body || '').trim() || 'Open Peggy for details.';
       const isUrgent = r.level === 'urgent';
       const tag = String(r.tag || `peggy-${r.type}-${Date.now()}`).trim();
