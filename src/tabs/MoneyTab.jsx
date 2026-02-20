@@ -53,9 +53,9 @@ const BENEFIT_OWNER_BY_ID = {
   m1: 'naomi',
   m2: 'naomi',
   m3: 'naomi',
-  m4: 'family',
-  m5: 'family',
-  m6: 'family',
+  m4: 'naomi',
+  m5: 'naomi',
+  m6: 'naomi',
   m7: 'family',
   m8: 'family',
   m9: 'family',
@@ -128,6 +128,8 @@ const FAMILY_BENEFITS_OPEN_KEY = 'baby-prep-family-benefits-open'
 const FAMILY_BENEFITS_CLAIMED_KEY = 'baby-prep-family-benefits-claimed'
 const BENEFIT_TOOLS_OPEN_KEY = 'baby-prep-benefit-tools-open'
 const FAMILY_LANE_TOOLS_OPEN_KEY = 'baby-prep-family-lane-tools-open'
+const INCIDENT_BRIDGE_OPEN_KEY = 'baby-prep-incident-bridge-open'
+const INCIDENT_BRIDGE_CLAIMED_KEY = 'baby-prep-incident-bridge-claimed'
 const SUPPORT_PROJECTION_SCENARIO_KEY = 'baby-prep-support-projection-scenario'
 const SUPPORT_PROJECTION_CHILD_MODEL_KEY = 'baby-prep-support-projection-child-model'
 const SUPPORT_PLAYBOOK_OPEN_KEY = 'baby-prep-support-playbook-open'
@@ -194,12 +196,12 @@ const FAMILY_BENEFIT_ITEMS = [
   },
   {
     id: 'f4',
-    label: 'Confirm childbirth lump-sum payer path (if Naomi under Shinji insurance)',
+    label: 'Confirm Naomi own-insured childbirth payer path (direct vs refund route)',
     estimateLabel: 'Route check',
-    owner: 'family',
+    owner: 'naomi',
     group: 'insurance',
     where: 'Insurance office + hospital billing desk',
-    howTo: 'Confirm who files and which route applies (direct payment vs refund) to avoid delayed payout.',
+    howTo: "Use Naomi's own insured route as default. Confirm filing owner, direct payment vs refund route, and required forms so payout is not delayed.",
     timing: 'Before delivery admission',
     askRequired: true,
     sourceLinks: [
@@ -262,6 +264,86 @@ const FAMILY_BENEFIT_ITEMS = [
     sourceLinks: [
       { label: 'MHLW: 育児休業給付', url: 'https://www.mhlw.go.jp/stf/seisakunitsuite/bunya/0000135090_00001.html' },
     ],
+  },
+]
+
+const INCIDENT_BRIDGE_ITEMS = [
+  {
+    id: 'wb1',
+    label: 'Medical re-check for persistent dizziness/head symptoms',
+    owner: 'husband',
+    timing: 'Today / ASAP',
+    where: 'Hospital / emergency follow-up clinic',
+    action: 'Report all symptoms and request updated shindansho with work restrictions.',
+    planTime: '09:30',
+    planOffsetDays: 0,
+    sourceLinks: [
+      { label: 'MHLW: 労災保険制度', url: 'https://www.mhlw.go.jp/stf/seisakunitsuite/bunya/koyou_roudou/roudoukijun/zigyonushi/rousai/index.html' },
+    ],
+  },
+  {
+    id: 'wb2',
+    label: 'Call multilingual legal support (rescheduled call)',
+    owner: 'husband',
+    timing: 'Fixed reminder: Feb 24, 2026, call early at 09:00',
+    where: 'Phone call',
+    action: 'Ask for Tagalog/English interpreter, verify rousai filing status, and ask legal referral path.',
+    planTime: '09:00',
+    planDateISO: '2026-02-24',
+    phones: ['0570-078377', '050-3754-5430', '03-5363-3025'],
+    sourceLinks: [
+      { label: 'Houterasu multilingual support', url: 'https://www.houterasu.or.jp/multilingual/' },
+    ],
+  },
+  {
+    id: 'wb3',
+    label: 'HR lock-in: Naomi own-insured childbirth route (separate from accident lane)',
+    owner: 'family',
+    timing: 'Within 24-48 hours',
+    where: 'Employer HR + insurer contact desk',
+    action: "Confirm Naomi insured-person status (本人/被保険者), childbirth lump-sum route, and required forms/deadlines. If any status changed, mark as 'needs HR/insurer confirmation' before acting.",
+    planTime: '10:30',
+    planOffsetDays: 1,
+    sourceLinks: [
+      { label: 'MHLW: 出産育児一時金', url: 'https://www.mhlw.go.jp/stf/seisakunitsuite/bunya/kenkou_iryou/iryouhoken/shussan/index.html' },
+      { label: 'Kyokai Kenpo: 出産育児一時金', url: 'https://www.kyoukaikenpo.or.jp/g3/sb3280/' },
+    ],
+  },
+  {
+    id: 'wb4',
+    label: 'Rousai follow-up + accident evidence packet',
+    owner: 'husband',
+    timing: 'This week',
+    where: 'Labor office / legal consult prep',
+    action: 'Consolidate medical records, photos, payslips, logs, and written communications.',
+    planTime: '14:00',
+    planOffsetDays: 2,
+    sourceLinks: [
+      { label: 'MHLW: 労災Q&A/claims info', url: 'https://www.mhlw.go.jp/stf/seisakunitsuite/bunya/0000154471.html' },
+    ],
+  },
+  {
+    id: 'wb5',
+    label: 'No-resignation gate check',
+    owner: 'family',
+    timing: 'Before any resignation decision',
+    where: 'Home legal/finance review',
+    action: 'Do not resign until new offer or signed settlement protects income and insurance continuity.',
+    planTime: '15:30',
+    planOffsetDays: 3,
+    sourceLinks: [
+      { label: 'MHLW: childcare leave benefit basics', url: 'https://www.mhlw.go.jp/stf/seisakunitsuite/bunya/0000135090_00001.html' },
+    ],
+  },
+  {
+    id: 'wb6',
+    label: 'Loan defense: request temporary repayment adjustment',
+    owner: 'family',
+    timing: 'This week',
+    where: 'Lender/bank customer support',
+    action: 'Submit temporary hardship request while medical/legal process is ongoing.',
+    planTime: '13:00',
+    planOffsetDays: 1,
   },
 ]
 
@@ -787,6 +869,8 @@ export default function MoneyTab() {
   const [recentIncomeMode, setRecentIncomeMode] = useState('work')
   const [familyBenefitsOpen, setFamilyBenefitsOpen] = useState(() => readStorageBool(FAMILY_BENEFITS_OPEN_KEY, false))
   const [familyBenefitsClaimed, setFamilyBenefitsClaimed] = useState(() => readStorageMap(FAMILY_BENEFITS_CLAIMED_KEY))
+  const [incidentBridgeOpen, setIncidentBridgeOpen] = useState(() => readStorageBool(INCIDENT_BRIDGE_OPEN_KEY, false))
+  const [incidentBridgeClaimed, setIncidentBridgeClaimed] = useState(() => readStorageMap(INCIDENT_BRIDGE_CLAIMED_KEY))
   const [benefitToolsOpen, setBenefitToolsOpen] = useState(() => readStorageBool(BENEFIT_TOOLS_OPEN_KEY, false))
   const [familyLaneToolsOpen, setFamilyLaneToolsOpen] = useState(() => readStorageBool(FAMILY_LANE_TOOLS_OPEN_KEY, false))
   const [supportProjectionScenario, setSupportProjectionScenario] = useState(() => {
@@ -869,6 +953,10 @@ export default function MoneyTab() {
   const familyBenefitsDoneCount = useMemo(
     () => FAMILY_BENEFIT_ITEMS.filter(item => familyBenefitsClaimed[item.id]).length,
     [familyBenefitsClaimed]
+  )
+  const incidentBridgeDoneCount = useMemo(
+    () => INCIDENT_BRIDGE_ITEMS.filter(item => incidentBridgeClaimed[item.id]).length,
+    [incidentBridgeClaimed]
   )
   const filteredFamilyBenefits = useMemo(() => {
     return FAMILY_BENEFIT_ITEMS.filter((item) => {
@@ -1029,6 +1117,10 @@ export default function MoneyTab() {
   }, [familyBenefitsOpen])
 
   useEffect(() => {
+    writeStorageBool(INCIDENT_BRIDGE_OPEN_KEY, incidentBridgeOpen)
+  }, [incidentBridgeOpen])
+
+  useEffect(() => {
     writeStorageBool(BENEFIT_TOOLS_OPEN_KEY, benefitToolsOpen)
   }, [benefitToolsOpen])
 
@@ -1051,6 +1143,10 @@ export default function MoneyTab() {
   useEffect(() => {
     writeStorageMap(FAMILY_BENEFITS_CLAIMED_KEY, familyBenefitsClaimed)
   }, [familyBenefitsClaimed])
+
+  useEffect(() => {
+    writeStorageMap(INCIDENT_BRIDGE_CLAIMED_KEY, incidentBridgeClaimed)
+  }, [incidentBridgeClaimed])
 
   const recentMonthKeys = useMemo(() => getRecentMonthKeys(6), [])
   const recentYearMonthKeys = useMemo(() => getRecentMonthKeys(12), [])
@@ -1157,6 +1253,44 @@ export default function MoneyTab() {
       ...(prev && typeof prev === 'object' ? prev : {}),
       [id]: !Boolean(prev?.[id]),
     }))
+  }
+
+  const toggleIncidentBridgeItem = (id) => {
+    setIncidentBridgeClaimed(prev => ({
+      ...(prev && typeof prev === 'object' ? prev : {}),
+      [id]: !Boolean(prev?.[id]),
+    }))
+  }
+
+  const getIncidentBridgePlanDateISO = (item) => {
+    const fixed = String(item?.planDateISO || '').trim()
+    if (fixed && parseIsoDate(fixed)) return fixed
+    const offset = Number(item?.planOffsetDays)
+    if (Number.isFinite(offset)) return toIsoDateWithOffset(offset)
+    return toIsoDate()
+  }
+
+  const addIncidentBridgeFollowUp = (item) => {
+    const dateISO = getIncidentBridgePlanDateISO(item)
+    const where = String(item?.where || '').trim()
+    const timing = String(item?.timing || '').trim()
+    const notes = [timing ? `Timing: ${timing}` : '', String(item?.action || '').trim()]
+      .filter(Boolean)
+      .join('\n')
+    addPlan(dateISO, {
+      time: String(item?.planTime || '').trim(),
+      title: `Bridge: ${item.label}`,
+      location: where || '',
+      notes: notes || 'Bridge follow-up',
+      done: false,
+    })
+  }
+
+  const addAllIncidentBridgeFollowUps = () => {
+    INCIDENT_BRIDGE_ITEMS
+      .filter(item => !incidentBridgeClaimed[item.id])
+      .slice(0, 8)
+      .forEach((item) => addIncidentBridgeFollowUp(item))
   }
 
   const addFamilyBenefitFollowUp = (item) => {
@@ -1839,7 +1973,7 @@ export default function MoneyTab() {
               </div>
             </div>
             <p className="section-note">
-              Optional Shinji-side support lane (kaisha/hoken). Naomi flow above stays unchanged.
+              Optional Shinji-side support lane (kaisha/hoken). Naomi core childbirth/maternity route stays owner=Naomi.
             </p>
             <p className="section-note">
               Full progress: {familyBenefitsDoneCount}/{FAMILY_BENEFIT_ITEMS.length} checked.
@@ -1974,6 +2108,125 @@ export default function MoneyTab() {
                   <p className="section-note">No family-lane items match current filters.</p>
                 )}
               </>
+            )}
+          </section>
+
+          <section className="glass-section">
+            <div className="section-header">
+              <span className="section-icon"><UiIcon icon={APP_ICONS.work} /></span>
+              <div>
+                <h2>Work Accident + Pregnancy Bridge</h2>
+                <span className="section-count">
+                  {incidentBridgeDoneCount}/{INCIDENT_BRIDGE_ITEMS.length} checked
+                </span>
+              </div>
+            </div>
+            <p className="section-note">
+              Accident lane only: track rousai/legal controls without changing Naomi's own-insured pregnancy claim route.
+            </p>
+            <div className="glass-tabs salary-mini-tabs">
+              <button
+                type="button"
+                className={`glass-tab ${incidentBridgeOpen ? 'active' : ''}`}
+                onClick={() => setIncidentBridgeOpen(prev => !prev)}
+              >
+                <span>{incidentBridgeOpen ? 'Hide bridge lane' : 'Show bridge lane'}</span>
+              </button>
+              {incidentBridgeOpen && (
+                <button
+                  type="button"
+                  className="glass-tab"
+                  onClick={addAllIncidentBridgeFollowUps}
+                  disabled={!INCIDENT_BRIDGE_ITEMS.some(item => !incidentBridgeClaimed[item.id])}
+                >
+                  <span>Add pending bridge follow-ups</span>
+                </button>
+              )}
+            </div>
+            {incidentBridgeOpen && (
+              <ul>
+                {INCIDENT_BRIDGE_ITEMS.map((item) => {
+                  const detailId = `bridge-${item.id}`
+                  const done = Boolean(incidentBridgeClaimed[item.id])
+                  const owner = normalizeBenefitOwner(item.owner || 'family')
+                  const planDateISO = getIncidentBridgePlanDateISO(item)
+                  return (
+                    <li key={item.id} className={`glass-card money-card ${done ? 'done' : ''}`}>
+                      <div className="money-card-top">
+                        <span className="checkbox glass-inner" onClick={() => toggleIncidentBridgeItem(item.id)}>
+                          {done ? '\u2713' : ''}
+                        </span>
+                        <div className="money-card-main">
+                          <div className="money-card-badges">
+                            <span className={`badge owner-badge owner-${owner}`}>{getBenefitOwnerLabel(owner)}</span>
+                            <span className="badge money-badge">{item.timing}</span>
+                          </div>
+                          <span className={`item-text ${done ? 'claimed' : ''}`}>{item.label}</span>
+                        </div>
+                        <button className="info-btn glass-inner" onClick={(event) => toggleExpand(detailId, event)}>
+                          {expandedItem === detailId ? 'Hide' : 'i'}
+                        </button>
+                      </div>
+                      {expandedItem === detailId && (
+                        <div className="money-detail">
+                          <div className="detail-section">
+                            <div className="detail-label">Action:</div>
+                            <div className="detail-text">{item.action}</div>
+                          </div>
+                          <div className="detail-section">
+                            <div className="detail-label">Where:</div>
+                            <div className="detail-text">{item.where}</div>
+                          </div>
+                          <div className="detail-section">
+                            <div className="detail-label">Target schedule:</div>
+                            <div className="detail-text">{planDateISO} {String(item.planTime || '').trim()}</div>
+                          </div>
+                          <div className="detail-section">
+                            <button
+                              type="button"
+                              className="tax-preset-btn glass-inner"
+                              onClick={() => addIncidentBridgeFollowUp(item)}
+                            >
+                              Add follow-up to Home calendar
+                            </button>
+                          </div>
+                          {Array.isArray(item.phones) && item.phones.length > 0 && (
+                            <div className="detail-section">
+                              <div className="detail-label">Phone numbers:</div>
+                              <div className="task-phones">
+                                {item.phones.map((phone) => {
+                                  const clean = String(phone || '').replace(/[^0-9]/g, '')
+                                  return (
+                                    <a key={`${item.id}-${phone}`} href={`tel:${clean}`} className="task-phone-link">
+                                      <span className="phone-icon"><UiIcon icon={APP_ICONS.phone} /></span>
+                                      <span className="phone-info">
+                                        <span className="phone-label">Call</span>
+                                        <span className="phone-number">{phone}</span>
+                                      </span>
+                                    </a>
+                                  )
+                                })}
+                              </div>
+                            </div>
+                          )}
+                          {Array.isArray(item.sourceLinks) && item.sourceLinks.length > 0 && (
+                            <div className="detail-section">
+                              <div className="detail-label">Official sources:</div>
+                              <div className="detail-text">
+                                {item.sourceLinks.map((source, index) => (
+                                  <div key={`${item.id}-source-${index}`}>
+                                    <a href={source.url} target="_blank" rel="noopener noreferrer">{source.label}</a>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </li>
+                  )
+                })}
+              </ul>
             )}
           </section>
 
