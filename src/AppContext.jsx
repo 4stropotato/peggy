@@ -63,6 +63,7 @@ function useLS(key, initial) {
 
 // Locked optimal schedule â€” no user editing
 const defaultSuppSchedule = OPTIMAL_SUPP_SCHEDULE
+const SUPP_SCHEDULE_VERSION = 2
 const defaultHealthCalendarVisibility = Object.freeze({
   supps: true,
   work: true,
@@ -152,12 +153,19 @@ export function AppProvider({ children }) {
   const [husbandWorkLocation, setHusbandWorkLocation] = useLS('baby-prep-work-location-husband', createDefaultWorkLocation())
   // Supplement schedule config: { suppId: { enabled, times: ['08:00', '20:00'], timesPerDay } }
   const [suppSchedule, setSuppSchedule] = useLS('baby-prep-supp-schedule', defaultSuppSchedule)
+  const [suppScheduleVersion, setSuppScheduleVersion] = useLS('baby-prep-supp-schedule-version', 0)
   // Supplement last taken timestamps: { 'suppId-doseIndex': 'ISO timestamp' }
   const [suppLastTaken, setSuppLastTaken] = useLS('baby-prep-supp-taken', {})
   // Supplement bottle start dates + remaining: { suppId: { startDate: 'ISO', remaining: 90 } }
   const [suppBottles, setSuppBottles] = useLS('baby-prep-supp-bottles', {})
 
   const toggleTheme = () => setTheme(prev => prev === 'dark' ? 'light' : 'dark')
+
+  useEffect(() => {
+    if (suppScheduleVersion >= SUPP_SCHEDULE_VERSION) return
+    setSuppSchedule(defaultSuppSchedule)
+    setSuppScheduleVersion(SUPP_SCHEDULE_VERSION)
+  }, [suppScheduleVersion, setSuppSchedule, setSuppScheduleVersion])
 
   // Synchronous guard ref - prevents rapid clicks from bypassing stale state check
   const suppToggleGuard = useRef(new Set())

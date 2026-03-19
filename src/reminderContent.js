@@ -666,6 +666,7 @@ export function getSupplementReminderContext({ dailySupp, suppSchedule, now = ne
 
   supplements.forEach(supp => {
     const schedule = suppSchedule?.[supp.id]
+    if (schedule?.enabled === false) return
     const times = schedule?.times?.length ? schedule.times : supp.defaultTimes
     times.forEach((clock, idx) => {
       totalDoses += 1

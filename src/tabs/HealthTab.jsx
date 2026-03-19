@@ -345,6 +345,7 @@ function getSuppDayStatus(dailySupp, suppSchedule, dateISO, firstTrackDate) {
 
   let total = 0, taken = 0
   supplements.forEach(s => {
+    if (suppSchedule?.[s.id]?.enabled === false) return
     const sched = suppSchedule[s.id]
     const times = sched?.times || s.defaultTimes
     times.forEach((_, i) => {
@@ -371,6 +372,10 @@ export default function HealthTab() {
   const [visitForm, setVisitForm] = useState({})
   const [moodForm, setMoodForm] = useState({ mood: '', energy: 3, cravings: '', notes: '' })
   const [expandedSupp, setExpandedSupp] = useState(null)
+  const activeSupplements = useMemo(
+    () => supplements.filter(s => suppSchedule?.[s.id]?.enabled !== false),
+    [suppSchedule]
+  )
   const showCalendar = useMemo(() => {
     const source = healthCalendarVisibility && typeof healthCalendarVisibility === 'object'
       ? healthCalendarVisibility
@@ -430,12 +435,12 @@ export default function HealthTab() {
     workLocation.awayMinutesForWork,
   ])
 
-  const suppTaken = supplements.filter(s => {
+  const suppTaken = activeSupplements.filter(s => {
     const schedule = suppSchedule[s.id]
     const times = schedule?.times || s.defaultTimes
     return times.every((_, i) => isSuppTaken(s.id, i))
   }).length
-  const suppTotal = supplements.length
+  const suppTotal = activeSupplements.length
   const savedWorkTargetValid = isValidLatLng(workLocation.lat, workLocation.lng)
   const savedHomeTargetValid = isValidLatLng(workLocation.homeLat, workLocation.homeLng)
   const hasSavedGeoTarget = savedWorkTargetValid || savedHomeTargetValid
@@ -733,7 +738,7 @@ export default function HealthTab() {
           <section className="glass-section">
             <p className="section-note">Tap dose to mark as taken. Tap ? for info. Use "Undo" if you made a mistake.</p>
             <ul className="supp-grid">
-              {supplements.map(s => (
+              {activeSupplements.map(s => (
                 <SuppCountdownCard
                   key={s.id}
                   supp={s}
@@ -783,9 +788,9 @@ export default function HealthTab() {
             <div className="glass-card warn-card">
               <p>Huwag sabayan ang Calcium at Prenatal (may iron)!</p>
               <p>Nag-aagawan sila sa absorption. Keep them 2+ hours apart.</p>
-              <p><strong>Morning:</strong> Prenatal + DHA + Choline + Chlorella</p>
-              <p><strong>Lunch:</strong> Calcium (1st) (+ Vitamin D3 only if advised)</p>
-              <p><strong>Evening:</strong> Calcium (2nd)</p>
+              <p><strong>Morning:</strong> Prenatal + DHA (2 softgels) + Choline</p>
+              <p><strong>Lunch:</strong> Calcium (1st tablet) (+ Vitamin D3 only if advised)</p>
+              <p><strong>Evening:</strong> Calcium (2nd tablet)</p>
             </div>
           </section>
         </>

@@ -182,7 +182,9 @@ export default function DayDetail({
 
   // Supplement status
   const suppStatus = useMemo(() => {
-    return supplements.map(s => {
+    return supplements
+      .filter(s => suppSchedule?.[s.id]?.enabled !== false)
+      .map(s => {
       const sched = suppSchedule[s.id]
       const times = sched?.times || s.defaultTimes
       const doses = times.map((t, i) => {

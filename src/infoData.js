@@ -725,9 +725,9 @@ export const healthTipsInfo = {
       title: 'The Ryzen Formula + Improvements',
       icon: '⭐',
       content: [
-        { label: 'What worked with Ryzen', detail: 'Chlorella supplementation + vegan/plant-heavy diet → Exceptionally smart at math' },
-        { label: 'Replicate', detail: 'Continue chlorella + plant-heavy eating as foundation' },
-        { label: 'ADD this time', detail: 'DHA supplement (biggest upgrade), Choline supplement + eggs, Calcium, Vitamin D3, more intentional brain stimulation' },
+        { label: 'What worked with Ryzen', detail: 'Consistent meals, plant-heavy eating, and steady routine support.' },
+        { label: 'Replicate', detail: 'Keep the food-first foundation: eggs, fish, greens, beans, hydration, and regular meals.' },
+        { label: 'ADD this time', detail: 'Structured core stack: prenatal, DHA, choline, calcium. Extra Vitamin D3 only if OB/labs say needed.' },
       ]
     },
     {
@@ -815,7 +815,7 @@ export const supplementsDetailInfo = {
       name: 'Calcium (No Added Zinc Preferred)',
       icon: '🦴',
       why: 'Use supplements only to fill calcium gap from food. Keep a safe margin below zinc and magnesium upper limits.',
-      when: 'Split into 2 doses (morning/evening). Body absorbs max 500mg at a time. TAKE 2+ HOURS AWAY FROM IRON/PRENATAL!',
+      when: 'Split into 2 later-day doses (lunch + dinner works well). TAKE 2+ HOURS AWAY FROM IRON/PRENATAL!',
       options: [
         { product: '21st Century, Calcium Citrate + D3, 120 Tablets', price: '~$8-12 (usually ¥1,200-1,800)', note: 'No added zinc. Citrate form is generally easier to absorb.', lasts: '1 month' },
         { product: 'Nature Made, Calcium 600mg + D3, 220 Tablets', price: '~$10-14 (usually ¥1,500-2,100)', note: 'No added zinc. Adjust tablet count based on food calcium intake.', lasts: '3+ months' },
@@ -825,7 +825,7 @@ export const supplementsDetailInfo = {
     {
       name: 'Chlorella',
       icon: '🌿',
-      why: 'Optional add-on only. Not a core prenatal requirement. If used, start low and monitor tolerance.',
+      why: 'Optional add-on only. Not a core prenatal requirement. Keep it off by default unless OB-GYN agrees and budget allows.',
       when: 'With meals. Start with lower dose, increase gradually over a week.',
       options: [
         { product: 'NOW Foods, Certified Organic Chlorella, 500 mg, 200 Tablets', price: '~$12-16 (usually ¥1,800-2,400)', note: 'Budget pick - organic, broken cell wall', lasts: '1-2 months' },
@@ -855,22 +855,22 @@ export const supplementsDetailInfo = {
     }
   ],
   schedule: [
-    { time: 'BREAKFAST', supplements: 'Prenatal Multi + DHA + Choline + Chlorella', note: 'With food (needs fat for DHA absorption)' },
-    { time: 'LUNCH/MERIENDA', supplements: 'Calcium (1st dose)', note: 'With food, AT LEAST 2 HOURS after breakfast supplements. Add Vitamin D3 only if advised.' },
-    { time: 'DINNER/BEFORE BED', supplements: 'Calcium (2nd dose)', note: 'With food' },
+    { time: 'BREAKFAST', supplements: 'Prenatal Multi + DHA (2 softgels) + Choline', note: 'Core stack. With food and some fat for DHA absorption.' },
+    { time: 'LUNCH/MERIENDA', supplements: 'Calcium (1st tablet)', note: 'With food, AT LEAST 2 HOURS after prenatal. Add extra Vitamin D3 only if advised.' },
+    { time: 'DINNER/BEFORE BED', supplements: 'Calcium (2nd tablet)', note: 'With food. Keep it separate from prenatal iron.' },
   ],
-  importantRule: 'HUWAG sabayan ang calcium at prenatal (may iron). Keep 2+ hours apart. Extra Vitamin D3 should be lab-guided, not automatic.',
+  importantRule: 'HUWAG sabayan ang calcium at prenatal (may iron). Keep 2+ hours apart. Core stack now is prenatal + DHA + choline + calcium. Extra Vitamin D3 should be lab-guided, not automatic.',
   budgetCart: {
     title: 'Budget iHerb Cart',
-    total: '~$78 (usually ¥11,500-12,500)',
-    note: 'Core stack only. Vitamin D3 can be added later if OB/labs recommend.',
+    total: '~$70-90 (usually JPY 10,500-13,000)',
+    note: 'Current 4-item core stack. Chlorella and extra Vitamin D3 stay optional for now.',
     items: [
-      'Nature Made, Prenatal Multi + DHA, 90 Softgels',
-      'Nordic Naturals, Prenatal DHA, 500 mg, 90 Soft Gels',
+      'Thorne, Basic Prenatal, 90 Capsules',
+      'Nordic Naturals, Prenatal DHA, 90 Soft Gels',
       '21st Century, Calcium Citrate + D3, 120 Tablets',
-      'NOW Foods, Certified Organic Chlorella, 500 mg, 200 Tablets',
-      'NOW Foods, Choline & Inositol, 500 mg, 100 Capsules',
-      'Vitamin D3 (optional add-on, only with OB/lab guidance)',
+      'NOW Foods, Choline & Inositol, 100 Capsules',
+      'Chlorella only if OB-GYN says yes later',
+      'Extra Vitamin D3 only with OB/lab guidance',
     ]
   },
   iherbTips: [
@@ -893,6 +893,7 @@ export const supplementsDetailInfo = {
     '"Pregnancy tea" blends (overpriced, minimal benefit)',
     'Separate B-complex (prenatal covers it)',
     'Expensive "prenatal packs" (paying for marketing)',
+    'High-dose extra Vitamin D without labs/OB',
   ]
 }
 

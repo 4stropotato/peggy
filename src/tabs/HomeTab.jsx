@@ -54,6 +54,7 @@ function getSuppDayStatus(dailySupp, suppSchedule, dateISO, firstTrackDate) {
   let total = 0
   let taken = 0
   supplements.forEach(s => {
+    if (suppSchedule?.[s.id]?.enabled === false) return
     const sched = suppSchedule[s.id]
     const times = sched?.times || s.defaultTimes
     times.forEach((_, i) => {
@@ -162,11 +163,12 @@ export default function HomeTab() {
   const progress = totalItems > 0 ? Math.round((doneItems / totalItems) * 100) : 0
 
   const suppTaken = supplements.filter(s => {
+    if (suppSchedule?.[s.id]?.enabled === false) return false
     const schedule = suppSchedule?.[s.id]
     const times = schedule?.times || s.defaultTimes
     return times.every((_, i) => isSuppTaken(s.id, i))
   }).length
-  const suppTotal = supplements.length
+  const suppTotal = supplements.filter(s => suppSchedule?.[s.id]?.enabled !== false).length
 
   const totalMoney = moneyTracker.reduce((acc, m) => acc + m.amount, 0)
   const claimedMoney = moneyTracker
