@@ -815,16 +815,16 @@ export const supplements = [
     id: 'prenatal',
     name: 'Prenatal Multivitamin',
     product: 'Thorne, Basic Prenatal, 90 Capsules',
-    when: 'Before bed with a snack or late meal',
+    when: 'Dinner with food',
     why: 'Folate + iron + iodine + B-vitamin foundation',
     icon: '💊',
     timesPerDay: 1,
-    defaultTimes: ['21:30'],
+    defaultTimes: ['18:30'],
     bottleSize: 90,
     perDose: 3,
     price: 4149,
-    note: 'Take 3 capsules with a light snack or late meal before bed. This is a nausea-friendly default for Naomi. Keep it 2+ hours away from calcium.',
-    dosageInfo: '3 capsules daily before bed, with food. Serving size = 3 caps, kaya 30 days lang ang isang bottle.',
+    note: 'Take 3 capsules with dinner or the largest meal Naomi can keep down. Avoid taking it with extra calcium-rich foods if possible.',
+    dosageInfo: '3 capsules daily with dinner. Serving size = 3 caps, kaya 30 days lang ang isang bottle.',
     warnings: 'Contains high iron. Keep 2+ hours away from calcium and do not add extra iron unless advised by OB-GYN.',
     explanation: 'Ang prenatal multivitamin ang base ng lahat. Ang Thorne version ay may methylated folate (L-5-MTHF) na mas mabilis ma-absorb kumpara sa regular folic acid. May iron din para sa blood production (dadami ang blood mo ng 50% during pregnancy!). 3 capsules per serving kaya 30 days lang per bottle.',
     budgetAlt: 'Nature Made Prenatal Multi + DHA (¥1,500, 90 days supply, 1/day) — same core nutrients, 8x cheaper per day!'
@@ -851,16 +851,16 @@ export const supplements = [
     id: 'calcium',
     name: 'Calcium Citrate + D3 (No Zinc)',
     product: '21st Century, Calcium Citrate + D3, 120 Tablets',
-    when: 'Lunch AND dinner (split dose, 2+ hours away from prenatal)',
+    when: 'Breakfast AND lunch (split dose, 2+ hours away from prenatal)',
     why: 'Bone support without stacking extra zinc',
     icon: '🦴',
     timesPerDay: 2,
-    defaultTimes: ['12:00', '18:30'],
+    defaultTimes: ['08:00', '12:00'],
     bottleSize: 120,
     perDose: 1,
     price: 1599,
     note: 'Prefer calcium-only or calcium + D3 formula without added zinc. Keep 2+ hours away from prenatal iron.',
-    dosageInfo: '1 tablet at LUNCH + 1 tablet at DINNER. Adjust total amount based on dietary calcium and OB-GYN advice.',
+    dosageInfo: '1 tablet at BREAKFAST + 1 tablet at LUNCH. Adjust total amount based on dietary calcium and OB-GYN advice.',
     warnings: 'HUWAG sabayan ng Prenatal vitamin! Calcium and iron compete for absorption. Keep at least 2 hours apart.',
     explanation: 'Goal is to close the calcium gap from food, not mega-dose. If food calcium is already high, lower supplemental dose may be enough.',
     budgetAlt: null
@@ -887,11 +887,11 @@ export const supplements = [
     id: 'choline',
     name: 'Choline (Bitartrate)',
     product: 'NOW Foods, Choline & Inositol, 500 mg, 100 Capsules',
-    when: 'Dinner with food',
+    when: 'Morning with breakfast',
     why: 'Brain-development support to help reach daily choline target',
     icon: '⚡',
     timesPerDay: 1,
-    defaultTimes: ['18:30'],
+    defaultTimes: ['08:00'],
     bottleSize: 100,
     perDose: 1,
     price: 1450,
@@ -1209,36 +1209,36 @@ export const taglishTips = [
 
 // Locked optimal supplement schedule (used by AppContext as default)
 export const OPTIMAL_SUPP_SCHEDULE = {
-  prenatal:  { enabled: true, times: ['21:30'], timesPerDay: 1 },
+  prenatal:  { enabled: true, times: ['18:30'], timesPerDay: 1 },
   dha:       { enabled: true, times: ['18:30'], timesPerDay: 1 },
-  calcium:   { enabled: true, times: ['12:00', '18:30'], timesPerDay: 2 },
+  calcium:   { enabled: true, times: ['08:00', '12:00'], timesPerDay: 2 },
   chlorella: { enabled: false, times: ['08:00'], timesPerDay: 1 },
-  choline:   { enabled: true, times: ['18:30'], timesPerDay: 1 },
+  choline:   { enabled: true, times: ['08:00'], timesPerDay: 1 },
   vitd:      { enabled: false, times: ['12:00'], timesPerDay: 1 },
 }
 
 // Optimal supplement schedule - displayed prominently
 export const optimalSchedule = [
   {
+    time: '08:00 - BREAKFAST',
+    icon: '??',
+    supps: ['Choline', 'Calcium (1st tablet)'],
+    note: 'Breakfast-only light stack. Choline is flexible, and first calcium dose starts the day without touching the prenatal iron.',
+    tagNote: 'Breakfast: choline + calcium muna. No prenatal yet.'
+  },
+  {
     time: '12:00 - LUNCH',
-    icon: '☀️',
-    supps: ['Calcium (1st tablet)'],
-    note: 'First calcium dose with lunch. Keeps it well away from the prenatal iron later at night.',
-    tagNote: 'Lunch calcium muna. Keep it far from the prenatal iron.'
+    icon: '??',
+    supps: ['Calcium (2nd tablet)'],
+    note: 'Second calcium dose with lunch. This keeps the full calcium serving far from the prenatal later at dinner.',
+    tagNote: 'Lunch calcium ulit. Keep dinner free for prenatal + DHA.'
   },
   {
     time: '18:30 - DINNER',
-    icon: '🌆',
-    supps: ['DHA (2 softgels)', 'Choline', 'Calcium (2nd tablet)'],
-    note: 'Dinner stack for Naomi. DHA needs food/fat, choline is flexible, and second calcium can go here as long as prenatal stays later.',
-    tagNote: 'Dinner stack: DHA + choline + 2nd calcium. Then wait 2+ hours before prenatal.'
-  },
-  {
-    time: '21:30 - BEFORE BED',
-    icon: '🌙',
-    supps: ['Prenatal Multivitamin'],
-    note: 'Best nausea-friendly default for Naomi. Take with a light snack or late meal, not on an empty stomach.',
-    tagNote: 'Prenatal bago matulog para mas mababa ang chance na masuka. Keep 2+ hours away from calcium.'
+    icon: '??',
+    supps: ['Prenatal Multivitamin', 'DHA (2 softgels)'],
+    note: 'Main meal stack for Naomi. DHA needs food/fat, and prenatal is better here if she cannot keep it down earlier in the day.',
+    tagNote: 'Dinner: prenatal + DHA. Best meal-only setup if morning nausea is rough.'
   }
 ]
 

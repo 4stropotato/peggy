@@ -63,7 +63,7 @@ function useLS(key, initial) {
 
 // Locked optimal schedule â€” no user editing
 const defaultSuppSchedule = OPTIMAL_SUPP_SCHEDULE
-const SUPP_SCHEDULE_VERSION = 3
+const SUPP_SCHEDULE_VERSION = 4
 const defaultHealthCalendarVisibility = Object.freeze({
   supps: true,
   work: true,
