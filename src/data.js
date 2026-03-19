@@ -819,11 +819,11 @@ export const supplements = [
     why: 'Folate + iron + iodine + B-vitamin foundation',
     icon: '💊',
     timesPerDay: 1,
-    defaultTimes: ['18:30'],
+    defaultTimes: ['20:30'],
     bottleSize: 90,
     perDose: 3,
     price: 4149,
-    note: 'Take 3 capsules with dinner or the largest meal Naomi can keep down. Avoid taking it with extra calcium-rich foods if possible.',
+    note: 'Take 3 capsules with dinner or the largest meal Naomi can keep down. Naomi can move the time in Peggy if her real dinner runs later.',
     dosageInfo: '3 capsules daily with dinner. Serving size = 3 caps, kaya 30 days lang ang isang bottle.',
     warnings: 'Contains high iron. Keep 2+ hours away from calcium and do not add extra iron unless advised by OB-GYN.',
     explanation: 'Ang prenatal multivitamin ang base ng lahat. Ang Thorne version ay may methylated folate (L-5-MTHF) na mas mabilis ma-absorb kumpara sa regular folic acid. May iron din para sa blood production (dadami ang blood mo ng 50% during pregnancy!). 3 capsules per serving kaya 30 days lang per bottle.',
@@ -837,11 +837,11 @@ export const supplements = [
     why: '#1 brain-building nutrient for baby',
     icon: '🧠',
     timesPerDay: 1,
-    defaultTimes: ['18:30'],
+    defaultTimes: ['20:30'],
     bottleSize: 90,
     perDose: 2,
     price: 3256,
-    note: 'Take 2 softgels with food containing fat for best absorption.',
+    note: 'Take 2 softgels with food containing fat for best absorption. Naomi can move the dinner time in Peggy if needed.',
     dosageInfo: '2 softgels daily with dinner or another fatty meal. This gives about 480mg DHA + 205mg EPA total.',
     warnings: 'Safe to take with prenatal. Best absorbed with fatty food. Some people get fishy burps - take with food or freeze the capsule.',
     explanation: 'DHA ang pinaka-importante para sa brain ng baby! 60% ng brain ay fat, at DHA ang primary building block. Studies show na mga baby ng mga nanay na nag-supplement ng DHA may higher IQ, better attention span, at better vision. Nordic Naturals ang gold standard for fish oil quality.',
@@ -1207,17 +1207,17 @@ export const taglishTips = [
   "Morning sunlight for 15-20 minutes = free Vitamin D! Plus better sleep and mood for mommy."
 ]
 
-// Locked optimal supplement schedule (used by AppContext as default)
+// Peggy recommended supplement schedule (used by AppContext as default)
 export const OPTIMAL_SUPP_SCHEDULE = {
-  prenatal:  { enabled: true, times: ['18:30'], timesPerDay: 1 },
-  dha:       { enabled: true, times: ['18:30'], timesPerDay: 1 },
+  prenatal:  { enabled: true, times: ['20:30'], timesPerDay: 1 },
+  dha:       { enabled: true, times: ['20:30'], timesPerDay: 1 },
   calcium:   { enabled: true, times: ['08:00', '12:00'], timesPerDay: 2 },
   chlorella: { enabled: false, times: ['08:00'], timesPerDay: 1 },
   choline:   { enabled: true, times: ['08:00'], timesPerDay: 1 },
   vitd:      { enabled: false, times: ['12:00'], timesPerDay: 1 },
 }
 
-// Optimal supplement schedule - displayed prominently
+// Recommended supplement schedule - displayed prominently
 export const optimalSchedule = [
   {
     time: '08:00 - BREAKFAST',
@@ -1234,11 +1234,11 @@ export const optimalSchedule = [
     tagNote: 'Lunch calcium ulit. Keep dinner free for prenatal + DHA.'
   },
   {
-    time: '18:30 - DINNER',
+    time: '20:30 - DINNER',
     icon: '??',
     supps: ['Prenatal Multivitamin', 'DHA (2 softgels)'],
     note: 'Main meal stack for Naomi. DHA needs food/fat, and prenatal is better here if she cannot keep it down earlier in the day.',
-    tagNote: 'Dinner: prenatal + DHA. Best meal-only setup if morning nausea is rough.'
+    tagNote: 'Dinner: prenatal + DHA. Change the time if Naomi gets home later.'
   }
 ]
 

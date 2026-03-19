@@ -855,11 +855,11 @@ export const supplementsDetailInfo = {
     }
   ],
   schedule: [
-    { time: 'BREAKFAST', supplements: 'Choline + Calcium (1st tablet)', note: 'Light breakfast stack. Keeps prenatal away from calcium.' },
+    { time: 'BREAKFAST', supplements: 'Choline + Calcium (1st tablet)', note: 'Light breakfast stack. Keeps prenatal away from calcium. Naomi can move the reminder time in Health > Supplements.' },
     { time: 'LUNCH', supplements: 'Calcium (2nd tablet)', note: 'Second calcium dose. Keep dinner free for prenatal + DHA.' },
-    { time: 'DINNER', supplements: 'Prenatal Multi (3 capsules) + DHA (2 softgels)', note: 'Best meal-only setup if mornings are rough. Take with the meal Naomi tolerates best.' },
+    { time: 'DINNER', supplements: 'Prenatal Multi (3 capsules) + DHA (2 softgels)', note: 'Best meal-only setup if mornings are rough. Default dinner recommendation is later now, and Naomi can edit it anytime.' },
   ],
-  importantRule: 'HUWAG sabayan ang calcium at prenatal (may iron). Keep 2+ hours apart. Naomi default now is breakfast choline/calcium, lunch calcium, then dinner prenatal + DHA. Extra Vitamin D3 should be lab-guided, not automatic.',
+  importantRule: 'HUWAG sabayan ang calcium at prenatal (may iron). Keep 2+ hours apart. Naomi default now is breakfast choline/calcium, lunch calcium, then later dinner prenatal + DHA. Actual times are editable in Health > Supplements. Extra Vitamin D3 should be lab-guided, not automatic.',
   budgetCart: {
     title: 'Budget iHerb Cart',
     total: '~$70-90 (usually JPY 10,500-13,000)',

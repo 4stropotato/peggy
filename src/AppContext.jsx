@@ -61,9 +61,17 @@ function useLS(key, initial) {
   return [value, setValue]
 }
 
-// Locked optimal schedule â€” no user editing
+// Peggy recommended schedule. Users can adjust it per account.
 const defaultSuppSchedule = OPTIMAL_SUPP_SCHEDULE
-const SUPP_SCHEDULE_VERSION = 4
+const LEGACY_MEAL_ONLY_SUPP_SCHEDULE = Object.freeze({
+  prenatal: { enabled: true, times: ['18:30'], timesPerDay: 1 },
+  dha: { enabled: true, times: ['18:30'], timesPerDay: 1 },
+  calcium: { enabled: true, times: ['08:00', '12:00'], timesPerDay: 2 },
+  chlorella: { enabled: false, times: ['08:00'], timesPerDay: 1 },
+  choline: { enabled: true, times: ['08:00'], timesPerDay: 1 },
+  vitd: { enabled: false, times: ['12:00'], timesPerDay: 1 },
+})
+const SUPP_SCHEDULE_VERSION = 5
 const defaultHealthCalendarVisibility = Object.freeze({
   supps: true,
   work: true,
@@ -103,6 +111,26 @@ function createDefaultFinanceConfig() {
       },
     },
   }
+}
+
+function scheduleEntryMatches(current, expected) {
+  const currentEnabled = current?.enabled !== false
+  const expectedEnabled = expected?.enabled !== false
+  const currentTimes = Array.isArray(current?.times) ? current.times : []
+  const expectedTimes = Array.isArray(expected?.times) ? expected.times : []
+  const currentTimesPerDay = Number(current?.timesPerDay || currentTimes.length || 1)
+  const expectedTimesPerDay = Number(expected?.timesPerDay || expectedTimes.length || 1)
+
+  return (
+    currentEnabled === expectedEnabled &&
+    currentTimesPerDay === expectedTimesPerDay &&
+    currentTimes.length === expectedTimes.length &&
+    currentTimes.every((time, index) => time === expectedTimes[index])
+  )
+}
+
+function matchesScheduleTemplate(currentSchedule, template) {
+  return Object.keys(template).every((suppId) => scheduleEntryMatches(currentSchedule?.[suppId], template[suppId]))
 }
 
 export function AppProvider({ children }) {
@@ -163,9 +191,16 @@ export function AppProvider({ children }) {
 
   useEffect(() => {
     if (suppScheduleVersion >= SUPP_SCHEDULE_VERSION) return
-    setSuppSchedule(defaultSuppSchedule)
+    if (suppScheduleVersion < 4) {
+      setSuppSchedule(defaultSuppSchedule)
+      setSuppScheduleVersion(SUPP_SCHEDULE_VERSION)
+      return
+    }
+    if (suppScheduleVersion === 4 && matchesScheduleTemplate(suppSchedule, LEGACY_MEAL_ONLY_SUPP_SCHEDULE)) {
+      setSuppSchedule(defaultSuppSchedule)
+    }
     setSuppScheduleVersion(SUPP_SCHEDULE_VERSION)
-  }, [suppScheduleVersion, setSuppSchedule, setSuppScheduleVersion])
+  }, [suppSchedule, suppScheduleVersion, setSuppSchedule, setSuppScheduleVersion])
 
   // Synchronous guard ref - prevents rapid clicks from bypassing stale state check
   const suppToggleGuard = useRef(new Set())
@@ -488,7 +523,7 @@ export function AppProvider({ children }) {
     familyConfig, setFamilyConfig,
     financeConfig, setFinanceConfig,
     expenses, addExpense, removeExpense,
-    suppSchedule,
+    suppSchedule, setSuppSchedule,
     suppLastTaken, suppBottles, resetBottle,
     theme, toggleTheme,
     iconStyle, setIconStyle

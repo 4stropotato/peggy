@@ -363,7 +363,7 @@ function getSuppDayStatus(dailySupp, suppSchedule, dateISO, firstTrackDate) {
 export default function HealthTab() {
   const {
     dailySupp, isSuppTaken, toggleSupp, undoSupp, checkups, updateCheckup, moods, addMood,
-    suppSchedule, suppLastTaken, suppBottles, resetBottle,
+    suppSchedule, setSuppSchedule, suppLastTaken, suppBottles, resetBottle,
     attendance, markAttendance, workLocation, setWorkLocation,
     healthCalendarVisibility, setHealthCalendarVisibility,
   } = useApp()
@@ -372,6 +372,7 @@ export default function HealthTab() {
   const [visitForm, setVisitForm] = useState({})
   const [moodForm, setMoodForm] = useState({ mood: '', energy: 3, cravings: '', notes: '' })
   const [expandedSupp, setExpandedSupp] = useState(null)
+  const [showSuppScheduleEditor, setShowSuppScheduleEditor] = useState(false)
   const activeSupplements = useMemo(
     () => supplements.filter(s => suppSchedule?.[s.id]?.enabled !== false),
     [suppSchedule]
@@ -441,6 +442,68 @@ export default function HealthTab() {
     return times.every((_, i) => isSuppTaken(s.id, i))
   }).length
   const suppTotal = activeSupplements.length
+  const updateSupplementTime = (suppId, timeIndex, value) => {
+    if (!value) return
+    const supp = supplements.find((item) => item.id === suppId)
+    if (!supp) return
+    setSuppSchedule((prev) => {
+      const current = prev?.[suppId] || {}
+      const targetCount = Number(current?.timesPerDay || supp.timesPerDay || 1)
+      const baseTimes = Array.isArray(current?.times) && current.times.length
+        ? [...current.times]
+        : [...supp.defaultTimes]
+      while (baseTimes.length < targetCount) {
+        baseTimes.push(supp.defaultTimes[baseTimes.length] || supp.defaultTimes.at(-1) || '08:00')
+      }
+      baseTimes[timeIndex] = value
+      return {
+        ...prev,
+        [suppId]: {
+          enabled: current?.enabled !== false,
+          timesPerDay: targetCount,
+          times: baseTimes.slice(0, targetCount),
+        },
+      }
+    })
+  }
+  const resetSupplementTiming = (suppId) => {
+    const supp = supplements.find((item) => item.id === suppId)
+    if (!supp) return
+    setSuppSchedule((prev) => ({
+      ...prev,
+      [suppId]: {
+        enabled: prev?.[suppId]?.enabled !== false,
+        timesPerDay: supp.timesPerDay,
+        times: [...supp.defaultTimes],
+      },
+    }))
+  }
+  const resetAllSupplementTiming = () => {
+    setSuppSchedule((prev) => {
+      const next = { ...prev }
+      supplements.forEach((supp) => {
+        next[supp.id] = {
+          enabled: prev?.[supp.id]?.enabled !== false,
+          timesPerDay: supp.timesPerDay,
+          times: [...supp.defaultTimes],
+        }
+      })
+      return next
+    })
+  }
+  const getSupplementTimes = (suppId) => {
+    const supp = supplements.find((item) => item.id === suppId)
+    if (!supp) return []
+    const schedule = suppSchedule?.[suppId]
+    return Array.isArray(schedule?.times) && schedule.times.length ? schedule.times : supp.defaultTimes
+  }
+  const calciumTimes = getSupplementTimes('calcium')
+  const cholineTimes = getSupplementTimes('choline')
+  const prenatalTimes = getSupplementTimes('prenatal')
+  const dhaTimes = getSupplementTimes('dha')
+  const breakfastRule = [cholineTimes[0], calciumTimes[0]].filter(Boolean).join(' / ')
+  const lunchRule = calciumTimes[1] || calciumTimes[0] || '--:--'
+  const dinnerRule = Array.from(new Set([...prenatalTimes, ...dhaTimes].filter(Boolean))).join(' / ') || '--:--'
   const savedWorkTargetValid = isValidLatLng(workLocation.lat, workLocation.lng)
   const savedHomeTargetValid = isValidLatLng(workLocation.homeLat, workLocation.homeLng)
   const hasSavedGeoTarget = savedWorkTargetValid || savedHomeTargetValid
@@ -759,9 +822,17 @@ export default function HealthTab() {
           <section className="glass-section">
             <div className="section-header">
               <span className="section-icon"><UiIcon icon={APP_ICONS.tasks} /></span>
-              <div><h2>Optimal Schedule (Locked)</h2></div>
+              <div><h2>Recommended Schedule</h2></div>
+              <button
+                type="button"
+                className="cal-collapse-btn"
+                onClick={() => setShowSuppScheduleEditor(prev => !prev)}
+                aria-expanded={showSuppScheduleEditor}
+              >
+                {showSuppScheduleEditor ? 'Hide editor' : 'Edit times'}
+              </button>
             </div>
-            <p className="section-note">This is the optimal schedule — follow it para ma-maximize ang absorption!</p>
+            <p className="section-note">Peggy starts with this recommendation, pero Naomi can change the actual reminder times below. Reminders follow her saved schedule.</p>
             <div className="optimal-schedule">
               {optimalSchedule.map((slot, i) => (
                 <div key={i} className="optimal-slot glass-card">
@@ -778,6 +849,52 @@ export default function HealthTab() {
                 </div>
               ))}
             </div>
+            {showSuppScheduleEditor && (
+              <div className="supp-schedule-editor">
+                <div className="supp-schedule-actions">
+                  <button
+                    type="button"
+                    className="cal-collapse-btn"
+                    onClick={resetAllSupplementTiming}
+                  >
+                    Use Peggy recommendation
+                  </button>
+                </div>
+                {activeSupplements.map((supp) => {
+                  const schedule = suppSchedule?.[supp.id]
+                  const times = Array.isArray(schedule?.times) && schedule.times.length ? schedule.times : supp.defaultTimes
+                  return (
+                    <div key={supp.id} className="supp-schedule-edit-card glass-inner">
+                      <div className="supp-schedule-edit-head">
+                        <div>
+                          <strong>{supp.name}</strong>
+                          <span>{supp.when}</span>
+                        </div>
+                        <button
+                          type="button"
+                          className="cal-collapse-btn"
+                          onClick={() => resetSupplementTiming(supp.id)}
+                        >
+                          Reset
+                        </button>
+                      </div>
+                      <div className="supp-schedule-time-grid">
+                        {times.map((time, timeIndex) => (
+                          <label key={`${supp.id}-${timeIndex}`} className="supp-time-field">
+                            <span>{times.length > 1 ? `Dose ${timeIndex + 1}` : 'Time'}</span>
+                            <input
+                              type="time"
+                              value={time}
+                              onChange={(event) => updateSupplementTime(supp.id, timeIndex, event.target.value)}
+                            />
+                          </label>
+                        ))}
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            )}
           </section>
 
           <section className="glass-section">
@@ -788,9 +905,9 @@ export default function HealthTab() {
             <div className="glass-card warn-card">
               <p>Huwag sabayan ang Calcium at Prenatal (may iron)!</p>
               <p>Nag-aagawan sila sa absorption. Keep them 2+ hours apart.</p>
-              <p><strong>Breakfast:</strong> Choline + Calcium (1st tablet)</p>
-              <p><strong>Lunch:</strong> Calcium (2nd tablet)</p>
-              <p><strong>Dinner:</strong> Prenatal + DHA (2 softgels)</p>
+              <p><strong>Breakfast window now:</strong> {breakfastRule || '--:--'} for choline + first calcium</p>
+              <p><strong>Lunch window now:</strong> {lunchRule} for second calcium</p>
+              <p><strong>Dinner window now:</strong> {dinnerRule} for prenatal + DHA</p>
             </div>
           </section>
         </>
