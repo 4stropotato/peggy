@@ -788,9 +788,9 @@ export default function HealthTab() {
             <div className="glass-card warn-card">
               <p>Huwag sabayan ang Calcium at Prenatal (may iron)!</p>
               <p>Nag-aagawan sila sa absorption. Keep them 2+ hours apart.</p>
-              <p><strong>Morning:</strong> Prenatal + DHA (2 softgels) + Choline</p>
-              <p><strong>Lunch:</strong> Calcium (1st tablet) (+ Vitamin D3 only if advised)</p>
-              <p><strong>Evening:</strong> Calcium (2nd tablet)</p>
+              <p><strong>Lunch:</strong> Calcium (1st tablet)</p>
+              <p><strong>Dinner:</strong> DHA (2 softgels) + Choline + Calcium (2nd tablet)</p>
+              <p><strong>Before bed:</strong> Prenatal with light food/snack</p>
             </div>
           </section>
         </>

@@ -245,7 +245,6 @@ export const phases = [
           'Then ask BOTH Shinji\'s and Naomi\'s HR departments for extra company-side benefits',
           'Things to ask about: Birth bonus (出産祝い金), Additional insurance benefit (付加給付)',
           'Also ask about: Maternity leave procedures, Childcare leave benefits',
-          'Keep Shinji work-accident paperwork separate from Naomi childbirth claim documents',
           'Some companies have mutual aid programs with extra benefits',
           'The 付加給付 alone can be ¥10,000-90,000 extra - many people miss this!'
         ],
@@ -816,16 +815,16 @@ export const supplements = [
     id: 'prenatal',
     name: 'Prenatal Multivitamin',
     product: 'Thorne, Basic Prenatal, 90 Capsules',
-    when: 'Morning with breakfast',
+    when: 'Before bed with a snack or late meal',
     why: 'Folate + iron + iodine + B-vitamin foundation',
     icon: '💊',
     timesPerDay: 1,
-    defaultTimes: ['08:00'],
+    defaultTimes: ['21:30'],
     bottleSize: 90,
     perDose: 3,
     price: 4149,
-    note: 'Take 3 capsules with a full meal. Default is breakfast; if breakfast causes nausea, move the whole prenatal dose to lunch and keep calcium 2+ hours away.',
-    dosageInfo: '3 capsules daily with a real meal. Serving size = 3 caps, kaya 30 days lang ang isang bottle.',
+    note: 'Take 3 capsules with a light snack or late meal before bed. This is a nausea-friendly default for Naomi. Keep it 2+ hours away from calcium.',
+    dosageInfo: '3 capsules daily before bed, with food. Serving size = 3 caps, kaya 30 days lang ang isang bottle.',
     warnings: 'Contains high iron. Keep 2+ hours away from calcium and do not add extra iron unless advised by OB-GYN.',
     explanation: 'Ang prenatal multivitamin ang base ng lahat. Ang Thorne version ay may methylated folate (L-5-MTHF) na mas mabilis ma-absorb kumpara sa regular folic acid. May iron din para sa blood production (dadami ang blood mo ng 50% during pregnancy!). 3 capsules per serving kaya 30 days lang per bottle.',
     budgetAlt: 'Nature Made Prenatal Multi + DHA (¥1,500, 90 days supply, 1/day) — same core nutrients, 8x cheaper per day!'
@@ -834,16 +833,16 @@ export const supplements = [
     id: 'dha',
     name: 'DHA (Omega-3)',
     product: 'Nordic Naturals, Prenatal DHA, 90 Soft Gels',
-    when: 'Morning with breakfast (needs fat)',
+    when: 'Dinner with food (needs fat)',
     why: '#1 brain-building nutrient for baby',
     icon: '🧠',
     timesPerDay: 1,
-    defaultTimes: ['08:00'],
+    defaultTimes: ['18:30'],
     bottleSize: 90,
     perDose: 2,
     price: 3256,
     note: 'Take 2 softgels with food containing fat for best absorption.',
-    dosageInfo: '2 softgels daily with breakfast or another fatty meal. This gives about 480mg DHA + 205mg EPA total.',
+    dosageInfo: '2 softgels daily with dinner or another fatty meal. This gives about 480mg DHA + 205mg EPA total.',
     warnings: 'Safe to take with prenatal. Best absorbed with fatty food. Some people get fishy burps - take with food or freeze the capsule.',
     explanation: 'DHA ang pinaka-importante para sa brain ng baby! 60% ng brain ay fat, at DHA ang primary building block. Studies show na mga baby ng mga nanay na nag-supplement ng DHA may higher IQ, better attention span, at better vision. Nordic Naturals ang gold standard for fish oil quality.',
     budgetAlt: null
@@ -852,11 +851,11 @@ export const supplements = [
     id: 'calcium',
     name: 'Calcium Citrate + D3 (No Zinc)',
     product: '21st Century, Calcium Citrate + D3, 120 Tablets',
-    when: 'Lunch AND evening (split dose, 2+ hours away from prenatal)',
+    when: 'Lunch AND dinner (split dose, 2+ hours away from prenatal)',
     why: 'Bone support without stacking extra zinc',
     icon: '🦴',
     timesPerDay: 2,
-    defaultTimes: ['12:00', '20:00'],
+    defaultTimes: ['12:00', '18:30'],
     bottleSize: 120,
     perDose: 1,
     price: 1599,
@@ -888,11 +887,11 @@ export const supplements = [
     id: 'choline',
     name: 'Choline (Bitartrate)',
     product: 'NOW Foods, Choline & Inositol, 500 mg, 100 Capsules',
-    when: 'Morning with breakfast',
+    when: 'Dinner with food',
     why: 'Brain-development support to help reach daily choline target',
     icon: '⚡',
     timesPerDay: 1,
-    defaultTimes: ['08:00'],
+    defaultTimes: ['18:30'],
     bottleSize: 100,
     perDose: 1,
     price: 1450,
@@ -1210,36 +1209,36 @@ export const taglishTips = [
 
 // Locked optimal supplement schedule (used by AppContext as default)
 export const OPTIMAL_SUPP_SCHEDULE = {
-  prenatal:  { enabled: true, times: ['08:00'], timesPerDay: 1 },
-  dha:       { enabled: true, times: ['08:00'], timesPerDay: 1 },
-  calcium:   { enabled: true, times: ['12:00', '20:00'], timesPerDay: 2 },
+  prenatal:  { enabled: true, times: ['21:30'], timesPerDay: 1 },
+  dha:       { enabled: true, times: ['18:30'], timesPerDay: 1 },
+  calcium:   { enabled: true, times: ['12:00', '18:30'], timesPerDay: 2 },
   chlorella: { enabled: false, times: ['08:00'], timesPerDay: 1 },
-  choline:   { enabled: true, times: ['08:00'], timesPerDay: 1 },
+  choline:   { enabled: true, times: ['18:30'], timesPerDay: 1 },
   vitd:      { enabled: false, times: ['12:00'], timesPerDay: 1 },
 }
 
 // Optimal supplement schedule - displayed prominently
 export const optimalSchedule = [
   {
-    time: '08:00 - BREAKFAST',
-    icon: '🌅',
-    supps: ['Prenatal Multivitamin', 'DHA (Omega-3)', 'Choline'],
-    note: 'Core stack. Take with food that has fat (eggs, avocado, milk, yogurt). If prenatal feels heavy in the morning, move only the prenatal dose to lunch.',
-    tagNote: 'Core morning stack: prenatal + DHA + choline. Need ng fat para ma-absorb ang DHA.'
-  },
-  {
     time: '12:00 - LUNCH',
     icon: '☀️',
-    supps: ['Calcium (1st dose)'],
-    note: 'AT LEAST 2 hours after breakfast supplements. Add extra Vitamin D3 only if advised.',
-    tagNote: '2+ HOURS after breakfast supplements! Iron at calcium nag-aagawan kasi.'
+    supps: ['Calcium (1st tablet)'],
+    note: 'First calcium dose with lunch. Keeps it well away from the prenatal iron later at night.',
+    tagNote: 'Lunch calcium muna. Keep it far from the prenatal iron.'
   },
   {
-    time: '20:00 - DINNER/BEFORE BED',
+    time: '18:30 - DINNER',
+    icon: '🌆',
+    supps: ['DHA (2 softgels)', 'Choline', 'Calcium (2nd tablet)'],
+    note: 'Dinner stack for Naomi. DHA needs food/fat, choline is flexible, and second calcium can go here as long as prenatal stays later.',
+    tagNote: 'Dinner stack: DHA + choline + 2nd calcium. Then wait 2+ hours before prenatal.'
+  },
+  {
+    time: '21:30 - BEFORE BED',
     icon: '🌙',
-    supps: ['Calcium (2nd dose)'],
-    note: 'Split calcium dose for better absorption.',
-    tagNote: 'Second calcium dose para hindi sabay sa prenatal iron.'
+    supps: ['Prenatal Multivitamin'],
+    note: 'Best nausea-friendly default for Naomi. Take with a light snack or late meal, not on an empty stomach.',
+    tagNote: 'Prenatal bago matulog para mas mababa ang chance na masuka. Keep 2+ hours away from calcium.'
   }
 ]
 

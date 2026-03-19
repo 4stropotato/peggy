@@ -792,7 +792,7 @@ export const supplementsDetailInfo = {
       name: 'Prenatal Multivitamin',
       icon: '💊',
       why: 'Foundation supplement. Covers folic acid (prevents neural tube defects), iron (prevents anemia, delivers oxygen to baby\'s brain), B vitamins, iodine, zinc.',
-      when: 'Daily with food, morning is best',
+      when: 'Daily with food. For Naomi, bedtime with a snack is the current nausea-friendly default.',
       options: [
         { product: 'Nature Made, Prenatal Multi + DHA, 90 Softgels', price: '~$15-18 (usually ¥2,200-2,800)', note: 'Budget pick - includes some DHA too', lasts: '3 months' },
         { product: 'Thorne, Basic Prenatal, 90 Capsules', price: '~$28-35 (usually ¥4,200-5,200)', note: 'Methylated folate option. Contains high iron, so avoid adding extra iron unless OB says needed.', lasts: '1 month' },
@@ -803,7 +803,7 @@ export const supplementsDetailInfo = {
       name: 'DHA (Omega-3)',
       icon: '🧠',
       why: 'THE #1 brain-building nutrient. Makes up large portion of brain\'s structural fat. Studies show mothers who supplement have children with higher cognitive scores.',
-      when: 'With any meal containing fat (helps absorption)',
+      when: 'Best with dinner or another meal containing fat',
       target: 'At least 200-300mg DHA daily. Many experts recommend 500mg+.',
       options: [
         { product: 'Nordic Naturals, Prenatal DHA, 500 mg, 90 Soft Gels', price: '~$25-35 (usually ¥3,700-5,200)', note: 'Best overall - 480mg DHA + 205mg EPA, purity tested', lasts: '1.5-3 months' },
@@ -837,7 +837,7 @@ export const supplementsDetailInfo = {
       name: 'Choline',
       icon: '⚡',
       why: 'MOST PEOPLE MISS THIS. On par with DHA for brain development. Improves memory, attention, processing speed. Most prenatals have little to none. Target: 450mg/day during pregnancy.',
-      when: 'With food, any time of day',
+      when: 'With dinner or another meal',
       options: [
         { product: 'NOW Foods, Choline & Inositol, 500 mg, 100 Capsules', price: '~$8-12 (usually ¥1,200-1,800)', note: 'Plain and practical top-up after checking choline from food (eggs, fish, meat).', lasts: '3+ months' },
         { product: 'NOW Foods, Sunflower Lecithin, 1200 mg, 100 Softgels', price: '~$10-14 (usually ¥1,500-2,100)', note: 'Alternative phosphatidylcholine source if better tolerated', lasts: '1-2 months' },
@@ -855,11 +855,11 @@ export const supplementsDetailInfo = {
     }
   ],
   schedule: [
-    { time: 'BREAKFAST', supplements: 'Prenatal Multi + DHA (2 softgels) + Choline', note: 'Core stack. With food and some fat for DHA absorption.' },
-    { time: 'LUNCH/MERIENDA', supplements: 'Calcium (1st tablet)', note: 'With food, AT LEAST 2 HOURS after prenatal. Add extra Vitamin D3 only if advised.' },
-    { time: 'DINNER/BEFORE BED', supplements: 'Calcium (2nd tablet)', note: 'With food. Keep it separate from prenatal iron.' },
+    { time: 'LUNCH', supplements: 'Calcium (1st tablet)', note: 'First calcium dose. Keep it well away from prenatal iron.' },
+    { time: 'DINNER', supplements: 'DHA (2 softgels) + Choline + Calcium (2nd tablet)', note: 'DHA with food/fat, choline is flexible, second calcium here is okay if prenatal is later.' },
+    { time: 'BEFORE BED', supplements: 'Prenatal Multi (3 capsules)', note: 'Take with a light snack or late meal. Good nausea fallback if mornings are rough.' },
   ],
-  importantRule: 'HUWAG sabayan ang calcium at prenatal (may iron). Keep 2+ hours apart. Core stack now is prenatal + DHA + choline + calcium. Extra Vitamin D3 should be lab-guided, not automatic.',
+  importantRule: 'HUWAG sabayan ang calcium at prenatal (may iron). Keep 2+ hours apart. Naomi default now is lunch calcium, dinner DHA/choline/calcium, then prenatal before bed. Extra Vitamin D3 should be lab-guided, not automatic.',
   budgetCart: {
     title: 'Budget iHerb Cart',
     total: '~$70-90 (usually JPY 10,500-13,000)',
