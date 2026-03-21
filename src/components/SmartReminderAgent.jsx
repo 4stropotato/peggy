@@ -12,6 +12,7 @@ import {
   buildPlannerReminder,
   buildSupplementReminder,
   buildWorkReminder,
+  getPendingSupplementGroups,
   getMoodReminderContext,
   getPlannerReminderContext,
   getSupplementReminderContext,
@@ -181,15 +182,10 @@ async function fireNotificationReliable(payload) {
 
 const SYNC_MIN_INTERVAL_MS = 2 * 60 * 1000 // 2 minutes — fast re-sync when state changes
 
-const SUPP_DISPLAY = {
-  prenatal: 'Prenatal', dha: 'DHA', calcium: 'Calcium',
-  chlorella: 'Chlorella', choline: 'Choline', vitd: 'Vitamin D',
-}
-
 function computeSyncHash(reminders) {
   if (!reminders || !reminders.length) return 'EMPTY'
   return reminders
-    .map(r => `${r.type}|${r.tag}|${r.fireAt || ''}|${r.notificationTitle}`)
+    .map(r => `${r.type}|${r.level}|${r.tag}|${r.fireAt || ''}|${r.notificationTitle || ''}|${r.notificationBody || ''}`)
     .join(';;')
 }
 
@@ -202,20 +198,10 @@ function computeUpcomingSchedule(suppSchedule, dailySupp, attendance, planner, m
   const twoHoursAgo = now.getTime() - 2 * 60 * 60 * 1000
 
   // --- Supplements: group untaken doses by their scheduled time ---
-  const timeGroups = {}
-  for (const suppId of Object.keys(suppSchedule || {})) {
-    const sched = suppSchedule[suppId]
-    if (!sched?.enabled) continue
-    const times = Array.isArray(sched.times) ? sched.times : []
-    times.forEach((time, doseIndex) => {
-      const key = `${suppId}-${doseIndex}-${dateStr}`
-      if (dailySupp[key] === true) return // already taken
-      if (!timeGroups[time]) timeGroups[time] = []
-      timeGroups[time].push(SUPP_DISPLAY[suppId] || suppId)
-    })
-  }
-  for (const time of Object.keys(timeGroups)) {
-    const names = timeGroups[time]
+  const timeGroups = getPendingSupplementGroups({ dailySupp, suppSchedule, now })
+  for (const group of timeGroups) {
+    const time = group.time
+    const names = group.names
     const parts = time.split(':').map(Number)
     const fireAt = new Date(now.getFullYear(), now.getMonth(), now.getDate(), parts[0], parts[1] || 0, 0)
     if (fireAt.getTime() < twoHoursAgo) continue
@@ -321,7 +307,7 @@ export default function SmartReminderAgent() {
       const namesChannelOn = isSmartNotifChannelEnabled('names', channelPrefs)
 
       const actionableCandidates = []
-      if (remindersChannelOn && suppCtx.remainingDoses > 0) {
+      if (remindersChannelOn && suppCtx.needsReminder) {
         actionableCandidates.push(buildSupplementReminder(suppCtx, now, 'notify'))
       }
       if (remindersChannelOn && workCtx.needsReminder) {
@@ -343,7 +329,8 @@ export default function SmartReminderAgent() {
         const schedule = computeUpcomingSchedule(suppSchedule, dailySupp, attendance, planner, moods, now)
         const hash = computeSyncHash(schedule)
         const elapsed = Date.now() - lastSyncTimeRef.current
-        if (hash !== lastSyncHashRef.current && elapsed >= SYNC_MIN_INTERVAL_MS && !syncBusyRef.current) {
+        const shouldSync = !syncBusyRef.current && (hash !== lastSyncHashRef.current || elapsed >= SYNC_MIN_INTERVAL_MS)
+        if (shouldSync) {
           const session = getCloudSession()
           if (session?.accessToken) {
             syncBusyRef.current = true

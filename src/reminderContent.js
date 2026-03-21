@@ -58,6 +58,74 @@ function toDoseDateKey(now) {
   return now.toDateString()
 }
 
+const SUPP_SHORT_NAMES = Object.freeze({
+  prenatal: 'Prenatal',
+  dha: 'DHA',
+  calcium: 'Calcium',
+  choline: 'Choline',
+  chlorella: 'Chlorella',
+  vitd: 'Vitamin D',
+})
+
+export function formatSupplementDoseLabel(suppId, doseIndex = 0, totalTimes = 1) {
+  const base = SUPP_SHORT_NAMES[suppId] || String(suppId || 'Supplement').trim() || 'Supplement'
+  if (Number(totalTimes) > 1 && (suppId === 'prenatal' || suppId === 'calcium')) {
+    return `${base} #${doseIndex + 1}`
+  }
+  return base
+}
+
+export function getPendingSupplementEntries({ dailySupp, suppSchedule, now = new Date() }) {
+  const doseDateKey = toDoseDateKey(now)
+  const nowMinutes = minutesSinceMidnight(now)
+  const pending = []
+
+  supplements.forEach((supp) => {
+    const schedule = suppSchedule?.[supp.id]
+    if (schedule?.enabled === false) return
+    const times = schedule?.times?.length ? schedule.times : supp.defaultTimes
+    times.forEach((clock, idx) => {
+      const doseKey = `${supp.id}-${idx}-${doseDateKey}`
+      if (dailySupp?.[doseKey]) return
+      const dueMinutes = parseClockMinutes(clock)
+      pending.push({
+        suppId: supp.id,
+        doseIndex: idx,
+        clock,
+        dueMinutes,
+        isOverdue: dueMinutes <= nowMinutes,
+        label: formatSupplementDoseLabel(supp.id, idx, times.length),
+      })
+    })
+  })
+
+  pending.sort((a, b) => a.dueMinutes - b.dueMinutes || a.label.localeCompare(b.label))
+  return pending
+}
+
+export function getPendingSupplementGroups({ dailySupp, suppSchedule, now = new Date() }) {
+  const entries = getPendingSupplementEntries({ dailySupp, suppSchedule, now })
+  const groups = new Map()
+
+  entries.forEach((entry) => {
+    if (!groups.has(entry.clock)) {
+      groups.set(entry.clock, {
+        time: entry.clock,
+        dueMinutes: entry.dueMinutes,
+        isOverdue: entry.isOverdue,
+        names: [],
+        entries: [],
+      })
+    }
+    const group = groups.get(entry.clock)
+    group.names.push(entry.label)
+    group.entries.push(entry)
+    group.isOverdue = group.isOverdue || entry.isOverdue
+  })
+
+  return Array.from(groups.values()).sort((a, b) => a.dueMinutes - b.dueMinutes)
+}
+
 function ensureSentence(text) {
   const safe = String(text || '').trim()
   if (!safe) return ''
@@ -655,37 +723,27 @@ const WITTY_TIP_POOL = expandTipArrayByFour(WITTY_TIP_DATABASE, [
 
 export function getSupplementReminderContext({ dailySupp, suppSchedule, now = new Date() }) {
   const dateKey = toIsoDate(now)
-  const doseDateKey = toDoseDateKey(now)
   const nowMinutes = minutesSinceMidnight(now)
-
+  const pendingEntries = getPendingSupplementEntries({ dailySupp, suppSchedule, now })
+  const overdueEntries = pendingEntries.filter((entry) => entry.isOverdue)
+  const upcomingEntries = pendingEntries.filter((entry) => !entry.isOverdue)
+  const nextDueAt = upcomingEntries.length > 0 ? upcomingEntries[0].dueMinutes : null
+  const nextDueEntries = nextDueAt === null
+    ? []
+    : upcomingEntries.filter((entry) => entry.dueMinutes === nextDueAt)
   let totalDoses = 0
   let takenDoses = 0
-  let remainingDoses = 0
-  let overdueDoses = 0
-  let nextDoseMinutes = Number.POSITIVE_INFINITY
 
-  supplements.forEach(supp => {
+  supplements.forEach((supp) => {
     const schedule = suppSchedule?.[supp.id]
     if (schedule?.enabled === false) return
     const times = schedule?.times?.length ? schedule.times : supp.defaultTimes
-    times.forEach((clock, idx) => {
-      totalDoses += 1
-      const doseKey = `${supp.id}-${idx}-${doseDateKey}`
-      const taken = Boolean(dailySupp?.[doseKey])
-      if (taken) {
-        takenDoses += 1
-        return
-      }
-
-      remainingDoses += 1
-      const dueMinutes = parseClockMinutes(clock)
-      if (dueMinutes <= nowMinutes) {
-        overdueDoses += 1
-      } else {
-        nextDoseMinutes = Math.min(nextDoseMinutes, dueMinutes - nowMinutes)
-      }
-    })
+    totalDoses += times.length
   })
+
+  const remainingDoses = pendingEntries.length
+  takenDoses = Math.max(0, totalDoses - remainingDoses)
+  const overdueDoses = overdueEntries.length
 
   return {
     dateKey,
@@ -693,7 +751,12 @@ export function getSupplementReminderContext({ dailySupp, suppSchedule, now = ne
     takenDoses,
     remainingDoses,
     overdueDoses,
-    nextDoseMinutes: Number.isFinite(nextDoseMinutes) ? nextDoseMinutes : null,
+    nextDoseMinutes: nextDueAt === null ? null : Math.max(0, nextDueAt - nowMinutes),
+    needsReminder: overdueDoses > 0 || (nextDueAt !== null && (nextDueAt - nowMinutes) <= 15),
+    overdueLabels: overdueEntries.map((entry) => entry.label),
+    nextDueLabels: nextDueEntries.map((entry) => entry.label),
+    nextDueTimeLabel: nextDueEntries[0]?.clock || '',
+    pendingEntries,
   }
 }
 
@@ -708,7 +771,7 @@ export function getWorkReminderContext({ attendance, now = new Date() }) {
     hour,
     isWeekday,
     hasAttendance,
-    needsReminder: isWeekday && !hasAttendance,
+    needsReminder: isWeekday && !hasAttendance && hour >= 11,
   }
 }
 
@@ -982,6 +1045,16 @@ export function buildSupplementReminder(ctx, now = new Date(), seedSalt = 'home'
     jokeLine,
     nextDoseMinutes: ctx.nextDoseMinutes,
   })
+  const focusLead = ctx.overdueLabels?.length
+    ? `Overdue now: ${ctx.overdueLabels.join(', ')}.`
+    : ctx.nextDueLabels?.length
+      ? `Next up at ${ctx.nextDueTimeLabel}: ${ctx.nextDueLabels.join(', ')}.`
+      : ''
+  const notificationBody = ctx.overdueLabels?.length
+    ? `Overdue now: ${ctx.overdueLabels.join(', ')}.`
+    : ctx.nextDueLabels?.length
+      ? `Next at ${ctx.nextDueTimeLabel}: ${ctx.nextDueLabels.join(', ')}.`
+      : `${ctx.remainingDoses} doses left today${ctx.overdueDoses ? `, ${ctx.overdueDoses} overdue` : ''}.`
 
   return {
     type: 'supp',
@@ -990,9 +1063,9 @@ export function buildSupplementReminder(ctx, now = new Date(), seedSalt = 'home'
     slotKey: `${ctx.dateKey}|supp|${intervalMinutes}|${slot}`,
     priorityScore: level === 'urgent' ? 5 : level === 'nudge' ? 3.6 : 2.4,
     title,
-    subtitle,
+    subtitle: [focusLead, subtitle].filter(Boolean).join(' '),
     notificationTitle: 'Peggy reminder: Supplements',
-    notificationBody: `${ctx.remainingDoses} doses left today${ctx.overdueDoses ? `, ${ctx.overdueDoses} overdue` : ''}.`,
+    notificationBody,
   }
 }
 
