@@ -437,6 +437,8 @@ export async function cloudSendPushTest(session, options = {}) {
   }
   const deviceId = String(options?.deviceId || '').trim()
   if (deviceId) body.deviceId = deviceId
+  const previewReminders = Array.isArray(options?.previewReminders) ? options.previewReminders : []
+  if (previewReminders.length > 0) body.previewReminders = previewReminders
 
   const { result } = await withSessionRetry(session, async (workingSession) => {
     return cloudFetch(

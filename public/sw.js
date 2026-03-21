@@ -1,6 +1,6 @@
 // Cache version bump: change this whenever static assets (icons, CSS, JS) change
 // so installed PWAs pick up updates reliably.
-const CACHE_NAME = 'peggy-v21';
+const CACHE_NAME = 'peggy-v22';
 const CACHE_PREFIXES = ['peggy-', 'baby-prep-'];
 
 function resolveBasePath() {
@@ -152,17 +152,26 @@ self.addEventListener('push', (event) => {
       const body = String(r.body || '').trim() || 'Open Peggy for details.';
       const isUrgent = r.level === 'urgent';
       const tag = String(r.tag || `peggy-${r.type}-${Date.now()}`).trim();
+      const reminderUrl = toAbsoluteUrl(r.url || payload.url || BASE);
+      const actionUrls = (r?.actionUrls && typeof r.actionUrls === 'object')
+        ? r.actionUrls
+        : {};
+      const actions = Array.isArray(r?.actions) ? r.actions.slice(0, 8) : [];
+      const options = {
+        body,
+        icon,
+        badge: icon,
+        tag,
+        renotify: isUrgent,
+        requireInteraction: isUrgent,
+        data: { url: reminderUrl, actionUrls },
+      };
+      if (actions.length > 0) {
+        options.actions = actions;
+      }
       return {
         title,
-        options: {
-          body,
-          icon,
-          badge: icon,
-          tag,
-          renotify: isUrgent,
-          requireInteraction: isUrgent,
-          data: { url: targetUrl, actionUrls: {} },
-        },
+        options,
       };
     });
 

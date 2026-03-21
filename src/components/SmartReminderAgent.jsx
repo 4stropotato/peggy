@@ -12,6 +12,7 @@ import {
   buildPlannerReminder,
   buildSupplementReminder,
   buildWorkReminder,
+  QUICK_MOOD_ACTIONS,
   getPendingSupplementGroups,
   getMoodReminderContext,
   getPlannerReminderContext,
@@ -193,9 +194,23 @@ function computeSyncHash(reminders) {
 // The server cron sends each one when its time arrives — like an alarm.
 function computeUpcomingSchedule(suppSchedule, dailySupp, attendance, planner, moods, now) {
   const upcoming = []
-  const dateStr = now.toDateString()
   const dateISO = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`
   const twoHoursAgo = now.getTime() - 2 * 60 * 60 * 1000
+  const moodActionUrls = Object.fromEntries(
+    QUICK_MOOD_ACTIONS
+      .map((item) => {
+        const code = String(item?.code || '').trim()
+        if (!code) return ['', '']
+        return [`quick_mood_${code}`, `${APP_BASE}?openMood=1&quickMood=${encodeURIComponent(code)}`]
+      })
+      .filter(([key, value]) => key && value),
+  )
+  const moodActions = QUICK_MOOD_ACTIONS
+    .map((item) => ({
+      action: `quick_mood_${String(item?.code || '').trim()}`,
+      title: String(item?.label || item?.emoji || '').trim(),
+    }))
+    .filter((item) => item.action && item.title)
 
   // --- Supplements: group untaken doses by their scheduled time ---
   const timeGroups = getPendingSupplementGroups({ dailySupp, suppSchedule, now })
@@ -213,6 +228,7 @@ function computeUpcomingSchedule(suppSchedule, dailySupp, attendance, planner, m
       notificationTitle: `${tone.titlePrefix} ${label}`.trim(),
       notificationBody: `${tone.bodyPrefix} Take ${names.join(', ')}`.trim(),
       tag: `supp-${dateISO}-${time}`, fireAt: fireAt.toISOString(), priorityScore: isOverdue ? 90 : 70,
+      url: APP_BASE,
     })
   }
 
@@ -229,6 +245,7 @@ function computeUpcomingSchedule(suppSchedule, dailySupp, attendance, planner, m
         notificationTitle: `${tone.titlePrefix} Work attendance`.trim(),
         notificationBody: `${tone.bodyPrefix} Log today's work attendance`.trim(),
         tag: `work-${dateISO}-${hour}`, fireAt: fireAt.toISOString(), priorityScore: level === 'urgent' ? 75 : 50,
+        url: APP_BASE,
       })
     }
   }
@@ -248,6 +265,9 @@ function computeUpcomingSchedule(suppSchedule, dailySupp, attendance, planner, m
         notificationTitle: '\uD83D\uDE0A Mood check',
         notificationBody: label,
         tag: `mood-${dateISO}-${hour}`, fireAt: fireAt.toISOString(), priorityScore: level === 'urgent' ? 65 : 40,
+        url: `${APP_BASE}?openMood=1`,
+        actionUrls: moodActionUrls,
+        actions: moodActions,
       })
     }
   }
@@ -269,6 +289,7 @@ function computeUpcomingSchedule(suppSchedule, dailySupp, attendance, planner, m
       notificationTitle: `${tone.titlePrefix} ${String(plan.title || 'Upcoming event').trim()}`.trim(),
       notificationBody: `${tone.bodyPrefix} ${planTime} — ${String(plan.title || '').trim()}`.trim(),
       tag: `plan-${dateISO}-${plan.id || planTime}`, fireAt: notifyAt.toISOString(), priorityScore: 85,
+      url: APP_BASE,
     })
   }
 

@@ -13,7 +13,10 @@ import {
   cloudTryRecoverSession, cloudValidateSession, cloudUploadBackup, cloudDownloadBackup, cloudSendPushTest
 } from '../cloudSync'
 import {
+  buildDailyTip,
+  buildDailyTipReminder,
   buildMoodReminder,
+  buildNameSpotlight,
   buildPlannerReminder,
   buildSupplementReminder,
   buildWorkReminder,
@@ -51,6 +54,52 @@ import {
 import { APP_ICONS, ExpandIcon, ICON_STYLE_PRESETS, TokenIcon, UiIcon, resolveIconStyle } from '../uiIcons'
 
 const PHOTO_CATEGORIES = ['Ultrasound', 'Documents', 'Receipts', 'Boshi Techo', 'Other']
+const APP_BASE = import.meta.env.BASE_URL || '/'
+
+function buildMoodPushActionUrls() {
+  return Object.fromEntries([
+    ['happy', 'Great'],
+    ['okay', 'Okay'],
+    ['sad', 'Low'],
+    ['nauseous', 'Nauseous'],
+    ['sleepy', 'Sleepy'],
+    ['stressed', 'Stressed'],
+    ['loved', 'Loved'],
+    ['anxious', 'Anxious'],
+  ].map(([code]) => [
+    `quick_mood_${code}`,
+    `${APP_BASE}?openMood=1&quickMood=${encodeURIComponent(code)}`,
+  ]))
+}
+
+function buildMoodPushActions() {
+  return [
+    { action: 'quick_mood_happy', title: 'Great' },
+    { action: 'quick_mood_okay', title: 'Okay' },
+    { action: 'quick_mood_nauseous', title: 'Nauseous' },
+    { action: 'quick_mood_sleepy', title: 'Sleepy' },
+  ]
+}
+
+function toPushPreviewReminder(item) {
+  if (!item) return null
+  const type = String(item.type || 'general').trim() || 'general'
+  const reminder = {
+    type,
+    level: String(item.level || 'gentle').trim() || 'gentle',
+    title: String(item.notificationTitle || item.title || 'Peggy reminder').trim() || 'Peggy reminder',
+    body: String(item.notificationBody || item.subtitle || '').trim() || 'Open Peggy for details.',
+    tag: String(item.tag || `${type}-${item.slotKey || Date.now()}`).trim() || `peggy-${type}-${Date.now()}`,
+    fireAt: String(item.fireAt || '').trim(),
+    priorityScore: Number(item.priorityScore) || 0,
+    url: String(item.url || (type === 'mood' ? `${APP_BASE}?openMood=1` : APP_BASE)).trim() || APP_BASE,
+  }
+  if (type === 'mood') {
+    reminder.actions = buildMoodPushActions()
+    reminder.actionUrls = buildMoodPushActionUrls()
+  }
+  return reminder
+}
 
 const INFO_SECTIONS = [
   { id: 'gov', label: 'Gov Support', icon: '🏛️' },
@@ -1046,9 +1095,9 @@ export default function MoreTab() {
         const isRegistrationTimeout = msg.includes('push registration timed out')
         if (!isRegistrationTimeout) throw err
 
-        setPushStatus('Registration is slow. Trying server push test on existing device subscription...')
+        setPushStatus('Registration is slow. Trying current reminder push preview on existing device subscription...')
         const existing = await withTimeout(
-          cloudSendPushTest(activeSession, { deviceId: getPushDeviceId() }),
+          cloudSendPushTest(activeSession, { deviceId: getPushDeviceId(), previewReminders: pushTestPreviewReminders }),
           20000,
           'push send_test after registration-timeout',
         )
@@ -1058,7 +1107,7 @@ export default function MoreTab() {
         const failed = Number(existing?.failed || 0)
         const fallbackSuffix = existing?.fallbackUsed ? ' (fallback subscription path)' : ''
         if (sent > 0) {
-          setPushStatus(`Test push sent via existing subscription after slow registration (${sent}/${total}, stale ${stale}, failed ${failed})${fallbackSuffix}.`)
+          setPushStatus(`Current reminder push preview sent via existing subscription after slow registration (${sent}/${total}, stale ${stale}, failed ${failed})${fallbackSuffix}.`)
           return
         }
         if (total <= 0) {
@@ -1088,7 +1137,7 @@ export default function MoreTab() {
             'Push manager unavailable in current context. On iPhone, use Safari Add to Home Screen for the HTTPS GH Pages URL, then open that Home Screen app and retry.'
           )
           const existing = await withTimeout(
-            cloudSendPushTest(activeSession, { deviceId: getPushDeviceId() }),
+            cloudSendPushTest(activeSession, { deviceId: getPushDeviceId(), previewReminders: pushTestPreviewReminders }),
             20000,
             'push send_test existing-subscription',
           )
@@ -1098,7 +1147,7 @@ export default function MoreTab() {
           const failed = Number(existing?.failed || 0)
           const fallbackSuffix = existing?.fallbackUsed ? ' (fallback subscription path)' : ''
           if (sent > 0) {
-            setPushStatus(`Test push sent via existing subscription (${sent}/${total}, stale ${stale}, failed ${failed})${fallbackSuffix}.`)
+            setPushStatus(`Current reminder push preview sent via existing subscription (${sent}/${total}, stale ${stale}, failed ${failed})${fallbackSuffix}.`)
             return
           }
           setPushStatus(`Push registration skipped (${reason}) and no existing delivery (${sent}/${total}, stale ${stale}, failed ${failed}).`)
@@ -1107,9 +1156,9 @@ export default function MoreTab() {
         setPushStatus(`Push registration skipped (${reason}).`)
         return
       }
-      setPushStatus('Sending test push... (2/2). Lock phone now and wait 5-10 seconds.')
+      setPushStatus('Sending current reminder push preview... (2/2). Lock phone now and wait 5-10 seconds.')
       let result = await withTimeout(
-        cloudSendPushTest(activeSession, { deviceId: getPushDeviceId() }),
+        cloudSendPushTest(activeSession, { deviceId: getPushDeviceId(), previewReminders: pushTestPreviewReminders }),
         20000,
         'push send_test',
       )
@@ -1120,7 +1169,7 @@ export default function MoreTab() {
       let failed = Number(result?.failed || 0)
 
       if (sent <= 0) {
-        setPushStatus('No delivery yet. Repairing device subscription then retrying test push...')
+        setPushStatus('No delivery yet. Repairing device subscription then retrying current reminder push preview...')
         await withTimeout(
           disableCurrentPushSubscription(activeSession, { unsubscribeLocal: true }),
           12000,
@@ -1137,9 +1186,9 @@ export default function MoreTab() {
           setPushStatus(`Push re-registration skipped (${reason}).`)
           return
         }
-        setPushStatus('Retrying test push after subscription repair...')
+        setPushStatus('Retrying current reminder push preview after subscription repair...')
         result = await withTimeout(
-          cloudSendPushTest(activeSession, { deviceId: getPushDeviceId() }),
+          cloudSendPushTest(activeSession, { deviceId: getPushDeviceId(), previewReminders: pushTestPreviewReminders }),
           20000,
           'push send_test retry',
         )
@@ -1151,7 +1200,7 @@ export default function MoreTab() {
 
       if (sent > 0) {
         const fallbackSuffix = result?.fallbackUsed ? ' (fallback subscription path)' : ''
-        setPushStatus(`Test push sent (${sent}/${total} device${total === 1 ? '' : 's'}, stale ${stale}, failed ${failed})${fallbackSuffix}.`)
+        setPushStatus(`Current reminder push preview sent (${sent}/${total} device${total === 1 ? '' : 's'}, stale ${stale}, failed ${failed})${fallbackSuffix}.`)
       } else if (total > 0) {
         const errorHint = Array.isArray(result?.errors) && result.errors.length
           ? ` First error: ${String(result.errors[0]).slice(0, 140)}.`
@@ -1401,6 +1450,35 @@ export default function MoreTab() {
     plannerReminderCtx?.pendingTodayCount,
     notifChannels,
     notifNowTick,
+  ])
+  const pushTestPreviewReminders = useMemo(() => {
+    const out = livePendingNotifications
+      .map(toPushPreviewReminder)
+      .filter(Boolean)
+
+    if (isSmartNotifChannelEnabled('dailyTip', notifChannels)) {
+      const tip = buildDailyTip({ now: notifNow, suppCtx: suppReminderCtx })
+      out.push(toPushPreviewReminder({
+        ...buildDailyTipReminder({ now: notifNow, dailyTip: tip, seedSalt: 'push-preview' }),
+        type: 'tip',
+        level: tip?.tone === 'serious' ? 'nudge' : 'gentle',
+      }))
+    }
+
+    if (isSmartNotifChannelEnabled('names', notifChannels)) {
+      out.push(toPushPreviewReminder({
+        ...buildNameSpotlight({ now: notifNow, babyNamesInfo, seedSalt: 'push-preview' }),
+        type: 'name',
+        level: 'gentle',
+      }))
+    }
+
+    return out.filter(Boolean)
+  }, [
+    livePendingNotifications,
+    notifChannels,
+    notifNowTick,
+    suppReminderCtx,
   ])
 
   const handleMarkNotifRead = (id) => {

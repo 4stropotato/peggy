@@ -10,6 +10,9 @@ type ReminderItem = {
   tag: string
   fireAt: string
   priorityScore: number
+  url?: string
+  actions?: { action: string; title: string }[]
+  actionUrls?: Record<string, string>
 }
 
 type DispatchRow = {

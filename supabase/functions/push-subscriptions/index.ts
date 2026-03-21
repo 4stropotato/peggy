@@ -8,6 +8,25 @@ type PushRow = {
   endpoint: string | null
   subscription: Record<string, unknown>
   app_base_url: string | null
+  pending_reminders?: ReminderItem[] | null
+}
+
+type ReminderAction = {
+  action: string
+  title: string
+}
+
+type ReminderItem = {
+  type: string
+  level: string
+  title: string
+  body: string
+  tag: string
+  fireAt: string
+  priorityScore: number
+  url?: string
+  actions?: ReminderAction[]
+  actionUrls?: Record<string, string>
 }
 
 function getEnv(name: string) {
@@ -34,6 +53,79 @@ function buildTestPayload(appBaseUrl: string) {
     renotify: true,
     requireInteraction: true,
   }
+}
+
+function sanitizeReminderAction(value: unknown): ReminderAction | null {
+  if (!value || typeof value !== 'object') return null
+  const action = String((value as Record<string, unknown>)?.action || '').trim().slice(0, 80)
+  const title = String((value as Record<string, unknown>)?.title || '').trim().slice(0, 40)
+  if (!action || !title) return null
+  return { action, title }
+}
+
+function sanitizeReminderActionUrls(value: unknown) {
+  if (!value || typeof value !== 'object') return null
+  const entries = Object.entries(value as Record<string, unknown>)
+    .map(([key, url]) => [String(key || '').trim().slice(0, 80), getSafeUrl(String(url || '').trim())] as const)
+    .filter(([key, url]) => key && url)
+  if (entries.length === 0) return null
+  return Object.fromEntries(entries)
+}
+
+function sanitizeReminderList(rawReminders: unknown, fallbackUrl: string) {
+  const source = Array.isArray(rawReminders) ? rawReminders : []
+  return source.slice(0, 12).map((raw) => {
+    const row = raw && typeof raw === 'object' ? raw as Record<string, unknown> : {}
+    const actions = Array.isArray(row.actions)
+      ? row.actions.map(sanitizeReminderAction).filter(Boolean) as ReminderAction[]
+      : []
+    return {
+      type: String(row?.type || 'general').slice(0, 30),
+      level: String(row?.level || 'gentle').slice(0, 20),
+      title: String(row?.notificationTitle || row?.title || '').slice(0, 120),
+      body: String(row?.notificationBody || row?.body || '').slice(0, 300),
+      tag: String(row?.tag || '').slice(0, 80),
+      fireAt: String(row?.fireAt || '').slice(0, 40),
+      priorityScore: Number(row?.priorityScore) || 0,
+      url: getSafeUrl(String(row?.url || fallbackUrl || '/peggy/')),
+      actions: actions.length > 0 ? actions : undefined,
+      actionUrls: sanitizeReminderActionUrls(row?.actionUrls) || undefined,
+    }
+  }).filter((item) => item.title || item.body)
+}
+
+function pickReminderPreview(reminders: ReminderItem[], limit = 4) {
+  const nowMs = Date.now()
+  const sorted = [...(Array.isArray(reminders) ? reminders : [])].sort((a, b) => {
+    const aFire = a.fireAt ? new Date(a.fireAt).getTime() : Number.POSITIVE_INFINITY
+    const bFire = b.fireAt ? new Date(b.fireAt).getTime() : Number.POSITIVE_INFINITY
+    const aDue = Number.isFinite(aFire) && aFire <= nowMs ? 0 : 1
+    const bDue = Number.isFinite(bFire) && bFire <= nowMs ? 0 : 1
+    if (aDue !== bDue) return aDue - bDue
+    if (b.priorityScore !== a.priorityScore) return b.priorityScore - a.priorityScore
+    if (aFire !== bFire) return aFire - bFire
+    return String(a.type || '').localeCompare(String(b.type || ''))
+  })
+
+  const picked: ReminderItem[] = []
+  const seenTypes = new Set<string>()
+  for (const reminder of sorted) {
+    const type = String(reminder?.type || '').trim()
+    if (type && seenTypes.has(type)) continue
+    picked.push(reminder)
+    if (type) seenTypes.add(type)
+    if (picked.length >= limit) break
+  }
+  if (picked.length < limit) {
+    const seenTags = new Set(picked.map((item) => item.tag))
+    for (const reminder of sorted) {
+      if (seenTags.has(reminder.tag)) continue
+      picked.push(reminder)
+      seenTags.add(reminder.tag)
+      if (picked.length >= limit) break
+    }
+  }
+  return picked.slice(0, limit)
 }
 
 Deno.serve(async (req) => {
@@ -155,16 +247,7 @@ Deno.serve(async (req) => {
       return jsonResponse(400, { error: 'Missing deviceId.' })
     }
 
-    const rawReminders = Array.isArray(body?.reminders) ? body.reminders : []
-    const sanitized = rawReminders.slice(0, 12).map((r: Record<string, unknown>) => ({
-      type: String(r?.type || 'general').slice(0, 30),
-      level: String(r?.level || 'gentle').slice(0, 20),
-      title: String(r?.notificationTitle || r?.title || '').slice(0, 120),
-      body: String(r?.notificationBody || r?.body || '').slice(0, 300),
-      tag: String(r?.tag || '').slice(0, 80),
-      fireAt: String(r?.fireAt || '').slice(0, 30),
-      priorityScore: Number(r?.priorityScore) || 0,
-    }))
+    const sanitized = sanitizeReminderList(body?.reminders, '/peggy/')
 
     const nowIso = new Date().toISOString()
     const { data, error } = await client
@@ -188,10 +271,11 @@ Deno.serve(async (req) => {
 
   if (action === 'send_test') {
     const targetDeviceId = String(body?.deviceId || '').trim()
+    const previewReminders = sanitizeReminderList(body?.previewReminders, '/peggy/')
 
     let query = client
       .from('push_subscriptions')
-      .select('id, device_id, endpoint, subscription, app_base_url, enabled, notif_enabled, last_seen_at')
+      .select('id, device_id, endpoint, subscription, app_base_url, pending_reminders, enabled, notif_enabled, last_seen_at')
       .eq('user_id', user.id)
     if (targetDeviceId) {
       // Manual test from a specific device should still work even when reminder toggles are OFF.
@@ -216,7 +300,7 @@ Deno.serve(async (req) => {
     if (targetDeviceId && rows.length === 0) {
       const fallback = await client
         .from('push_subscriptions')
-        .select('id, device_id, endpoint, subscription, app_base_url, enabled, notif_enabled, last_seen_at')
+        .select('id, device_id, endpoint, subscription, app_base_url, pending_reminders, enabled, notif_enabled, last_seen_at')
         .eq('user_id', user.id)
         .eq('enabled', true)
         .eq('notif_enabled', true)
@@ -234,7 +318,14 @@ Deno.serve(async (req) => {
     const errors: string[] = []
 
     for (const row of rows) {
-      const push = await sendWebPush(row.subscription, buildTestPayload(row.app_base_url || '/peggy/'))
+      const reminderSource = previewReminders.length > 0
+        ? sanitizeReminderList(previewReminders, row.app_base_url || '/peggy/')
+        : sanitizeReminderList(row.pending_reminders, row.app_base_url || '/peggy/')
+      const preview = pickReminderPreview(reminderSource, 4)
+      const payload = preview.length > 0
+        ? { reminders: preview, url: getSafeUrl(row.app_base_url || '/peggy/') }
+        : buildTestPayload(row.app_base_url || '/peggy/')
+      const push = await sendWebPush(row.subscription, payload)
       if (push.ok) {
         sent += 1
         continue
