@@ -2836,6 +2836,12 @@ ul { list-style: none; }
   align-items: flex-start;
   justify-content: space-between;
 }
+.supp-schedule-edit-actions {
+  display: flex;
+  gap: 0.45rem;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
 .supp-schedule-edit-head strong {
   display: block;
   font-size: 0.9rem;
@@ -2860,6 +2866,25 @@ ul { list-style: none; }
   font-size: 0.72rem;
   font-weight: 700;
   color: var(--text2);
+}
+.supp-flex-toggle {
+  padding: 0.36rem 0.65rem;
+  border-radius: 999px;
+  border: 1px solid var(--glass-border);
+  background: var(--glass-highlight);
+  color: var(--text2);
+  font-size: 0.68rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+.supp-flex-toggle.on {
+  color: var(--green);
+  border-color: rgba(46, 204, 113, 0.35);
+  background: rgba(46, 204, 113, 0.12);
+}
+.supp-flex-toggle.off {
+  color: var(--text2);
+  border-color: rgba(255, 255, 255, 0.14);
 }
 .input-with-action {
   display: flex;

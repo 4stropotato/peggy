@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo, useRef } from 'react'
 import { useApp } from '../AppContext'
-import { supplements, checkupSchedule, optimalSchedule } from '../data'
+import { supplements, checkupSchedule, optimalSchedule, OPTIMAL_SUPP_SCHEDULE } from '../data'
 import Calendar, { isoToDateString } from '../components/Calendar'
 import { APP_ICONS, TokenIcon, UiIcon } from '../uiIcons'
 import { getCurrentAppLocation, isNativeIos } from '../native/locationBridge'
@@ -377,6 +377,10 @@ export default function HealthTab() {
     () => supplements.filter(s => suppSchedule?.[s.id]?.enabled !== false),
     [suppSchedule]
   )
+  const editorSupplements = useMemo(
+    () => supplements.filter((s) => ['prenatal', 'dha', 'calcium', 'choline'].includes(s.id)),
+    []
+  )
   const showCalendar = useMemo(() => {
     const source = healthCalendarVisibility && typeof healthCalendarVisibility === 'object'
       ? healthCalendarVisibility
@@ -469,23 +473,41 @@ export default function HealthTab() {
   const resetSupplementTiming = (suppId) => {
     const supp = supplements.find((item) => item.id === suppId)
     if (!supp) return
+    const recommended = OPTIMAL_SUPP_SCHEDULE[suppId]
     setSuppSchedule((prev) => ({
       ...prev,
       [suppId]: {
-        enabled: prev?.[suppId]?.enabled !== false,
-        timesPerDay: supp.timesPerDay,
-        times: [...supp.defaultTimes],
+        enabled: recommended?.enabled !== false,
+        timesPerDay: recommended?.timesPerDay || supp.timesPerDay,
+        times: [...(recommended?.times || supp.defaultTimes)],
       },
     }))
+  }
+  const toggleSupplementEnabled = (suppId) => {
+    const supp = supplements.find((item) => item.id === suppId)
+    if (!supp) return
+    setSuppSchedule((prev) => {
+      const current = prev?.[suppId] || {}
+      const times = Array.isArray(current?.times) && current.times.length ? [...current.times] : [...supp.defaultTimes]
+      return {
+        ...prev,
+        [suppId]: {
+          enabled: current?.enabled === false,
+          timesPerDay: Number(current?.timesPerDay || supp.timesPerDay || times.length || 1),
+          times,
+        },
+      }
+    })
   }
   const resetAllSupplementTiming = () => {
     setSuppSchedule((prev) => {
       const next = { ...prev }
       supplements.forEach((supp) => {
+        const recommended = OPTIMAL_SUPP_SCHEDULE[supp.id]
         next[supp.id] = {
-          enabled: prev?.[supp.id]?.enabled !== false,
-          timesPerDay: supp.timesPerDay,
-          times: [...supp.defaultTimes],
+          enabled: recommended?.enabled !== false,
+          timesPerDay: recommended?.timesPerDay || supp.timesPerDay,
+          times: [...(recommended?.times || supp.defaultTimes)],
         }
       })
       return next
@@ -502,9 +524,11 @@ export default function HealthTab() {
   const prenatalTimes = getSupplementTimes('prenatal')
   const dhaTimes = getSupplementTimes('dha')
   const breakfastRule = [cholineTimes[0], prenatalTimes[0]].filter(Boolean).join(' / ') || '--:--'
+  const lunchRule = prenatalTimes[1] || '--:--'
   const calciumRule = calciumTimes.filter(Boolean).join(' / ') || '--:--'
-  const dinnerRule = [dhaTimes[0], prenatalTimes[1]].filter(Boolean).join(' / ') || '--:--'
-  const bedtimeRule = prenatalTimes[2] || prenatalTimes.at(-1) || '--:--'
+  const dinnerRule = [dhaTimes[0], prenatalTimes[2]].filter(Boolean).join(' / ') || '--:--'
+  const calciumEnabled = suppSchedule?.calcium?.enabled !== false
+  const cholineEnabled = suppSchedule?.choline?.enabled !== false
   const savedWorkTargetValid = isValidLatLng(workLocation.lat, workLocation.lng)
   const savedHomeTargetValid = isValidLatLng(workLocation.homeLat, workLocation.homeLng)
   const hasSavedGeoTarget = savedWorkTargetValid || savedHomeTargetValid
@@ -861,9 +885,11 @@ export default function HealthTab() {
                     Use Peggy recommendation
                   </button>
                 </div>
-                {activeSupplements.map((supp) => {
+                {editorSupplements.map((supp) => {
                   const schedule = suppSchedule?.[supp.id]
                   const times = Array.isArray(schedule?.times) && schedule.times.length ? schedule.times : supp.defaultTimes
+                  const isFlexible = supp.id === 'calcium' || supp.id === 'choline'
+                  const isEnabled = schedule?.enabled !== false
                   return (
                     <div key={supp.id} className="supp-schedule-edit-card glass-inner">
                       <div className="supp-schedule-edit-head">
@@ -871,13 +897,24 @@ export default function HealthTab() {
                           <strong>{supp.name}</strong>
                           <span>{supp.when}</span>
                         </div>
-                        <button
-                          type="button"
-                          className="cal-collapse-btn"
-                          onClick={() => resetSupplementTiming(supp.id)}
-                        >
-                          Reset
-                        </button>
+                        <div className="supp-schedule-edit-actions">
+                          {isFlexible && (
+                            <button
+                              type="button"
+                              className={`supp-flex-toggle ${isEnabled ? 'on' : 'off'}`}
+                              onClick={() => toggleSupplementEnabled(supp.id)}
+                            >
+                              {isEnabled ? 'On today-ready' : 'Off / food day'}
+                            </button>
+                          )}
+                          <button
+                            type="button"
+                            className="cal-collapse-btn"
+                            onClick={() => resetSupplementTiming(supp.id)}
+                          >
+                            Reset
+                          </button>
+                        </div>
                       </div>
                       <div className="supp-schedule-time-grid">
                         {times.map((time, timeIndex) => (
@@ -907,9 +944,10 @@ export default function HealthTab() {
               <p>Huwag sabayan ang Calcium at Prenatal (may iron)!</p>
               <p>Nag-aagawan sila sa absorption. Keep them 2+ hours apart.</p>
               <p><strong>Breakfast window now:</strong> {breakfastRule} for choline + prenatal #1</p>
-              <p><strong>Calcium windows now:</strong> {calciumRule} for calcium #1 and #2</p>
-              <p><strong>Dinner window now:</strong> {dinnerRule} for DHA + prenatal #2</p>
-              <p><strong>Bedtime window now:</strong> {bedtimeRule} for prenatal #3</p>
+              <p><strong>Lunch window now:</strong> {lunchRule} for prenatal #2</p>
+              <p><strong>Calcium windows now:</strong> {calciumRule} for calcium #1 and #2 {calciumEnabled ? '' : '(currently off)'}</p>
+              <p><strong>Dinner window now:</strong> {dinnerRule} for DHA + prenatal #3</p>
+              <p><strong>Flexible toggles:</strong> Choline is {cholineEnabled ? 'ON' : 'OFF'} and Calcium is {calciumEnabled ? 'ON' : 'OFF'} based on food tolerance and diet that day.</p>
             </div>
           </section>
         </>

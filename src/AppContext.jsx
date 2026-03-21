@@ -79,7 +79,15 @@ const PREVIOUS_RECOMMENDED_SUPP_SCHEDULE = Object.freeze({
   choline: { enabled: true, times: ['08:00'], timesPerDay: 1 },
   vitd: { enabled: false, times: ['12:00'], timesPerDay: 1 },
 })
-const SUPP_SCHEDULE_VERSION = 6
+const PREVIOUS_SPLIT_PRENATAL_SCHEDULE = Object.freeze({
+  prenatal: { enabled: true, times: ['08:00', '20:30', '22:00'], timesPerDay: 3 },
+  dha: { enabled: true, times: ['20:30'], timesPerDay: 1 },
+  calcium: { enabled: true, times: ['12:00', '15:00'], timesPerDay: 2 },
+  chlorella: { enabled: false, times: ['08:00'], timesPerDay: 1 },
+  choline: { enabled: true, times: ['08:00'], timesPerDay: 1 },
+  vitd: { enabled: false, times: ['12:00'], timesPerDay: 1 },
+})
+const SUPP_SCHEDULE_VERSION = 7
 const defaultHealthCalendarVisibility = Object.freeze({
   supps: true,
   work: true,
@@ -208,6 +216,9 @@ export function AppProvider({ children }) {
       setSuppSchedule(defaultSuppSchedule)
     }
     if (suppScheduleVersion === 5 && matchesScheduleTemplate(suppSchedule, PREVIOUS_RECOMMENDED_SUPP_SCHEDULE)) {
+      setSuppSchedule(defaultSuppSchedule)
+    }
+    if (suppScheduleVersion === 6 && matchesScheduleTemplate(suppSchedule, PREVIOUS_SPLIT_PRENATAL_SCHEDULE)) {
       setSuppSchedule(defaultSuppSchedule)
     }
     setSuppScheduleVersion(SUPP_SCHEDULE_VERSION)

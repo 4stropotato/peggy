@@ -856,12 +856,12 @@ export const supplementsDetailInfo = {
   ],
   schedule: [
     { time: 'BREAKFAST', supplements: 'Choline + Prenatal capsule #1', note: 'Smaller breakfast pill load. Naomi can move the reminder time in Health > Supplements.' },
-    { time: 'LUNCH', supplements: 'Calcium (1st tablet)', note: 'First calcium dose, kept away from the prenatal iron.' },
-    { time: 'MID-AFTERNOON', supplements: 'Calcium (2nd tablet)', note: 'Second calcium dose. Keep dinner free for prenatal + DHA.' },
-    { time: 'DINNER', supplements: 'Prenatal capsule #2 + DHA (2 softgels)', note: 'Main meal stack. DHA stays with food and only one prenatal capsule is paired here.' },
-    { time: 'BEDTIME', supplements: 'Prenatal capsule #3', note: 'Last prenatal capsule with a light snack before sleep.' },
+    { time: 'LUNCH', supplements: 'Prenatal capsule #2', note: 'Second prenatal capsule so the 3 daily capsules stay split instead of landing all at once.' },
+    { time: 'MID-AFTERNOON', supplements: 'Calcium (1st tablet)', note: 'First calcium dose, kept away from the prenatal iron.' },
+    { time: 'DINNER', supplements: 'Prenatal capsule #3 + DHA (2 softgels)', note: 'Main meal stack. DHA stays with food and only one prenatal capsule is paired here.' },
+    { time: 'BEDTIME', supplements: 'Calcium (2nd tablet)', note: 'Use only if 2+ hours na ang lumipas after dinner prenatal. Calcium is flexible and can stay off on food-rich calcium days.' },
   ],
-  importantRule: 'HUWAG sabayan ang calcium at prenatal (may iron). Keep 2+ hours apart. Naomi default now is breakfast choline + prenatal #1, lunch calcium, afternoon calcium, dinner DHA + prenatal #2, then prenatal #3 before bed. Actual times are editable in Health > Supplements. Extra Vitamin D3 should be lab-guided, not automatic.',
+  importantRule: 'HUWAG sabayan ang calcium at prenatal (may iron). Keep 2+ hours apart. Naomi default now is breakfast choline + prenatal #1, lunch prenatal #2, 3PM calcium, dinner DHA + prenatal #3, then bedtime calcium only if enough gap. Choline and calcium can be toggled off on better food days. Actual times are editable in Health > Supplements. Extra Vitamin D3 should be lab-guided, not automatic.',
   budgetCart: {
     title: 'Budget iHerb Cart',
     total: '~$70-90 (usually JPY 10,500-13,000)',

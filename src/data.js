@@ -815,16 +815,16 @@ export const supplements = [
     id: 'prenatal',
     name: 'Prenatal Multivitamin',
     product: 'Thorne, Basic Prenatal, 90 Capsules',
-    when: 'Split across breakfast, dinner, and bedtime snack',
+    when: 'Split across morning, lunch, and dinner',
     why: 'Folate + iron + iodine + B-vitamin foundation',
     icon: '💊',
     timesPerDay: 3,
-    defaultTimes: ['08:00', '20:30', '22:00'],
+    defaultTimes: ['08:00', '12:00', '20:30'],
     bottleSize: 90,
     perDose: 1,
     price: 4149,
-    note: 'Take 1 capsule at a time with real food or a light snack until all 3 capsules are finished for the day. Keep each prenatal dose 2+ hours away from calcium.',
-    dosageInfo: '3 capsules daily total = 1 capsule at breakfast + 1 capsule with dinner + 1 capsule before bed. One bottle still lasts about 30 days.',
+    note: 'Take 1 capsule at a time with real food until all 3 capsules are finished for the day. Keep each prenatal dose 2+ hours away from calcium.',
+    dosageInfo: '3 capsules daily total = 1 capsule in the morning + 1 capsule at lunch + 1 capsule with dinner. One bottle still lasts about 30 days.',
     warnings: 'Contains high iron. Keep each prenatal capsule 2+ hours away from calcium and do not add extra iron unless advised by OB-GYN.',
     explanation: 'Ang prenatal multivitamin ang base ng lahat. Ang Thorne version ay may methylated folate (L-5-MTHF) na mas mabilis ma-absorb kumpara sa regular folic acid. May iron din para sa blood production (dadami ang blood mo ng 50% during pregnancy!). Since 3 capsules per day siya, puwedeng split into 3 smaller doses para mas gentle sa tiyan ni Naomi.',
     budgetAlt: 'Nature Made Prenatal Multi + DHA (¥1,500, 90 days supply, 1/day) — same core nutrients, 8x cheaper per day!'
@@ -851,16 +851,16 @@ export const supplements = [
     id: 'calcium',
     name: 'Calcium Citrate + D3 (No Zinc)',
     product: '21st Century, Calcium Citrate + D3, 120 Tablets',
-    when: 'Lunch AND mid-afternoon (split dose, 2+ hours away from prenatal)',
+    when: 'Mid-afternoon AND before bed (only if 2+ hours away from dinner prenatal)',
     why: 'Bone support without stacking extra zinc',
     icon: '🦴',
     timesPerDay: 2,
-    defaultTimes: ['12:00', '15:00'],
+    defaultTimes: ['15:00', '23:00'],
     bottleSize: 120,
     perDose: 1,
     price: 1599,
-    note: 'Prefer calcium-only or calcium + D3 formula without added zinc. Keep 2+ hours away from prenatal iron.',
-    dosageInfo: '1 tablet at LUNCH + 1 tablet at MID-AFTERNOON. Adjust total amount based on dietary calcium and OB-GYN advice.',
+    note: 'Prefer calcium-only or calcium + D3 formula without added zinc. Keep 2+ hours away from prenatal iron. This one is flexible and can be turned off on food-rich calcium days.',
+    dosageInfo: '1 tablet at 3PM + 1 tablet before bed only if 2+ hours na ang lumipas after dinner prenatal. Adjust total amount based on dietary calcium and OB-GYN advice.',
     warnings: 'HUWAG sabayan ng Prenatal vitamin! Calcium and iron compete for absorption. Keep at least 2 hours apart.',
     explanation: 'Goal is to close the calcium gap from food, not mega-dose. If food calcium is already high, lower supplemental dose may be enough.',
     budgetAlt: null
@@ -895,7 +895,7 @@ export const supplements = [
     bottleSize: 100,
     perDose: 1,
     price: 1450,
-    note: 'Use plain choline form. Aim total intake (food + supplement) near pregnancy target, not megadoses.',
+    note: 'Use plain choline form. Aim total intake (food + supplement) near pregnancy target, not megadoses. This one is flexible and can be turned off on good egg / protein days.',
     dosageInfo: '1 capsule daily with food. Count egg/food intake first, then top up only what is missing.',
     warnings: 'Food-first approach is best. No need to stack multiple choline products.',
     explanation: 'Most practical approach: food + simple choline top-up. Eggs, fish, meat, and dairy already contribute a lot.',
@@ -1209,9 +1209,9 @@ export const taglishTips = [
 
 // Peggy recommended supplement schedule (used by AppContext as default)
 export const OPTIMAL_SUPP_SCHEDULE = {
-  prenatal:  { enabled: true, times: ['08:00', '20:30', '22:00'], timesPerDay: 3 },
+  prenatal:  { enabled: true, times: ['08:00', '12:00', '20:30'], timesPerDay: 3 },
   dha:       { enabled: true, times: ['20:30'], timesPerDay: 1 },
-  calcium:   { enabled: true, times: ['12:00', '15:00'], timesPerDay: 2 },
+  calcium:   { enabled: true, times: ['15:00', '23:00'], timesPerDay: 2 },
   chlorella: { enabled: false, times: ['08:00'], timesPerDay: 1 },
   choline:   { enabled: true, times: ['08:00'], timesPerDay: 1 },
   vitd:      { enabled: false, times: ['12:00'], timesPerDay: 1 },
@@ -1229,30 +1229,30 @@ export const optimalSchedule = [
   {
     time: '12:00 - LUNCH',
     icon: '??',
-    supps: ['Calcium (1st tablet)'],
-    note: 'First calcium dose goes here so it stays clear of the prenatal iron.',
-    tagNote: 'Lunch: calcium #1.'
+    supps: ['Prenatal capsule #2'],
+    note: 'Second prenatal capsule with lunch so the daily 3-caps schedule is split more gently.',
+    tagNote: 'Lunch: prenatal #2.'
   },
   {
     time: '15:00 - MID-AFTERNOON',
     icon: '??',
-    supps: ['Calcium (2nd tablet)'],
-    note: 'Second calcium dose. Gives another clean gap before dinner prenatal.',
-    tagNote: 'Afternoon: calcium #2.'
+    supps: ['Calcium (1st tablet)'],
+    note: 'First calcium dose goes here so it stays clear of the lunch and dinner prenatal iron.',
+    tagNote: 'Afternoon: calcium #1.'
   },
   {
     time: '20:30 - DINNER',
     icon: '??',
-    supps: ['Prenatal capsule #2', 'DHA (2 softgels)'],
+    supps: ['Prenatal capsule #3', 'DHA (2 softgels)'],
     note: 'Main meal stack for Naomi. DHA needs food/fat, and only one prenatal capsule is paired here.',
-    tagNote: 'Dinner: DHA + prenatal #2. Change the time if Naomi gets home later.'
+    tagNote: 'Dinner: DHA + prenatal #3. Change the time if Naomi gets home later.'
   },
   {
-    time: '22:00 - BEDTIME SNACK',
+    time: '23:00 - BEDTIME',
     icon: '??',
-    supps: ['Prenatal capsule #3'],
-    note: 'Last prenatal capsule with a light snack before sleep.',
-    tagNote: 'Bedtime: prenatal #3 with snack.'
+    supps: ['Calcium (2nd tablet)'],
+    note: 'Second calcium dose only if 2+ hours na ang lumipas after dinner prenatal.',
+    tagNote: 'Bedtime: calcium #2 only if enough gap after dinner.'
   }
 ]
 
