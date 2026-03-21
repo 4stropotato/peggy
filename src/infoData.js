@@ -855,11 +855,13 @@ export const supplementsDetailInfo = {
     }
   ],
   schedule: [
-    { time: 'BREAKFAST', supplements: 'Choline + Calcium (1st tablet)', note: 'Light breakfast stack. Keeps prenatal away from calcium. Naomi can move the reminder time in Health > Supplements.' },
-    { time: 'LUNCH', supplements: 'Calcium (2nd tablet)', note: 'Second calcium dose. Keep dinner free for prenatal + DHA.' },
-    { time: 'DINNER', supplements: 'Prenatal Multi (3 capsules) + DHA (2 softgels)', note: 'Best meal-only setup if mornings are rough. Default dinner recommendation is later now, and Naomi can edit it anytime.' },
+    { time: 'BREAKFAST', supplements: 'Choline + Prenatal capsule #1', note: 'Smaller breakfast pill load. Naomi can move the reminder time in Health > Supplements.' },
+    { time: 'LUNCH', supplements: 'Calcium (1st tablet)', note: 'First calcium dose, kept away from the prenatal iron.' },
+    { time: 'MID-AFTERNOON', supplements: 'Calcium (2nd tablet)', note: 'Second calcium dose. Keep dinner free for prenatal + DHA.' },
+    { time: 'DINNER', supplements: 'Prenatal capsule #2 + DHA (2 softgels)', note: 'Main meal stack. DHA stays with food and only one prenatal capsule is paired here.' },
+    { time: 'BEDTIME', supplements: 'Prenatal capsule #3', note: 'Last prenatal capsule with a light snack before sleep.' },
   ],
-  importantRule: 'HUWAG sabayan ang calcium at prenatal (may iron). Keep 2+ hours apart. Naomi default now is breakfast choline/calcium, lunch calcium, then later dinner prenatal + DHA. Actual times are editable in Health > Supplements. Extra Vitamin D3 should be lab-guided, not automatic.',
+  importantRule: 'HUWAG sabayan ang calcium at prenatal (may iron). Keep 2+ hours apart. Naomi default now is breakfast choline + prenatal #1, lunch calcium, afternoon calcium, dinner DHA + prenatal #2, then prenatal #3 before bed. Actual times are editable in Health > Supplements. Extra Vitamin D3 should be lab-guided, not automatic.',
   budgetCart: {
     title: 'Budget iHerb Cart',
     total: '~$70-90 (usually JPY 10,500-13,000)',

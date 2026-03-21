@@ -815,18 +815,18 @@ export const supplements = [
     id: 'prenatal',
     name: 'Prenatal Multivitamin',
     product: 'Thorne, Basic Prenatal, 90 Capsules',
-    when: 'Dinner with food',
+    when: 'Split across breakfast, dinner, and bedtime snack',
     why: 'Folate + iron + iodine + B-vitamin foundation',
     icon: '💊',
-    timesPerDay: 1,
-    defaultTimes: ['20:30'],
+    timesPerDay: 3,
+    defaultTimes: ['08:00', '20:30', '22:00'],
     bottleSize: 90,
-    perDose: 3,
+    perDose: 1,
     price: 4149,
-    note: 'Take 3 capsules with dinner or the largest meal Naomi can keep down. Naomi can move the time in Peggy if her real dinner runs later.',
-    dosageInfo: '3 capsules daily with dinner. Serving size = 3 caps, kaya 30 days lang ang isang bottle.',
-    warnings: 'Contains high iron. Keep 2+ hours away from calcium and do not add extra iron unless advised by OB-GYN.',
-    explanation: 'Ang prenatal multivitamin ang base ng lahat. Ang Thorne version ay may methylated folate (L-5-MTHF) na mas mabilis ma-absorb kumpara sa regular folic acid. May iron din para sa blood production (dadami ang blood mo ng 50% during pregnancy!). 3 capsules per serving kaya 30 days lang per bottle.',
+    note: 'Take 1 capsule at a time with real food or a light snack until all 3 capsules are finished for the day. Keep each prenatal dose 2+ hours away from calcium.',
+    dosageInfo: '3 capsules daily total = 1 capsule at breakfast + 1 capsule with dinner + 1 capsule before bed. One bottle still lasts about 30 days.',
+    warnings: 'Contains high iron. Keep each prenatal capsule 2+ hours away from calcium and do not add extra iron unless advised by OB-GYN.',
+    explanation: 'Ang prenatal multivitamin ang base ng lahat. Ang Thorne version ay may methylated folate (L-5-MTHF) na mas mabilis ma-absorb kumpara sa regular folic acid. May iron din para sa blood production (dadami ang blood mo ng 50% during pregnancy!). Since 3 capsules per day siya, puwedeng split into 3 smaller doses para mas gentle sa tiyan ni Naomi.',
     budgetAlt: 'Nature Made Prenatal Multi + DHA (¥1,500, 90 days supply, 1/day) — same core nutrients, 8x cheaper per day!'
   },
   {
@@ -851,16 +851,16 @@ export const supplements = [
     id: 'calcium',
     name: 'Calcium Citrate + D3 (No Zinc)',
     product: '21st Century, Calcium Citrate + D3, 120 Tablets',
-    when: 'Breakfast AND lunch (split dose, 2+ hours away from prenatal)',
+    when: 'Lunch AND mid-afternoon (split dose, 2+ hours away from prenatal)',
     why: 'Bone support without stacking extra zinc',
     icon: '🦴',
     timesPerDay: 2,
-    defaultTimes: ['08:00', '12:00'],
+    defaultTimes: ['12:00', '15:00'],
     bottleSize: 120,
     perDose: 1,
     price: 1599,
     note: 'Prefer calcium-only or calcium + D3 formula without added zinc. Keep 2+ hours away from prenatal iron.',
-    dosageInfo: '1 tablet at BREAKFAST + 1 tablet at LUNCH. Adjust total amount based on dietary calcium and OB-GYN advice.',
+    dosageInfo: '1 tablet at LUNCH + 1 tablet at MID-AFTERNOON. Adjust total amount based on dietary calcium and OB-GYN advice.',
     warnings: 'HUWAG sabayan ng Prenatal vitamin! Calcium and iron compete for absorption. Keep at least 2 hours apart.',
     explanation: 'Goal is to close the calcium gap from food, not mega-dose. If food calcium is already high, lower supplemental dose may be enough.',
     budgetAlt: null
@@ -1209,9 +1209,9 @@ export const taglishTips = [
 
 // Peggy recommended supplement schedule (used by AppContext as default)
 export const OPTIMAL_SUPP_SCHEDULE = {
-  prenatal:  { enabled: true, times: ['20:30'], timesPerDay: 1 },
+  prenatal:  { enabled: true, times: ['08:00', '20:30', '22:00'], timesPerDay: 3 },
   dha:       { enabled: true, times: ['20:30'], timesPerDay: 1 },
-  calcium:   { enabled: true, times: ['08:00', '12:00'], timesPerDay: 2 },
+  calcium:   { enabled: true, times: ['12:00', '15:00'], timesPerDay: 2 },
   chlorella: { enabled: false, times: ['08:00'], timesPerDay: 1 },
   choline:   { enabled: true, times: ['08:00'], timesPerDay: 1 },
   vitd:      { enabled: false, times: ['12:00'], timesPerDay: 1 },
@@ -1222,23 +1222,37 @@ export const optimalSchedule = [
   {
     time: '08:00 - BREAKFAST',
     icon: '??',
-    supps: ['Choline', 'Calcium (1st tablet)'],
-    note: 'Breakfast-only light stack. Choline is flexible, and first calcium dose starts the day without touching the prenatal iron.',
-    tagNote: 'Breakfast: choline + calcium muna. No prenatal yet.'
+    supps: ['Choline', 'Prenatal capsule #1'],
+    note: 'Start with the smallest useful pair. Choline is flexible, and one prenatal capsule is easier than all 3 at once.',
+    tagNote: 'Breakfast: choline + prenatal #1 muna.'
   },
   {
     time: '12:00 - LUNCH',
     icon: '??',
+    supps: ['Calcium (1st tablet)'],
+    note: 'First calcium dose goes here so it stays clear of the prenatal iron.',
+    tagNote: 'Lunch: calcium #1.'
+  },
+  {
+    time: '15:00 - MID-AFTERNOON',
+    icon: '??',
     supps: ['Calcium (2nd tablet)'],
-    note: 'Second calcium dose with lunch. This keeps the full calcium serving far from the prenatal later at dinner.',
-    tagNote: 'Lunch calcium ulit. Keep dinner free for prenatal + DHA.'
+    note: 'Second calcium dose. Gives another clean gap before dinner prenatal.',
+    tagNote: 'Afternoon: calcium #2.'
   },
   {
     time: '20:30 - DINNER',
     icon: '??',
-    supps: ['Prenatal Multivitamin', 'DHA (2 softgels)'],
-    note: 'Main meal stack for Naomi. DHA needs food/fat, and prenatal is better here if she cannot keep it down earlier in the day.',
-    tagNote: 'Dinner: prenatal + DHA. Change the time if Naomi gets home later.'
+    supps: ['Prenatal capsule #2', 'DHA (2 softgels)'],
+    note: 'Main meal stack for Naomi. DHA needs food/fat, and only one prenatal capsule is paired here.',
+    tagNote: 'Dinner: DHA + prenatal #2. Change the time if Naomi gets home later.'
+  },
+  {
+    time: '22:00 - BEDTIME SNACK',
+    icon: '??',
+    supps: ['Prenatal capsule #3'],
+    note: 'Last prenatal capsule with a light snack before sleep.',
+    tagNote: 'Bedtime: prenatal #3 with snack.'
   }
 ]
 

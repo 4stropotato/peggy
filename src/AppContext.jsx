@@ -71,7 +71,15 @@ const LEGACY_MEAL_ONLY_SUPP_SCHEDULE = Object.freeze({
   choline: { enabled: true, times: ['08:00'], timesPerDay: 1 },
   vitd: { enabled: false, times: ['12:00'], timesPerDay: 1 },
 })
-const SUPP_SCHEDULE_VERSION = 5
+const PREVIOUS_RECOMMENDED_SUPP_SCHEDULE = Object.freeze({
+  prenatal: { enabled: true, times: ['20:30'], timesPerDay: 1 },
+  dha: { enabled: true, times: ['20:30'], timesPerDay: 1 },
+  calcium: { enabled: true, times: ['08:00', '12:00'], timesPerDay: 2 },
+  chlorella: { enabled: false, times: ['08:00'], timesPerDay: 1 },
+  choline: { enabled: true, times: ['08:00'], timesPerDay: 1 },
+  vitd: { enabled: false, times: ['12:00'], timesPerDay: 1 },
+})
+const SUPP_SCHEDULE_VERSION = 6
 const defaultHealthCalendarVisibility = Object.freeze({
   supps: true,
   work: true,
@@ -197,6 +205,9 @@ export function AppProvider({ children }) {
       return
     }
     if (suppScheduleVersion === 4 && matchesScheduleTemplate(suppSchedule, LEGACY_MEAL_ONLY_SUPP_SCHEDULE)) {
+      setSuppSchedule(defaultSuppSchedule)
+    }
+    if (suppScheduleVersion === 5 && matchesScheduleTemplate(suppSchedule, PREVIOUS_RECOMMENDED_SUPP_SCHEDULE)) {
       setSuppSchedule(defaultSuppSchedule)
     }
     setSuppScheduleVersion(SUPP_SCHEDULE_VERSION)

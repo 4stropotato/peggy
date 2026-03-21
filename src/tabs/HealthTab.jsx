@@ -501,9 +501,10 @@ export default function HealthTab() {
   const cholineTimes = getSupplementTimes('choline')
   const prenatalTimes = getSupplementTimes('prenatal')
   const dhaTimes = getSupplementTimes('dha')
-  const breakfastRule = [cholineTimes[0], calciumTimes[0]].filter(Boolean).join(' / ')
-  const lunchRule = calciumTimes[1] || calciumTimes[0] || '--:--'
-  const dinnerRule = Array.from(new Set([...prenatalTimes, ...dhaTimes].filter(Boolean))).join(' / ') || '--:--'
+  const breakfastRule = [cholineTimes[0], prenatalTimes[0]].filter(Boolean).join(' / ') || '--:--'
+  const calciumRule = calciumTimes.filter(Boolean).join(' / ') || '--:--'
+  const dinnerRule = [dhaTimes[0], prenatalTimes[1]].filter(Boolean).join(' / ') || '--:--'
+  const bedtimeRule = prenatalTimes[2] || prenatalTimes.at(-1) || '--:--'
   const savedWorkTargetValid = isValidLatLng(workLocation.lat, workLocation.lng)
   const savedHomeTargetValid = isValidLatLng(workLocation.homeLat, workLocation.homeLng)
   const hasSavedGeoTarget = savedWorkTargetValid || savedHomeTargetValid
@@ -905,9 +906,10 @@ export default function HealthTab() {
             <div className="glass-card warn-card">
               <p>Huwag sabayan ang Calcium at Prenatal (may iron)!</p>
               <p>Nag-aagawan sila sa absorption. Keep them 2+ hours apart.</p>
-              <p><strong>Breakfast window now:</strong> {breakfastRule || '--:--'} for choline + first calcium</p>
-              <p><strong>Lunch window now:</strong> {lunchRule} for second calcium</p>
-              <p><strong>Dinner window now:</strong> {dinnerRule} for prenatal + DHA</p>
+              <p><strong>Breakfast window now:</strong> {breakfastRule} for choline + prenatal #1</p>
+              <p><strong>Calcium windows now:</strong> {calciumRule} for calcium #1 and #2</p>
+              <p><strong>Dinner window now:</strong> {dinnerRule} for DHA + prenatal #2</p>
+              <p><strong>Bedtime window now:</strong> {bedtimeRule} for prenatal #3</p>
             </div>
           </section>
         </>
