@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 920 280" role="img" aria-labelledby="t d">
+  <title id="t">Peggy Logo 05 Wordmark</title>
+  <desc id="d">Horizontal wordmark with icon and tagline.</desc>
+  <defs>
+    <linearGradient id="g5" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#ff5fa2"/>
+      <stop offset="100%" stop-color="#7b6dff"/>
+    </linearGradient>
+  </defs>
+  <rect width="920" height="280" rx="44" fill="#120f1a"/>
+  <rect x="36" y="36" width="208" height="208" rx="56" fill="url(#g5)"/>
+  <path d="M102 186V92h62c35 0 57 20 57 48s-22 47-57 47h-36" fill="none" stroke="#fff" stroke-width="16" stroke-linecap="round" stroke-linejoin="round"/>
+  <text x="284" y="146" font-family="Segoe UI, Arial, sans-serif" font-size="96" font-weight="800" fill="#ffffff">Peggy</text>
+  <text x="286" y="188" font-family="Segoe UI, Arial, sans-serif" font-size="26" font-weight="600" fill="#b8b2d1" letter-spacing="1.2">PREGNANCY COMPANION</text>
+</svg>
