@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-labelledby="t d">
+  <title id="t">Peggy Logo 03 Monogram</title>
+  <desc id="d">Minimal monogram icon using P and G ligature.</desc>
+  <rect width="512" height="512" rx="112" fill="#12161f"/>
+  <rect x="58" y="58" width="396" height="396" rx="88" fill="#1d2433" stroke="#4b77ff" stroke-width="4"/>
+  <path d="M170 354V156h128c56 0 92 33 92 83 0 49-36 82-92 82h-66" fill="none" stroke="#7ad2ff" stroke-width="28" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M330 282h58v72h-72" fill="none" stroke="#7ad2ff" stroke-width="24" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>

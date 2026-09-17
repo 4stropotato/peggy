@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-labelledby="t d">
+  <title id="t">Peggy Logo 06 Crest</title>
+  <desc id="d">Shield crest with abstract leaf and star.</desc>
+  <defs>
+    <linearGradient id="g6" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#ffe7f1"/>
+      <stop offset="100%" stop-color="#ffeef6"/>
+    </linearGradient>
+  </defs>
+  <rect width="512" height="512" rx="110" fill="#f6f2ff"/>
+  <path d="M256 86l160 52v118c0 90-57 143-160 170-103-27-160-80-160-170V138z" fill="url(#g6)" stroke="#6f4be9" stroke-width="12"/>
+  <path d="M176 282c57-7 103-51 120-114 10 56-18 126-74 166-22-15-37-32-46-52z" fill="#d95b9a"/>
+  <path d="M312 238l8 18 20 3-15 13 3 20-16-10-16 10 3-20-15-13 20-3z" fill="#6f4be9"/>
+</svg>
