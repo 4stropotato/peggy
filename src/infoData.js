@@ -80,6 +80,87 @@ export const kawasakiInfo = {
 
 export const governmentSupportInfo = [
   {
+    phase: 'Zeon - dated steps (born 2026-09-12)',
+    icon: '\u{1F5D3}',
+    items: [
+      {
+        title: '1. Child Allowance (\u5150\u7ae5\u624b\u5f53) - APPLY BY 2026-09-30',
+        value: 'Missing the month costs \u00a515,000',
+        details: [
+          'Payment starts the month AFTER the month you apply. Apply in September, paid from October. Apply on October 1, paid from November and September plus October are gone.',
+          'The 15-day grace that would have let an early-October filing still count as September expired on 2026-09-27 (a Sunday, so the 28th). September 30 is the real edge.',
+          'Under age 3: \u00a515,000 per month. No income limit since the 2024 reform.',
+          'Where: \u533a\u5f79\u6240\u533a\u6c11\u8ab2. Do it in the same visit as the medical certificate below.',
+          'If it is already done, ignore this and tick it off.'
+        ]
+      },
+      {
+        title: '2. Child Medical Certificate (\u5c0f\u5150\u533b\u7642\u8a3c) - now that the insurance card is in hand',
+        value: 'Free medical care, 0 to high-school age in Kawasaki',
+        details: [
+          'This is what the health insurance card unlocks. Covers outpatient, inpatient and prescriptions.',
+          'Bring: your My Number card, Zeon\u2019s My Number card or \u8cc7\u683c\u78ba\u8a8d\u66f8, and the health insurance \u8cc7\u683c\u78ba\u8a8d\u66f8.',
+          'GOTCHA: if your \u5e02\u6c11\u7a0e\u6240\u5f97\u5272 is non-taxable you must bring proof of that specifically. A \u5150\u7ae5\u624b\u5f53 certificate does not show it, and without it you do not get the full subsidy.',
+          'Any doctor visit before the card arrives is refundable later. Keep every receipt.'
+        ]
+      },
+      {
+        title: '3. Birth half of the Support Grant (\u51fa\u7523\u30fb\u5b50\u80b2\u3066\u5fdc\u63f4\u7d66\u4ed8\u91d1)',
+        value: '\u00a550,000',
+        details: [
+          'The second half, paid after birth registration.',
+          'It requires the \u9762\u8ac7 consultation, normally done at the \u65b0\u751f\u5150\u8a2a\u554f home visit.',
+          'No consultation, no money. Make sure that visit is actually booked.'
+        ]
+      },
+      {
+        title: '4. Childbirth Lump Sum (\u51fa\u7523\u80b2\u5150\u4e00\u6642\u91d1) - check the difference',
+        value: '\u00a5500,000, plus possible extras',
+        details: [
+          'You are on \u5efa\u8a2d\u56fd\u4fdd, not \u5354\u4f1a\u3051\u3093\u307d, so this comes from your association and not the usual route.',
+          'If the hospital used \u76f4\u63a5\u652f\u6255 and the bill came under \u00a5500,000, the difference is yours but you have to claim it (\u5dee\u984d\u8acb\u6c42).',
+          'Ask the association whether they add a \u4ed8\u52a0\u7d66\u4ed8 on top. Some do and nobody tells you.'
+        ]
+      },
+      {
+        title: '5. Father\u2019s Leave (\u7523\u5f8c\u30d1\u30d1\u80b2\u4f11) - window closes 2026-11-07',
+        value: 'Biggest remaining money item',
+        details: [
+          'Must be taken within 8 weeks of birth, so by 2026-11-07.',
+          'Employers normally need 2 weeks notice, so decide by about 2026-10-24.',
+          'Paid through employment insurance. With both parents taking leave the 2025 rules can top it up close to full pay for 28 days.',
+          'Even a short block is worth claiming.'
+        ]
+      },
+      {
+        title: '6. Health checks and vaccinations',
+        value: 'Free, but they are date-driven',
+        details: [
+          '1-month checkup: around 2026-10-12.',
+          'Vaccinations start at 2 months: around 2026-11-12. The \u4e88\u8a3a\u7968 arrive by post.',
+          'If the post has not arrived a week before, call the ward office rather than wait.'
+        ]
+      },
+      {
+        title: '7. Philippine Embassy Report of Birth',
+        value: 'Easier now than later',
+        details: [
+          'Report the birth to the embassy while the documents are fresh.',
+          'It matters for his passport and for dual citizenship later.',
+          'Late registration means extra paperwork, so do not let it drift.'
+        ]
+      },
+      {
+        title: '8. Year-end tax adjustment (\u5e74\u672b\u8abf\u6574) - November to December',
+        value: 'Lowers this year\u2019s tax',
+        details: [
+          'Add Zeon as a dependent on the \u6276\u990a\u63a7\u9664\u7533\u544a\u66f8 when the employer hands it out.',
+          'Keep all birth-related medical receipts for \u533b\u7642\u8cbb\u63a7\u9664. The threshold is reachable in a birth year.'
+        ]
+      }
+    ]
+  },
+  {
     phase: 'Pregnancy (ASAP)',
     icon: '🤰',
     items: [
