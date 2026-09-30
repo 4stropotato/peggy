@@ -84,14 +84,29 @@ export const governmentSupportInfo = [
     icon: '\u{1F5D3}',
     items: [
       {
+        title: '0. Ward office visit - bring this, in one trip',
+        value: 'Both items in one trip',
+        details: [
+          'Ward office hours 8:30 to 17:00, weekdays. It must be the \u533a\u5f79\u6240, not a \u51fa\u5f35\u6240.',
+          'BRING: your My Number card / something showing your spouse\u2019s My Number (both parents are required) / bankbook or cash card in YOUR name / the child\u2019s health insurance \u8cc7\u683c\u78ba\u8a8d\u66f8 / the child\u2019s My Number card / \u6bcd\u5b50\u5065\u5eb7\u624b\u5e33 / the \u5fa1\u6848\u5185 sheet from the counter / hanko just in case.',
+          'DESK 1, allowance: \u533a\u6c11\u8ab2 \u4f4f\u6c11\u8a18\u9332\u7b2c2\u4fc2. Say: jidou teate no nintei seikyuu o onegaishimasu.',
+          'DESK 2, medical certificate: \u4fdd\u967a\u5e74\u91d1\u8ab2 \u5f8c\u671f\u30fb\u4ecb\u8b77\u30fb\u533b\u7642\u8cbb\u52a9\u6210\u62c5\u5f53. Say: shouni iryoushou no koufu shinsei mo onegaishimasu.',
+          'ASK: shikyuu wa raigetsu-bun kara ni narimasu ka (confirms you did not lose a month) / hoka ni tarinai shorui wa arimasu ka / shouni iryoushou wa itsu todokimasu ka.',
+          'BEFORE LEAVING: get the dated receipt copy, photograph it, and check the bank account they registered. That date proves which month you filed in.',
+          'The counter needs no card password, so nothing can lock. That is why it beats the app when a deadline is close.'
+        ]
+      },
+      {
         title: '1. Child Allowance (\u5150\u7ae5\u624b\u5f53) - APPLY BY 2026-09-30',
         value: 'Missing the month costs \u00a515,000',
         details: [
           'Payment starts the month AFTER the month you apply. Apply in September, paid from October. Apply on October 1, paid from November and September plus October are gone.',
           'The 15-day grace that would have let an early-October filing still count as September expired on 2026-09-27 (a Sunday, so the 28th). September 30 is the real edge.',
           'Under age 3: \u00a515,000 per month. No income limit since the 2024 reform.',
-          'Where: \u533a\u5f79\u6240\u533a\u6c11\u8ab2. Do it in the same visit as the medical certificate below.',
-          'If it is already done, ignore this and tick it off.'
+          'Desk: \u533a\u5f79\u6240 \u533a\u6c11\u8ab2 \u4f4f\u6c11\u8a18\u9332\u7b2c2\u4fc2. A \u51fa\u5f35\u6240 branch office cannot accept it.',
+          'Applicant must be the main earner (\u751f\u8a08\u4e2d\u5fc3\u8005), and the bank account must be in that same name.',
+          'Online caveat: a My Number card for anyone under 15 has no signing certificate, so the child\u2019s card cannot sign the application. Log in with the parent\u2019s card.',
+          'If it turns out to be already filed, apply anyway. A duplicate is sorted out by the city; not applying is the only move that costs money.'
         ]
       },
       {
@@ -100,8 +115,12 @@ export const governmentSupportInfo = [
         details: [
           'This is what the health insurance card unlocks. Covers outpatient, inpatient and prescriptions.',
           'Bring: your My Number card, Zeon\u2019s My Number card or \u8cc7\u683c\u78ba\u8a8d\u66f8, and the health insurance \u8cc7\u683c\u78ba\u8a8d\u66f8.',
-          'GOTCHA: if your \u5e02\u6c11\u7a0e\u6240\u5f97\u5272 is non-taxable you must bring proof of that specifically. A \u5150\u7ae5\u624b\u5f53 certificate does not show it, and without it you do not get the full subsidy.',
-          'Any doctor visit before the card arrives is refundable later. Keep every receipt.'
+          'The clerk marked this with a triangle, not a circle. Triangle means conditional: it was waiting on the child\u2019s health insurance. That condition is now met.',
+          'No income limit, and from September 2026 Kawasaki abolished the per-visit copay. The old \u5e02\u6c11\u7a0e\u6240\u5f97\u5272 non-taxable proof is no longer needed. Ignore any advice that still asks for it.',
+          'Desk: \u4fdd\u967a\u5e74\u91d1\u8ab2 \u5f8c\u671f\u30fb\u4ecb\u8b77\u30fb\u533b\u7642\u8cbb\u52a9\u6210\u62c5\u5f53. Different desk from the allowance, same building.',
+          'Online instead: \u3074\u3063\u305f\u308a\u30b5\u30fc\u30d3\u30b9, keyword \u5c0f\u5150\u533b\u7642. Attach the image of the \u8cc7\u683c\u78ba\u8a8d\u66f8 rather than using the child\u2019s My Number, or the city waits for the employer\u2019s insurer to link the number first.',
+          'Card arrives about 5 working days after they confirm the insurance. Centre: 044-222-6211.',
+          'Any doctor visit before the card arrives is refundable: \u511f\u9084\u6255\u3044, claimable for 5 years from the month after the visit. Keep every receipt showing name, date, clinic and amount.'
         ]
       },
       {
